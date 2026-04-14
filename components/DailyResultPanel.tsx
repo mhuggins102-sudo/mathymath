@@ -47,13 +47,7 @@ export function DailyResultPanel({
         {!won && (
           <p className="text-muted text-sm mt-1">
             Target was{" "}
-            <span className="font-mono font-bold">
-              {[...target].map((d, i) => (
-                <span key={i} className={`digit-${d}`}>
-                  {d}
-                </span>
-              ))}
-            </span>
+            <span className="font-mono font-bold text-foreground">{target}</span>
           </p>
         )}
       </div>

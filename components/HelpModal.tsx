@@ -1,8 +1,7 @@
 "use client";
 
 import { CLUES } from "@/lib/game/clues/registry";
-import { ClueBadge } from "./ClueBadge";
-import { Digit } from "./Digit";
+import { GuessRow } from "./GuessRow";
 
 interface HelpModalProps {
   open: boolean;
@@ -33,24 +32,26 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 
         <div className="space-y-3 text-sm text-muted leading-relaxed mb-6">
           <p>
-            Guess the secret 5-digit number in 8 tries. Digits can repeat (e.g., <span className="digit-7 font-mono">7</span><span className="digit-4 font-mono">4</span><span className="digit-7 font-mono">7</span><span className="digit-2 font-mono">2</span><span className="digit-7 font-mono">7</span>).
+            Guess the secret 5-digit number in 8 tries. Digits can repeat
+            (e.g. <span className="font-mono text-foreground">74727</span>).
           </p>
           <p>
-            After each guess you&apos;ll be offered <strong className="text-foreground">two clue options</strong>. Pick the one that will help you most. Some clues tell you about specific slots (<span className="text-accent">positional</span>), others about the whole number (<span className="text-warn">compositional</span>).
+            After each guess you&apos;ll be offered{" "}
+            <strong className="text-foreground">two clue options</strong>.
+            Pick the one that will help you most. <span className="text-accent">Positional</span> clues
+            color the cells; <span className="text-warn">compositional</span> clues tell you something
+            about the whole number.
           </p>
           <p>
-            Typical game takes 4–6 guesses. Plan your clues.
+            A clue type can only be chosen once per game — used types won&apos;t
+            appear as future options.
           </p>
         </div>
 
         <h3 className="text-sm uppercase tracking-wider text-muted mb-3">
-          Clue types — example target{" "}
-          <span className="font-mono font-bold">
-            {[...EXAMPLE_TARGET].map((d, i) => (
-              <span key={i} className={`digit-${d}`}>
-                {d}
-              </span>
-            ))}
+          Clue reference — example target{" "}
+          <span className="font-mono font-bold text-foreground">
+            {EXAMPLE_TARGET}
           </span>
         </h3>
 
@@ -62,8 +63,8 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                 key={clue.id}
                 className="bg-surface rounded-lg border border-border p-3"
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold">{clue.name}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-sm">{clue.name}</span>
                   <span
                     className={`text-[10px] uppercase px-2 py-0.5 rounded ${
                       clue.category === "positional"
@@ -74,15 +75,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                     {clue.category}
                   </span>
                 </div>
-                <p className="text-xs text-muted mb-2">{clue.description}</p>
-                <div className="flex items-center justify-center gap-1 mb-2">
-                  <span className="text-[10px] text-muted mr-1">guess:</span>
-                  {[...guess].map((d, i) => (
-                    <Digit key={i} value={d} size="sm" filled />
-                  ))}
-                </div>
-                <div className="flex justify-center">
-                  <ClueBadge result={result} guess={guess} />
+                <p className="text-xs text-muted mb-2 leading-relaxed">
+                  {clue.description}
+                </p>
+                <div className="scale-90 origin-left">
+                  <GuessRow guess={guess} digits={guess.length} result={result} />
                 </div>
               </div>
             );

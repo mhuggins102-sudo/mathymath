@@ -76,7 +76,8 @@ export function reduce(state: GameState, action: GameAction): GameState {
         };
       }
 
-      const options = pickTwoClues(state.seed, state.guesses.length);
+      const usedClueIds = state.guesses.map((g) => g.clueId);
+      const options = pickTwoClues(state.seed, usedClueIds);
       return {
         ...state,
         pendingGuess: { guess: action.guess, options },

@@ -12,8 +12,10 @@ import { validateGuess } from "@/lib/game/validator";
 import {
   clearGame,
   loadGame,
+  loadUnlimitedStats,
   recordUnlimitedResult,
   saveGame,
+  type PersonalStats,
 } from "@/lib/persistence/localStore";
 
 export interface UseGameConfig {
@@ -31,6 +33,8 @@ export interface UseGameResult {
   input: string;
   error: string | null;
   hydrated: boolean;
+  /** Non-null only when trackStats is enabled and stats have been loaded. */
+  unlimitedStats: PersonalStats | null;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
@@ -53,7 +57,15 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [unlimitedStats, setUnlimitedStats] = useState<PersonalStats | null>(null);
   const statsRecordedRef = useRef(false);
+
+  // Load initial personal stats once on mount (so they render under the
+  // game area even before the first win).
+  useEffect(() => {
+    if (!config.trackStats) return;
+    setUnlimitedStats(loadUnlimitedStats());
+  }, [config.trackStats]);
 
   // Hydration: load saved game if present.
   useEffect(() => {
@@ -78,10 +90,13 @@ export function useGame(config: UseGameConfig): UseGameResult {
     if (!config.storageKey || !hydrated) return;
     saveGame(config.storageKey, state);
     if (state.status !== "playing") {
-      // Record stats once.
       if (config.trackStats && !statsRecordedRef.current) {
-        recordUnlimitedResult(state.status === "won", state.guesses.length);
+        const updated = recordUnlimitedResult(
+          state.status === "won",
+          state.guesses.length,
+        );
         statsRecordedRef.current = true;
+        setUnlimitedStats(updated);
       }
     }
   }, [state, config.storageKey, config.trackStats, hydrated]);
@@ -136,6 +151,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
     input,
     error,
     hydrated,
+    unlimitedStats,
     appendDigit,
     backspace,
     submit,

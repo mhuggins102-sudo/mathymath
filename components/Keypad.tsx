@@ -27,7 +27,7 @@ export function Keypad({
           <button
             key={d}
             type="button"
-            className={`${btn} text-xl digit-${d}`}
+            className={`${btn} text-xl`}
             onClick={() => onDigit(d)}
             disabled={disabled}
           >
@@ -40,7 +40,7 @@ export function Keypad({
           <button
             key={d}
             type="button"
-            className={`${btn} text-xl digit-${d}`}
+            className={`${btn} text-xl`}
             onClick={() => onDigit(d)}
             disabled={disabled}
           >

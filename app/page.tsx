@@ -5,16 +5,8 @@ export default function Home() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
       <div className="max-w-md w-full">
-        <h1 className="text-4xl font-bold tracking-tight mb-2">
-          <span className="digit-2">m</span>
-          <span className="digit-5">a</span>
-          <span className="digit-7">t</span>
-          <span className="digit-1">h</span>
-          <span className="digit-9">y</span>
-          <span className="digit-4">m</span>
-          <span className="digit-6">a</span>
-          <span className="digit-8">t</span>
-          <span className="digit-3">h</span>
+        <h1 className="text-4xl font-bold tracking-tight mb-2 font-mono">
+          mathymath
         </h1>
         <p className="text-muted mb-8 text-sm">
           A number-guessing Wordle. Pick your clue each round.

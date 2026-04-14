@@ -8,14 +8,22 @@ interface GuessGridProps {
   currentInput: string;
 }
 
+/**
+ * Renders only the rows that actually exist:
+ *  - every resolved guess (with its revealed clue)
+ *  - either the pending (awaiting-clue) row OR the current-input row,
+ *    but never both
+ *  - NO empty padding rows beneath — the next row appears only after
+ *    the current one is resolved.
+ */
 export function GuessGrid({ state, currentInput }: GuessGridProps) {
   const rows: React.ReactNode[] = [];
 
-  // Already-resolved guesses
-  for (const g of state.guesses) {
+  for (let i = 0; i < state.guesses.length; i++) {
+    const g = state.guesses[i];
     rows.push(
       <GuessRow
-        key={`done-${rows.length}`}
+        key={`done-${i}`}
         guess={g.guess}
         digits={state.digits}
         result={g.result}
@@ -23,11 +31,10 @@ export function GuessGrid({ state, currentInput }: GuessGridProps) {
     );
   }
 
-  // Pending (awaiting clue choice) row
   if (state.pendingGuess) {
     rows.push(
       <GuessRow
-        key={`pending`}
+        key="pending"
         guess={state.pendingGuess.guess}
         digits={state.digits}
         pending
@@ -35,7 +42,6 @@ export function GuessGrid({ state, currentInput }: GuessGridProps) {
       />,
     );
   } else if (state.status === "playing") {
-    // Current input row (typing)
     rows.push(
       <GuessRow
         key="current"
@@ -44,13 +50,6 @@ export function GuessGrid({ state, currentInput }: GuessGridProps) {
         active
       />,
     );
-  }
-
-  // Remaining empty rows up to maxGuesses.
-  const shownRows =
-    state.guesses.length + (state.pendingGuess || state.status === "playing" ? 1 : 0);
-  for (let i = shownRows; i < state.maxGuesses; i++) {
-    rows.push(<GuessRow key={`empty-${i}`} guess="" digits={state.digits} />);
   }
 
   return <div className="w-full flex flex-col gap-1">{rows}</div>;

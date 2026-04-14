@@ -1,20 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { loadUnlimitedStats, type PersonalStats } from "@/lib/persistence/localStore";
+import type { PersonalStats } from "@/lib/persistence/localStore";
 
 interface StatsPanelProps {
-  refreshKey?: number;
+  stats: PersonalStats | null;
   maxGuesses: number;
 }
 
-export function StatsPanel({ refreshKey, maxGuesses }: StatsPanelProps) {
-  const [stats, setStats] = useState<PersonalStats | null>(null);
-
-  useEffect(() => {
-    setStats(loadUnlimitedStats());
-  }, [refreshKey]);
-
+export function StatsPanel({ stats, maxGuesses }: StatsPanelProps) {
   if (!stats) return null;
 
   const winPct = stats.played ? Math.round((stats.wins / stats.played) * 100) : 0;

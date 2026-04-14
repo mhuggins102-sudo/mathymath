@@ -1,52 +1,43 @@
 "use client";
 
-import { ReactNode } from "react";
+export type DigitState = "idle" | "match" | "warm" | "cool" | "cold" | "hint" | "entering";
 
 interface DigitProps {
   value: string | null;
   size?: "sm" | "md" | "lg";
-  filled?: boolean;
-  state?: "idle" | "exact" | "miss" | "hint";
-  overlay?: ReactNode;
+  state?: DigitState;
   animate?: boolean;
 }
+
+const STATE_CLASS: Record<DigitState, string> = {
+  idle: "border-border bg-surface text-foreground",
+  entering: "border-accent/60 bg-surface-2 text-foreground",
+  match: "border-good/70 bg-good/20 text-good",
+  warm: "border-warn/70 bg-warn/20 text-warn",
+  cool: "border-cool/70 bg-cool/20 text-cool",
+  cold: "border-bad/70 bg-bad/20 text-bad",
+  hint: "border-warn/50 bg-warn/10 text-foreground",
+};
+
+const SIZE_CLASS: Record<"sm" | "md" | "lg", string> = {
+  sm: "h-9 w-8 text-lg",
+  md: "h-11 w-10 text-xl",
+  lg: "h-12 w-10 text-2xl sm:h-14 sm:w-12",
+};
 
 export function Digit({
   value,
   size = "md",
-  filled = false,
   state = "idle",
-  overlay,
   animate = false,
 }: DigitProps) {
-  const sizeClasses =
-    size === "lg"
-      ? "h-14 w-12 text-3xl sm:h-16 sm:w-14 sm:text-4xl"
-      : size === "sm"
-      ? "h-9 w-8 text-lg"
-      : "h-12 w-11 text-2xl";
-
-  const border =
-    state === "exact"
-      ? "border-good/80 bg-good/10"
-      : state === "miss"
-      ? "border-border bg-surface"
-      : state === "hint"
-      ? "border-warn/60 bg-warn/5"
-      : filled
-      ? "border-accent/60 bg-surface-2"
-      : "border-border bg-surface";
-
-  const colorClass = value ? `digit-${value}` : "text-muted";
-
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-md border ${sizeClasses} ${border} font-mono font-semibold ${
+      className={`inline-flex items-center justify-center rounded-md border font-mono font-semibold ${SIZE_CLASS[size]} ${STATE_CLASS[state]} ${
         animate ? "pop" : ""
       }`}
     >
-      <span className={colorClass}>{value ?? ""}</span>
-      {overlay}
+      {value ?? ""}
     </div>
   );
 }

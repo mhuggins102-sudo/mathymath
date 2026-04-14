@@ -11,18 +11,7 @@
   --good: #52d977;
   --bad: #ff6b6b;
   --warn: #f5c24b;
-
-  /* digit-popping palette (dark-friendly) */
-  --d-0: #d0d0dc;
-  --d-1: #ff7aa8;
-  --d-2: #ffbe55;
-  --d-3: #ffd866;
-  --d-4: #a6f07a;
-  --d-5: #6be3c4;
-  --d-6: #6ec4ff;
-  --d-7: #9d8aff;
-  --d-8: #f17aff;
-  --d-9: #ff9565;
+  --cool: #f0935f;
 }
 
 @theme inline {
@@ -36,6 +25,7 @@
   --color-good: var(--good);
   --color-bad: var(--bad);
   --color-warn: var(--warn);
+  --color-cool: var(--cool);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -52,16 +42,18 @@ body {
   overscroll-behavior: none;
 }
 
-.digit-0 { color: var(--d-0); }
-.digit-1 { color: var(--d-1); }
-.digit-2 { color: var(--d-2); }
-.digit-3 { color: var(--d-3); }
-.digit-4 { color: var(--d-4); }
-.digit-5 { color: var(--d-5); }
-.digit-6 { color: var(--d-6); }
-.digit-7 { color: var(--d-7); }
-.digit-8 { color: var(--d-8); }
-.digit-9 { color: var(--d-9); }
+.digit-0,
+.digit-1,
+.digit-2,
+.digit-3,
+.digit-4,
+.digit-5,
+.digit-6,
+.digit-7,
+.digit-8,
+.digit-9 {
+  color: inherit;
+}
 
 @keyframes pop {
   0% { transform: scale(0.7); opacity: 0; }

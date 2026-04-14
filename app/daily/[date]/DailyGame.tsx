@@ -6,7 +6,7 @@ import { useGame } from "@/lib/hooks/useGame";
 import { useClientId } from "@/lib/hooks/useClientId";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
-import { ClueChoiceModal } from "@/components/ClueChoiceModal";
+import { ClueChooser } from "@/components/ClueChooser";
 import { HelpModal } from "@/components/HelpModal";
 import {
   DailyResultPanel,
@@ -43,7 +43,7 @@ export function DailyGame({
     digits,
     maxGuesses,
     storageKey: `daily:${date}`,
-    trackStats: false, // daily stats are server-side
+    trackStats: false,
   });
 
   const { state, input, error, appendDigit, backspace, submit, chooseClue, hydrated } =
@@ -52,7 +52,6 @@ export function DailyGame({
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
   const submitDisabled = input.length !== state.digits || keypadDisabled;
 
-  // On terminal state, submit to server once.
   useEffect(() => {
     if (!hydrated) return;
     if (state.status === "playing") return;
@@ -118,7 +117,7 @@ export function DailyGame({
 
   return (
     <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
-      <header className="flex items-center justify-between mb-2">
+      <header className="flex items-center justify-between mb-3">
         <Link href="/" className="text-muted text-sm hover:text-foreground">
           ← home
         </Link>
@@ -133,49 +132,48 @@ export function DailyGame({
         </button>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto pb-4">
+      <div className="flex-1 flex flex-col">
         <GuessGrid state={state} currentInput={input} />
 
-        {error && <p className="text-bad text-xs mt-2 shake">{error}</p>}
+        {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
 
-        {state.status !== "playing" && (
-          <div className="w-full mt-4">
-            <DailyResultPanel
-              won={state.status === "won"}
-              guessCount={state.guesses.length}
-              target={state.target}
-              data={percentile}
-              loading={statsLoading}
-              error={statsError}
-              maxGuesses={state.maxGuesses}
-              onShare={handleShare}
+        <div className="mt-4">
+          {state.pendingGuess ? (
+            <ClueChooser
+              options={state.pendingGuess.options}
+              onChoose={chooseClue}
             />
-            {!isToday && (
-              <p className="text-center text-xs text-muted mt-3">
-                <Link href="/archive" className="underline">
-                  ← Back to archive
-                </Link>
-              </p>
-            )}
-          </div>
-        )}
+          ) : state.status === "playing" ? (
+            <Keypad
+              onDigit={appendDigit}
+              onBackspace={backspace}
+              onSubmit={submit}
+              disabled={keypadDisabled}
+              submitDisabled={submitDisabled}
+            />
+          ) : (
+            <div className="space-y-3">
+              <DailyResultPanel
+                won={state.status === "won"}
+                guessCount={state.guesses.length}
+                target={state.target}
+                data={percentile}
+                loading={statsLoading}
+                error={statsError}
+                maxGuesses={state.maxGuesses}
+                onShare={handleShare}
+              />
+              {!isToday && (
+                <p className="text-center text-xs text-muted">
+                  <Link href="/archive" className="underline">
+                    ← Back to archive
+                  </Link>
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-
-      <div className="pt-2">
-        <Keypad
-          onDigit={appendDigit}
-          onBackspace={backspace}
-          onSubmit={submit}
-          disabled={keypadDisabled}
-          submitDisabled={submitDisabled}
-        />
-      </div>
-
-      <ClueChoiceModal
-        open={!!state.pendingGuess}
-        options={state.pendingGuess?.options ?? null}
-        onChoose={chooseClue}
-      />
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </main>
