@@ -10,6 +10,7 @@ import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { HelpModal } from "@/components/HelpModal";
 import { StatsPanel } from "@/components/StatsPanel";
+import { SettingsDrawer } from "@/components/SettingsDrawer";
 
 function newSession() {
   return { target: generateRandomTarget(5), seed: uuidv4() };
@@ -20,6 +21,7 @@ export default function UnlimitedPage() {
     null,
   );
   const [helpOpen, setHelpOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     setSession(newSession());
@@ -41,6 +43,8 @@ export default function UnlimitedPage() {
       onNew={() => setSession(newSession())}
       helpOpen={helpOpen}
       setHelpOpen={setHelpOpen}
+      settingsOpen={settingsOpen}
+      setSettingsOpen={setSettingsOpen}
     />
   );
 }
@@ -50,11 +54,15 @@ function UnlimitedGame({
   onNew,
   helpOpen,
   setHelpOpen,
+  settingsOpen,
+  setSettingsOpen,
 }: {
   session: { target: string; seed: string };
   onNew: () => void;
   helpOpen: boolean;
   setHelpOpen: (v: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (v: boolean) => void;
 }) {
   const {
     state,
@@ -91,14 +99,24 @@ function UnlimitedGame({
           ← home
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">Unlimited</h1>
-        <button
-          type="button"
-          className="text-muted text-sm hover:text-foreground px-2"
-          onClick={() => setHelpOpen(true)}
-          aria-label="Help"
-        >
-          ?
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="text-muted text-base hover:text-foreground px-2"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Settings"
+          >
+            ⚙
+          </button>
+          <button
+            type="button"
+            className="text-muted text-sm hover:text-foreground px-2"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Help"
+          >
+            ?
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col">
@@ -148,6 +166,7 @@ function UnlimitedGame({
       </div>
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   );
 }

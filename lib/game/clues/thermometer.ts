@@ -14,7 +14,7 @@ export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
   name: "Thermometer",
   category: "positional",
   description:
-    "For each slot: 🔥 exact, 🟧 within 1, 🟨 within 3, 🟦 within 5, 🧊 far. Rich per-slot heat.",
+    "A heat scale per slot showing how close your digit is to the target's. Green = exact, teal = within 1, yellow = within 3, orange = within 5, red = further off.",
   weight: 0.8,
   compute(guess, target) {
     const tiers = [...guess].map((ch, i) => tier(Number(ch) - Number(target[i])));

@@ -9,9 +9,8 @@ interface ClueChooserProps {
 
 /**
  * Inline clue picker rendered in place of the keypad after a guess is
- * submitted. Two options, tap to reveal. Unlike a modal, the guess grid
- * above stays visible so the player can reason about prior clues before
- * picking.
+ * submitted. Stacked vertically (full width) so each clue's description
+ * can render on multiple lines without truncation.
  */
 export function ClueChooser({ options, onChoose }: ClueChooserProps) {
   return (
@@ -19,29 +18,27 @@ export function ClueChooser({ options, onChoose }: ClueChooserProps) {
       <p className="text-center text-[10px] uppercase tracking-wider text-muted mb-2">
         Pick a clue
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-col gap-2">
         {options.map((clue) => (
           <button
             key={clue.id}
             type="button"
             onClick={() => onChoose(clue.id)}
-            className="text-left bg-surface-2 hover:bg-surface-2/80 active:scale-[0.99] transition rounded-lg px-3 py-3 border border-border"
+            className="w-full text-left bg-surface-2 hover:bg-surface-2/80 active:scale-[0.99] transition rounded-lg px-4 py-3 border border-border"
           >
             <div className="flex items-center justify-between mb-1 gap-2">
-              <span className="font-semibold text-sm text-foreground truncate">
-                {clue.name}
-              </span>
+              <span className="font-semibold text-foreground">{clue.name}</span>
               <span
-                className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+                className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
                   clue.category === "positional"
                     ? "bg-accent/20 text-accent"
                     : "bg-warn/20 text-warn"
                 }`}
               >
-                {clue.category === "positional" ? "pos" : "comp"}
+                {clue.category}
               </span>
             </div>
-            <p className="text-[11px] text-muted leading-snug line-clamp-3">
+            <p className="text-xs text-muted leading-relaxed">
               {clue.description}
             </p>
           </button>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SettingsHydrator } from "@/components/SettingsHydrator";
 
 export const metadata: Metadata = {
   title: "mathymath — Number Wordle",
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
+        <SettingsHydrator />
         <div
           className="portrait-only hidden fixed inset-0 z-50 bg-black/95 text-foreground items-center justify-center text-center px-6"
           aria-hidden

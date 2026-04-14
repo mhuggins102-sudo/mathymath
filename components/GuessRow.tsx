@@ -8,9 +8,7 @@ interface GuessRowProps {
   guess: string;
   digits: number;
   result?: ClueResult;
-  /** True while the user is currently typing in this row. */
   active?: boolean;
-  /** True when the guess is submitted and awaiting clue choice. */
   pending?: boolean;
 }
 
@@ -37,11 +35,11 @@ function cellStates(
       );
     case "thermometer":
       return result.tier.map((t) => {
-        if (t === 0) return "match";
-        if (t === 1) return "match";
-        if (t === 2) return "warm";
-        if (t === 3) return "cool";
-        return "cold";
+        if (t === 0) return "match"; // exact
+        if (t === 1) return "close"; // within 1 (distinct from exact)
+        if (t === 2) return "warm"; // within 3
+        if (t === 3) return "cool"; // within 5
+        return "cold"; // far
       });
     default:
       return new Array(digits).fill("idle");
@@ -62,7 +60,7 @@ function displayDigits(
   return out;
 }
 
-/** Minimal right-side summary: just the clue name, plus one compact value for compositional clues. */
+/** Minimal LEFT-side label: clue name + a compact value chip for compositional clues. */
 function ClueSideLabel({ result }: { result: ClueResult }) {
   const meta = getClueById(result.kind);
   let sub: React.ReactNode = null;
@@ -71,6 +69,7 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
   switch (result.kind) {
     case "sumDirection":
     case "rangeCompare":
+    case "maxDigit":
       sub =
         result.cmp === "eq" ? "equal" : result.cmp === "gt" ? "target ↑" : "target ↓";
       subClass =
@@ -95,10 +94,18 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
       sub = `${result.count} shared`;
       subClass = "text-accent";
       break;
+    case "distinctDigits":
+      sub = `${result.count} unique`;
+      subClass = "text-accent";
+      break;
     case "parityBalance":
     case "primeCount":
       sub = result.match ? "match" : "differs";
       subClass = result.match ? "text-good" : "text-bad";
+      break;
+    case "containsDigit":
+      sub = `${result.digit}? ${result.present ? "yes" : "no"}`;
+      subClass = result.present ? "text-good" : "text-bad";
       break;
     case "oracle":
       sub = `slot ${result.slot + 1}`;
@@ -109,12 +116,14 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
   }
 
   return (
-    <div className="flex flex-col justify-center text-left min-w-0">
-      <span className="text-[11px] font-semibold text-foreground truncate">
+    <div className="flex flex-col justify-center text-right min-w-0">
+      <span className="text-[11px] font-semibold text-foreground truncate leading-tight">
         {meta.name}
       </span>
       {sub && (
-        <span className={`text-[10px] font-mono ${subClass} truncate`}>{sub}</span>
+        <span className={`text-[10px] font-mono ${subClass} truncate leading-tight`}>
+          {sub}
+        </span>
       )}
     </div>
   );
@@ -136,7 +145,14 @@ export function GuessRow({
         active ? "bg-surface/40" : ""
       }`}
     >
-      <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex-1 min-w-0">
+        {pending && !result ? (
+          <p className="text-[10px] text-muted text-right">pick a clue below…</p>
+        ) : result ? (
+          <ClueSideLabel result={result} />
+        ) : null}
+      </div>
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {displayed.map((v, i) => {
           const state: DigitState = result
             ? states[i]
@@ -153,13 +169,6 @@ export function GuessRow({
             />
           );
         })}
-      </div>
-      <div className="flex-1 min-w-0">
-        {pending && !result ? (
-          <p className="text-[10px] text-muted">pick a clue below…</p>
-        ) : result ? (
-          <ClueSideLabel result={result} />
-        ) : null}
       </div>
     </div>
   );

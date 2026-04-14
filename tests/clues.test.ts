@@ -11,6 +11,9 @@ import { digitOverlapClue } from "@/lib/game/clues/digitOverlap";
 import { parityBalanceClue } from "@/lib/game/clues/parityBalance";
 import { primeCountClue } from "@/lib/game/clues/primeCount";
 import { rangeCompareClue } from "@/lib/game/clues/rangeCompare";
+import { containsDigitClue } from "@/lib/game/clues/containsDigit";
+import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
+import { maxDigitClue } from "@/lib/game/clues/maxDigit";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
 describe("Bullseyes", () => {
@@ -125,6 +128,40 @@ describe("Prime Count", () => {
   });
 });
 
+describe("Contains Digit", () => {
+  it("deterministic per (guess, target)", () => {
+    const a = containsDigitClue.compute("12345", "67890");
+    const b = containsDigitClue.compute("12345", "67890");
+    expect(a).toEqual(b);
+    expect(a.digit).toBeGreaterThanOrEqual(0);
+    expect(a.digit).toBeLessThan(10);
+  });
+  it("present=true when the seeded digit appears in target", () => {
+    // Use a target where ALL digits are the same so any seeded digit lookup is trivial.
+    const r = containsDigitClue.compute("12345", "77777");
+    expect(r.present).toBe(r.digit === 7);
+  });
+});
+
+describe("Distinct Digits", () => {
+  it("counts unique digits", () => {
+    expect(distinctDigitsClue.compute("00000", "77727").count).toBe(2);
+    expect(distinctDigitsClue.compute("00000", "12345").count).toBe(5);
+    expect(distinctDigitsClue.compute("00000", "11111").count).toBe(1);
+  });
+});
+
+describe("Max Digit", () => {
+  it("compares maxes", () => {
+    // guess max 9 vs target max 5 -> lt
+    expect(maxDigitClue.compute("19000", "12345").cmp).toBe("lt");
+    // guess max 5 vs target max 9 -> gt
+    expect(maxDigitClue.compute("12345", "90000").cmp).toBe("gt");
+    // equal maxes -> eq
+    expect(maxDigitClue.compute("12345", "54321").cmp).toBe("eq");
+  });
+});
+
 describe("Range Compare", () => {
   it("compares whole numbers", () => {
     expect(rangeCompareClue.compute("01234", "99999").cmp).toBe("gt");
@@ -134,10 +171,10 @@ describe("Range Compare", () => {
 });
 
 describe("Registry", () => {
-  it("has all 12 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(12);
+  it("has 15 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(15);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(12);
+    expect(ids.size).toBe(15);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

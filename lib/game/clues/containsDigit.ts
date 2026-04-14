@@ -1,0 +1,30 @@
+import type { Clue } from "./types";
+import { seededRng } from "../seededRng";
+
+/**
+ * Asks whether a specific digit (seeded deterministically from the guess +
+ * target) appears anywhere in the target. Same guess + target always asks
+ * about the same digit, so daily play is fair.
+ */
+export const containsDigitClue: Clue<{
+  kind: "containsDigit";
+  digit: number;
+  present: boolean;
+}> = {
+  id: "containsDigit",
+  name: "Contains Digit",
+  category: "compositional",
+  description:
+    "Picks one specific digit (shown in the clue) and tells you yes or no: is it anywhere in the target?",
+  weight: 1.0,
+  compute(guess, target) {
+    const rng = seededRng(`contains:${guess}:${target}`);
+    const digit = Math.floor(rng() * 10);
+    const present = target.includes(String(digit));
+    return { kind: "containsDigit", digit, present };
+  },
+  example(target) {
+    const guess = "0".repeat(target.length);
+    return { guess, result: this.compute(guess, target) };
+  },
+};

@@ -18,7 +18,10 @@ export type ClueResult =
   | { kind: "digitOverlap"; count: number }
   | { kind: "parityBalance"; match: boolean }
   | { kind: "primeCount"; match: boolean }
-  | { kind: "rangeCompare"; cmp: Cmp };
+  | { kind: "rangeCompare"; cmp: Cmp }
+  | { kind: "containsDigit"; digit: number; present: boolean }
+  | { kind: "distinctDigits"; count: number }
+  | { kind: "maxDigit"; cmp: Cmp };
 
 export type ClueId = ClueResult["kind"];
 

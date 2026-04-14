@@ -10,7 +10,7 @@ export const higherLowerClue: Clue<{ kind: "higherLower"; cmp: Cmp[] }> = {
   name: "Higher or Lower",
   category: "positional",
   description:
-    "For each slot, shows whether the target digit is higher (↑), lower (↓), or equal (✓) to your guess.",
+    "For each slot: green if your digit matches the target, yellow if the target's digit at that slot is higher than yours (go up), red if it's lower (go down).",
   weight: 0.6,
   compute(guess, target) {
     const out: Cmp[] = [];

@@ -8,11 +8,18 @@ import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { HelpModal } from "@/components/HelpModal";
+import { SettingsDrawer } from "@/components/SettingsDrawer";
 import {
   DailyResultPanel,
   type DailyPercentileData,
 } from "@/components/DailyResultPanel";
 import { buildShareText } from "@/lib/game/share";
+import {
+  dailyHistoryStats,
+  loadDailyHistory,
+  recordDailyResult,
+  type DailyHistoryStats,
+} from "@/lib/persistence/localStore";
 
 interface DailyGameProps {
   date: string;
@@ -31,10 +38,13 @@ export function DailyGame({
 }: DailyGameProps) {
   const clientId = useClientId();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [percentile, setPercentile] = useState<DailyPercentileData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [personalStats, setPersonalStats] = useState<DailyHistoryStats | null>(null);
   const submittedRef = useRef(false);
+  const personalRecordedRef = useRef(false);
   const startedAtRef = useRef<number>(Date.now());
 
   const game = useGame({
@@ -51,6 +61,26 @@ export function DailyGame({
 
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
   const submitDisabled = input.length !== state.digits || keypadDisabled;
+
+  // On first render, show personal stats already-accumulated across prior dailies
+  // even before this puzzle is resolved.
+  useEffect(() => {
+    setPersonalStats(dailyHistoryStats(loadDailyHistory()));
+  }, []);
+
+  // Record this daily's result locally (first write wins per date).
+  useEffect(() => {
+    if (!hydrated) return;
+    if (state.status === "playing") return;
+    if (personalRecordedRef.current) return;
+    personalRecordedRef.current = true;
+    const updated = recordDailyResult(
+      date,
+      state.guesses.length,
+      state.status === "won",
+    );
+    setPersonalStats(dailyHistoryStats(updated));
+  }, [hydrated, state.status, state.guesses.length, date]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -122,14 +152,24 @@ export function DailyGame({
           ← home
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">{statusLabel}</h1>
-        <button
-          type="button"
-          className="text-muted text-sm hover:text-foreground px-2"
-          onClick={() => setHelpOpen(true)}
-          aria-label="Help"
-        >
-          ?
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="text-muted text-base hover:text-foreground px-2"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Settings"
+          >
+            ⚙
+          </button>
+          <button
+            type="button"
+            className="text-muted text-sm hover:text-foreground px-2"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Help"
+          >
+            ?
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col">
@@ -161,6 +201,7 @@ export function DailyGame({
                 loading={statsLoading}
                 error={statsError}
                 maxGuesses={state.maxGuesses}
+                personal={personalStats}
                 onShare={handleShare}
               />
               {!isToday && (
@@ -176,6 +217,7 @@ export function DailyGame({
       </div>
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   );
 }

@@ -14,6 +14,9 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   parityBalance: "⚪",
   primeCount: "🟣",
   rangeCompare: "🧭",
+  containsDigit: "🔎",
+  distinctDigits: "🎲",
+  maxDigit: "🔝",
 };
 
 function perSlotLine(result: ClueResult, digits: number): string {

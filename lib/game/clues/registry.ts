@@ -11,6 +11,9 @@ import { digitOverlapClue } from "./digitOverlap";
 import { parityBalanceClue } from "./parityBalance";
 import { primeCountClue } from "./primeCount";
 import { rangeCompareClue } from "./rangeCompare";
+import { containsDigitClue } from "./containsDigit";
+import { distinctDigitsClue } from "./distinctDigits";
+import { maxDigitClue } from "./maxDigit";
 
 export const CLUES: readonly Clue[] = [
   bullseyesClue,
@@ -25,6 +28,9 @@ export const CLUES: readonly Clue[] = [
   parityBalanceClue,
   primeCountClue,
   rangeCompareClue,
+  containsDigitClue,
+  distinctDigitsClue,
+  maxDigitClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));

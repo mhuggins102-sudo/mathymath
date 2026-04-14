@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Countdown } from "@/components/Countdown";
+import { SettingsButton } from "@/components/SettingsButton";
 
 export default function Home() {
   return (
@@ -38,6 +39,10 @@ export default function Home() {
         <p className="text-xs text-muted mt-10">
           5 digits · 8 guesses · repeats allowed
         </p>
+
+        <div className="mt-4 flex items-center justify-center gap-3 text-xs">
+          <SettingsButton className="text-muted hover:text-foreground underline-offset-4 hover:underline" />
+        </div>
       </div>
     </main>
   );

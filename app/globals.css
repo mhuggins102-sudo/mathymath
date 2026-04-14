@@ -9,9 +9,21 @@
   --border: #2a2a3a;
   --accent: #7c8cff;
   --good: #52d977;
+  --close: #85e5b4;
   --bad: #ff6b6b;
   --warn: #f5c24b;
   --cool: #f0935f;
+}
+
+/* Colorblind palette: swaps red/green for a blue/orange/magenta scale that
+   is distinguishable across common forms of color vision deficiency
+   (Wong 2011-inspired, adapted). Applied to <html class="colorblind">. */
+html.colorblind {
+  --good: #3fa9f5;   /* bright blue = correct */
+  --close: #65d7d7;  /* cyan = close */
+  --warn: #ffba4d;   /* yellow-orange = target higher */
+  --cool: #ff8a5c;   /* orange = within 5 */
+  --bad: #d665bb;    /* magenta = target lower / far */
 }
 
 @theme inline {
@@ -23,6 +35,7 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-good: var(--good);
+  --color-close: var(--close);
   --color-bad: var(--bad);
   --color-warn: var(--warn);
   --color-cool: var(--cool);

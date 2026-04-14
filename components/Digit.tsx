@@ -1,6 +1,6 @@
 "use client";
 
-export type DigitState = "idle" | "match" | "warm" | "cool" | "cold" | "hint" | "entering";
+export type DigitState = "idle" | "match" | "close" | "warm" | "cool" | "cold" | "hint" | "entering";
 
 interface DigitProps {
   value: string | null;
@@ -13,6 +13,7 @@ const STATE_CLASS: Record<DigitState, string> = {
   idle: "border-border bg-surface text-foreground",
   entering: "border-accent/60 bg-surface-2 text-foreground",
   match: "border-good/70 bg-good/20 text-good",
+  close: "border-close/70 bg-close/15 text-close",
   warm: "border-warn/70 bg-warn/20 text-warn",
   cool: "border-cool/70 bg-cool/20 text-cool",
   cold: "border-bad/70 bg-bad/20 text-bad",

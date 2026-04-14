@@ -17,6 +17,7 @@ import {
   saveGame,
   type PersonalStats,
 } from "@/lib/persistence/localStore";
+import { buzz } from "@/lib/settings";
 
 export interface UseGameConfig {
   target: string;
@@ -85,21 +86,27 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setHydrated(true);
   }, [config.storageKey, config.target, config.seed]);
 
-  // Persist.
+  // Persist in-progress game (only when we have a storage key, i.e. daily mode).
   useEffect(() => {
     if (!config.storageKey || !hydrated) return;
     saveGame(config.storageKey, state);
-    if (state.status !== "playing") {
-      if (config.trackStats && !statsRecordedRef.current) {
-        const updated = recordUnlimitedResult(
-          state.status === "won",
-          state.guesses.length,
-        );
-        statsRecordedRef.current = true;
-        setUnlimitedStats(updated);
-      }
-    }
-  }, [state, config.storageKey, config.trackStats, hydrated]);
+  }, [state, config.storageKey, hydrated]);
+
+  // Record personal stats on terminal state.
+  // Runs independently of storageKey so unlimited mode (which has no
+  // storageKey) still gets stats recorded.
+  useEffect(() => {
+    if (state.status === "playing") return;
+    if (state.status === "won") buzz(40);
+    if (!config.trackStats) return;
+    if (statsRecordedRef.current) return;
+    const updated = recordUnlimitedResult(
+      state.status === "won",
+      state.guesses.length,
+    );
+    statsRecordedRef.current = true;
+    setUnlimitedStats(updated);
+  }, [state.status, state.guesses.length, config.trackStats]);
 
   const appendDigit = useCallback(
     (d: string) => {
@@ -123,10 +130,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setError(null);
     dispatch({ type: "SUBMIT_GUESS", guess: v.digits });
     setInput("");
+    buzz(12);
   }, [input, state.digits]);
 
   const chooseClue = useCallback((id: string) => {
     dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
+    buzz(18);
   }, []);
 
   const reset = useCallback(

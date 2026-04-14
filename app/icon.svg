@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0d"/>
+  <g fill="none" stroke="#7c8cff" stroke-width="28" stroke-linecap="round">
+    <rect x="88" y="88" width="96" height="96" rx="14"/>
+    <rect x="208" y="88" width="96" height="96" rx="14"/>
+    <rect x="328" y="88" width="96" height="96" rx="14"/>
+    <rect x="88" y="208" width="96" height="96" rx="14"/>
+    <rect x="208" y="208" width="96" height="96" rx="14" fill="#52d977" stroke="#52d977"/>
+    <rect x="328" y="208" width="96" height="96" rx="14"/>
+    <rect x="88" y="328" width="96" height="96" rx="14"/>
+    <rect x="208" y="328" width="96" height="96" rx="14"/>
+    <rect x="328" y="328" width="96" height="96" rx="14"/>
+  </g>
+  <g fill="#e8e8ed" font-family="ui-monospace, Menlo, monospace" font-weight="700" font-size="72" text-anchor="middle" dominant-baseline="central">
+    <text x="136" y="136">3</text>
+    <text x="256" y="136">1</text>
+    <text x="376" y="136">4</text>
+    <text x="136" y="256">1</text>
+    <text x="256" y="256" fill="#0a0a0d">5</text>
+    <text x="376" y="256">9</text>
+    <text x="136" y="376">2</text>
+    <text x="256" y="376">6</text>
+    <text x="376" y="376">5</text>
+  </g>
+</svg>
