@@ -16,12 +16,14 @@ export type ClueResult =
   | { kind: "sumDirection"; cmp: Cmp }
   | { kind: "sumDelta"; delta: number } // target - guess
   | { kind: "digitOverlap"; count: number }
-  | { kind: "parityBalance"; match: boolean }
-  | { kind: "primeCount"; match: boolean }
+  | { kind: "parityBalance"; cmp: Cmp }
+  | { kind: "primeCount"; cmp: Cmp }
   | { kind: "rangeCompare"; cmp: Cmp }
   | { kind: "containsDigit"; digit: number; present: boolean }
   | { kind: "distinctDigits"; count: number }
-  | { kind: "maxDigit"; cmp: Cmp };
+  | { kind: "maxDigit"; cmp: Cmp }
+  | { kind: "median"; cmp: Cmp }
+  | { kind: "divisibleBy"; divisor: number | null; present: boolean };
 
 export type ClueId = ClueResult["kind"];
 

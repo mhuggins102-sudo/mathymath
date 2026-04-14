@@ -17,6 +17,8 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   containsDigit: "🔎",
   distinctDigits: "🎲",
   maxDigit: "🔝",
+  median: "🎚️",
+  divisibleBy: "➗",
 };
 
 function perSlotLine(result: ClueResult, digits: number): string {

@@ -8,11 +8,11 @@
   --surface-2: #1e1e2c;
   --border: #2a2a3a;
   --accent: #7c8cff;
-  --good: #52d977;
-  --close: #85e5b4;
-  --bad: #ff6b6b;
-  --warn: #f5c24b;
-  --cool: #f0935f;
+  --good: #52d977;   /* green = exact / match */
+  --close: #c4e157;  /* yellow-green = within 1 (distinct from pure green) */
+  --warn: #f5c24b;   /* yellow = target higher / within 3 */
+  --cool: #f0935f;   /* orange = within 5 */
+  --bad: #ff6b6b;    /* red = target lower / far */
 }
 
 /* Colorblind palette: swaps red/green for a blue/orange/magenta scale that
@@ -20,10 +20,10 @@
    (Wong 2011-inspired, adapted). Applied to <html class="colorblind">. */
 html.colorblind {
   --good: #3fa9f5;   /* bright blue = correct */
-  --close: #65d7d7;  /* cyan = close */
-  --warn: #ffba4d;   /* yellow-orange = target higher */
+  --close: #80dbff;  /* pale sky = close (distinct from the saturated blue) */
+  --warn: #ffcc55;   /* yellow-orange = target higher */
   --cool: #ff8a5c;   /* orange = within 5 */
-  --bad: #d665bb;    /* magenta = target lower / far */
+  --bad: #e06eb5;    /* magenta = target lower / far */
 }
 
 @theme inline {

@@ -14,6 +14,8 @@ import { rangeCompareClue } from "@/lib/game/clues/rangeCompare";
 import { containsDigitClue } from "@/lib/game/clues/containsDigit";
 import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
 import { maxDigitClue } from "@/lib/game/clues/maxDigit";
+import { medianClue } from "@/lib/game/clues/median";
+import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
 describe("Bullseyes", () => {
@@ -101,9 +103,14 @@ describe("Sum Direction + Sum Delta", () => {
 });
 
 describe("Digit Overlap", () => {
-  it("multiset intersection", () => {
-    // target counts: {7:3,4:1,2:1}; guess counts: {7:4,2:1}
-    expect(digitOverlapClue.compute("77772", "74727").count).toBe(4);
+  it("counts each guess digit that appears in target", () => {
+    // guess 23446 vs target 44215: target's digit set is {4,2,1,5};
+    // guess positions [2,3,4,4,6] -> 2:yes, 3:no, 4:yes, 4:yes, 6:no = 3
+    expect(digitOverlapClue.compute("23446", "44215").count).toBe(3);
+  });
+  it("repeated guess digits all count when present in target", () => {
+    // guess 11111 vs target 14321: all five 1s in guess count
+    expect(digitOverlapClue.compute("11111", "14321").count).toBe(5);
   });
   it("disjoint is 0", () => {
     expect(digitOverlapClue.compute("11111", "22222").count).toBe(0);
@@ -111,20 +118,24 @@ describe("Digit Overlap", () => {
 });
 
 describe("Parity Balance", () => {
-  it("matches count of evens", () => {
-    // target 02468 -> 5 evens; guess 24680 -> 5 evens
-    expect(parityBalanceClue.compute("24680", "02468").match).toBe(true);
-    // target 12345 -> 2 evens; guess 11111 -> 0 evens
-    expect(parityBalanceClue.compute("11111", "12345").match).toBe(false);
+  it("compares even-digit counts", () => {
+    // target 02468 -> 5 evens; guess 24680 -> 5 evens => eq
+    expect(parityBalanceClue.compute("24680", "02468").cmp).toBe("eq");
+    // target 12345 -> 2 evens; guess 11111 -> 0 evens => target has more => gt
+    expect(parityBalanceClue.compute("11111", "12345").cmp).toBe("gt");
+    // target 11111 (0); guess 24680 (5) => lt
+    expect(parityBalanceClue.compute("24680", "11111").cmp).toBe("lt");
   });
 });
 
 describe("Prime Count", () => {
-  it("counts digits in {2,3,5,7}", () => {
-    // target 23579 -> 4 primes; guess 12345 -> 3 primes (2,3,5)
-    expect(primeCountClue.compute("12345", "23579").match).toBe(false);
-    // target 23570 (4 primes); guess 23579 (4 primes)
-    expect(primeCountClue.compute("23570", "23579").match).toBe(true);
+  it("compares prime-digit counts", () => {
+    // target 23579 -> 4 primes; guess 12345 -> 3 primes (2,3,5) => target has more => gt
+    expect(primeCountClue.compute("12345", "23579").cmp).toBe("gt");
+    // target 23570 (4 primes); guess 23579 (4 primes) => eq
+    expect(primeCountClue.compute("23570", "23579").cmp).toBe("eq");
+    // target 11111 (0); guess 22222 (5) => lt
+    expect(primeCountClue.compute("22222", "11111").cmp).toBe("lt");
   });
 });
 
@@ -162,19 +173,54 @@ describe("Max Digit", () => {
   });
 });
 
-describe("Range Compare", () => {
-  it("compares whole numbers", () => {
-    expect(rangeCompareClue.compute("01234", "99999").cmp).toBe("gt");
-    expect(rangeCompareClue.compute("99999", "00001").cmp).toBe("lt");
-    expect(rangeCompareClue.compute("12345", "12345").cmp).toBe("eq");
+describe("Digit Range (rangeCompare)", () => {
+  it("compares the spread (max-min) of digits", () => {
+    // guess 12532 range = 5-1 = 4; target 51903 range = 9-0 = 9 => target ↑
+    expect(rangeCompareClue.compute("12532", "51903").cmp).toBe("gt");
+    // both equal range
+    expect(rangeCompareClue.compute("12345", "56789").cmp).toBe("eq");
+    // guess wider than target
+    expect(rangeCompareClue.compute("19000", "12345").cmp).toBe("lt");
+  });
+});
+
+describe("Median", () => {
+  it("compares the sorted-middle digit", () => {
+    // guess 12345 median=3; target 54321 median=3 => eq
+    expect(medianClue.compute("12345", "54321").cmp).toBe("eq");
+    // guess 11111 median=1; target 99999 median=9 => target ↑
+    expect(medianClue.compute("11111", "99999").cmp).toBe("gt");
+    // guess 99999; target 11111 => target ↓
+    expect(medianClue.compute("99999", "11111").cmp).toBe("lt");
+  });
+});
+
+describe("Divisible By", () => {
+  it("picks a divisor in 2-9 that divides the target", () => {
+    // 12345 is divisible by 3 and 5 and 15. Valid divisors 2-9: 3, 5.
+    const r = divisibleByClue.compute("00000", "12345");
+    expect(r.present).toBe(true);
+    expect([3, 5]).toContain(r.divisor);
+  });
+  it("reports 'no' when no value 2-9 divides", () => {
+    // 11 is prime, only divisor 2-9 divides nothing. But target needs to be 5 digits.
+    // 10007 is prime. 10007 % 2-9: none divide (it's prime).
+    const r = divisibleByClue.compute("00000", "10007");
+    expect(r.present).toBe(false);
+    expect(r.divisor).toBe(null);
+  });
+  it("is deterministic per (guess, target)", () => {
+    const a = divisibleByClue.compute("12345", "67890");
+    const b = divisibleByClue.compute("12345", "67890");
+    expect(a).toEqual(b);
   });
 });
 
 describe("Registry", () => {
-  it("has 15 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(15);
+  it("has 17 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(17);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(15);
+    expect(ids.size).toBe(17);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

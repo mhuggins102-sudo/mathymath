@@ -1,23 +1,16 @@
 import type { Clue } from "./types";
 
-function digitCounts(s: string): number[] {
-  const c = new Array(10).fill(0);
-  for (const ch of s) c[Number(ch)]++;
-  return c;
-}
-
 export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
   id: "digitOverlap",
   name: "Digit Overlap",
   category: "compositional",
   description:
-    "Counts how many digits you share with the target (ignoring position). Repeats count once per pair.",
+    "For each digit in your guess, checks whether that digit appears anywhere in the target (any position). Counts the matches — so if you guess 23446 and the target is 44215, the overlap is 3 (both 4s and the 2 all appear in the target).",
   weight: 1.0,
   compute(guess, target) {
-    const g = digitCounts(guess);
-    const t = digitCounts(target);
+    const targetSet = new Set(target);
     let count = 0;
-    for (let i = 0; i < 10; i++) count += Math.min(g[i], t[i]);
+    for (const ch of guess) if (targetSet.has(ch)) count++;
     return { kind: "digitOverlap", count };
   },
   example(target) {

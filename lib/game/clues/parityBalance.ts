@@ -1,4 +1,4 @@
-import type { Clue } from "./types";
+import type { Clue, Cmp } from "./types";
 
 function evenCount(s: string): number {
   let n = 0;
@@ -6,15 +6,18 @@ function evenCount(s: string): number {
   return n;
 }
 
-export const parityBalanceClue: Clue<{ kind: "parityBalance"; match: boolean }> = {
+export const parityBalanceClue: Clue<{ kind: "parityBalance"; cmp: Cmp }> = {
   id: "parityBalance",
   name: "Parity Balance",
   category: "compositional",
   description:
-    "Yes/no: does your guess have the same number of even digits as the target?",
+    "Compares the number of even digits in the target to your guess. target ↑ means the target has more even digits than you do, target ↓ means fewer, equal means the same count.",
   weight: 1.2,
   compute(guess, target) {
-    return { kind: "parityBalance", match: evenCount(guess) === evenCount(target) };
+    const t = evenCount(target);
+    const g = evenCount(guess);
+    const cmp: Cmp = t === g ? "eq" : t > g ? "gt" : "lt";
+    return { kind: "parityBalance", cmp };
   },
   example(target) {
     const guess = "0".repeat(target.length);

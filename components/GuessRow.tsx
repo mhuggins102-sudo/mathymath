@@ -70,6 +70,9 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
     case "sumDirection":
     case "rangeCompare":
     case "maxDigit":
+    case "parityBalance":
+    case "primeCount":
+    case "median":
       sub =
         result.cmp === "eq" ? "equal" : result.cmp === "gt" ? "target ↑" : "target ↓";
       subClass =
@@ -80,14 +83,16 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
           : "text-bad";
       break;
     case "sumDelta": {
-      const sign = result.delta > 0 ? "+" : "";
-      sub = `${sign}${result.delta}`;
-      subClass =
-        result.delta === 0
-          ? "text-good"
-          : result.delta > 0
-          ? "text-warn"
-          : "text-bad";
+      if (result.delta === 0) {
+        sub = "equal";
+        subClass = "text-good";
+      } else if (result.delta > 0) {
+        sub = `target +${result.delta}`;
+        subClass = "text-warn";
+      } else {
+        sub = `target −${Math.abs(result.delta)}`;
+        subClass = "text-bad";
+      }
       break;
     }
     case "digitOverlap":
@@ -98,14 +103,18 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
       sub = `${result.count} unique`;
       subClass = "text-accent";
       break;
-    case "parityBalance":
-    case "primeCount":
-      sub = result.match ? "match" : "differs";
-      subClass = result.match ? "text-good" : "text-bad";
-      break;
     case "containsDigit":
       sub = `${result.digit}? ${result.present ? "yes" : "no"}`;
       subClass = result.present ? "text-good" : "text-bad";
+      break;
+    case "divisibleBy":
+      if (result.present && result.divisor !== null) {
+        sub = `${result.divisor}? yes`;
+        subClass = "text-good";
+      } else {
+        sub = "divisible? no";
+        subClass = "text-bad";
+      }
       break;
     case "oracle":
       sub = `slot ${result.slot + 1}`;

@@ -14,6 +14,8 @@ import { rangeCompareClue } from "./rangeCompare";
 import { containsDigitClue } from "./containsDigit";
 import { distinctDigitsClue } from "./distinctDigits";
 import { maxDigitClue } from "./maxDigit";
+import { medianClue } from "./median";
+import { divisibleByClue } from "./divisibleBy";
 
 export const CLUES: readonly Clue[] = [
   bullseyesClue,
@@ -31,6 +33,8 @@ export const CLUES: readonly Clue[] = [
   containsDigitClue,
   distinctDigitsClue,
   maxDigitClue,
+  medianClue,
+  divisibleByClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));

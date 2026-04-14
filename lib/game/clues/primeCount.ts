@@ -1,4 +1,4 @@
-import type { Clue } from "./types";
+import type { Clue, Cmp } from "./types";
 
 const PRIMES = new Set([2, 3, 5, 7]);
 
@@ -8,18 +8,18 @@ function primeDigitCount(s: string): number {
   return n;
 }
 
-export const primeCountClue: Clue<{ kind: "primeCount"; match: boolean }> = {
+export const primeCountClue: Clue<{ kind: "primeCount"; cmp: Cmp }> = {
   id: "primeCount",
   name: "Prime Count",
   category: "compositional",
   description:
-    "Yes/no: does your guess have the same number of prime digits (2, 3, 5, 7) as the target?",
+    "Compares the number of prime digits (2, 3, 5, 7) in the target to your guess. target ↑ means the target has more prime digits, target ↓ means fewer, equal means the same count.",
   weight: 1.2,
   compute(guess, target) {
-    return {
-      kind: "primeCount",
-      match: primeDigitCount(guess) === primeDigitCount(target),
-    };
+    const t = primeDigitCount(target);
+    const g = primeDigitCount(guess);
+    const cmp: Cmp = t === g ? "eq" : t > g ? "gt" : "lt";
+    return { kind: "primeCount", cmp };
   },
   example(target) {
     const guess = "0".repeat(target.length);
