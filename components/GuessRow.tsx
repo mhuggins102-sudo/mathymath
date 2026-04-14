@@ -194,7 +194,11 @@ export function GuessRow({
           active ? "bg-surface/40" : ""
         }`}
       >
-        <div className="flex-1 min-w-0">{labelSlot}</div>
+        {/* `min-w-[6rem]` keeps every row's label column the same size so
+             digits line up across rows; `shrink-0` (instead of `flex-1`)
+             means the row no longer stretches label whitespace out to the
+             right — the content hugs the left with slack on the right. */}
+        <div className="min-w-[6rem] shrink-0">{labelSlot}</div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {displayed.map((v, i) => {
             const state: DigitState = result

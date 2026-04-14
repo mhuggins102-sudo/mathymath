@@ -40,7 +40,7 @@ export function HomeHeaderIcons() {
         <button
           type="button"
           onClick={() => setHelpOpen(true)}
-          className={`${btn} text-sm`}
+          className={`${btn} text-lg font-semibold`}
           aria-label="Help"
         >
           ?

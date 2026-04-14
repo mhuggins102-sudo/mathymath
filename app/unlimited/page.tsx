@@ -124,7 +124,7 @@ function UnlimitedGame({
           </button>
           <button
             type="button"
-            className="text-muted text-sm hover:text-foreground px-2"
+            className="text-muted text-lg font-semibold hover:text-foreground px-2"
             onClick={() => setHelpOpen(true)}
             aria-label="Help"
           >

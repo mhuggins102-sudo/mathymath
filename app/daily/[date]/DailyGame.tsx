@@ -155,8 +155,11 @@ export function DailyGame({
   return (
     <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
       <header className="flex items-center justify-between mb-3">
-        <Link href="/" className="text-muted text-sm hover:text-foreground">
-          ← home
+        <Link
+          href={isToday ? "/" : "/archive"}
+          className="text-muted text-sm hover:text-foreground"
+        >
+          ← {isToday ? "home" : "back"}
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">{statusLabel}</h1>
         <div className="flex items-center gap-1">
@@ -189,7 +192,7 @@ export function DailyGame({
           </button>
           <button
             type="button"
-            className="text-muted text-sm hover:text-foreground px-2"
+            className="text-muted text-lg font-semibold hover:text-foreground px-2"
             onClick={() => setHelpOpen(true)}
             aria-label="Help"
           >
@@ -220,13 +223,6 @@ export function DailyGame({
               />
             )}
           </div>
-        )}
-        {state.status !== "playing" && !isToday && (
-          <p className="text-center text-xs text-muted mt-4">
-            <Link href="/archive" className="underline">
-              ← Back to archive
-            </Link>
-          </p>
         )}
       </div>
 

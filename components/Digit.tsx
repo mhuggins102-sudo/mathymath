@@ -23,9 +23,9 @@ const STATE_CLASS: Record<DigitState, string> = {
 const SIZE_CLASS: Record<"sm" | "md" | "lg", string> = {
   sm: "h-9 w-8 text-lg",
   md: "h-10 w-9 text-lg",
-  // "lg" is the in-game row size. Shrunk ~10% so 8 rows + keypad fit on
-  // small phones without vertical scrolling.
-  lg: "h-11 w-10 text-xl sm:h-12 sm:w-11 sm:text-2xl",
+  // "lg" is the in-game row size. Perfect-square cells so 8 rows + keypad
+  // comfortably fit on a typical phone without vertical scrolling.
+  lg: "h-10 w-10 text-xl sm:h-11 sm:w-11 sm:text-2xl",
 };
 
 export function Digit({
