@@ -172,6 +172,7 @@ function Block({
           <DistributionBars
             distribution={distribution}
             maxGuesses={DEFAULT_MAX_GUESSES}
+            losses={Math.max(0, played - wins)}
           />
         </>
       )}
@@ -204,12 +205,15 @@ function Stat({
 function DistributionBars({
   distribution,
   maxGuesses,
+  losses,
 }: {
   distribution: Record<string, number>;
   maxGuesses: number;
+  losses: number;
 }) {
   const values = Object.values(distribution);
-  const max = Math.max(1, ...values);
+  // Include DNFs in the max so the losses bar shares the same scale.
+  const max = Math.max(1, ...values, losses);
   return (
     <div className="space-y-1">
       {Array.from({ length: maxGuesses }, (_, i) => i + 1).map((n) => {
@@ -229,6 +233,28 @@ function DistributionBars({
           </div>
         );
       })}
+      {/* DNF row: games ended without a solve (ran out of guesses). */}
+      <div className="flex items-center gap-2 text-xs">
+        <span
+          className="w-4 text-muted font-mono"
+          aria-label="did not finish"
+          title="Did not finish"
+        >
+          ✕
+        </span>
+        <div className="flex-1 bg-surface rounded overflow-hidden h-5 relative">
+          <div
+            className="bg-bad/60 h-full flex items-center justify-end px-2 text-[10px] font-mono text-background"
+            style={{
+              width: `${
+                losses === 0 ? 0 : Math.max((losses / max) * 100, 12)
+              }%`,
+            }}
+          >
+            {losses || ""}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

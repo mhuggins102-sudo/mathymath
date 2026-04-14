@@ -94,6 +94,8 @@ export function DailyResultPanel({
             distribution={data.aggregate.distribution}
             maxGuesses={maxGuesses}
             yourGuess={won ? guessCount : null}
+            losses={Math.max(0, data.aggregate.total - data.aggregate.wins)}
+            youLost={!won}
           />
         </div>
       )}
@@ -127,13 +129,19 @@ function DistributionBars({
   distribution,
   maxGuesses,
   yourGuess,
+  losses,
+  youLost,
 }: {
   distribution: Record<string | number, number>;
   maxGuesses: number;
   yourGuess: number | null;
+  losses: number;
+  youLost: boolean;
 }) {
   const values = Object.values(distribution);
-  const max = Math.max(1, ...values);
+  // Normalize bar widths against the max across both wins and DNFs so
+  // every bar is drawn to the same scale.
+  const max = Math.max(1, ...values, losses);
   return (
     <div className="space-y-1">
       <p className="text-[10px] uppercase tracking-wider text-muted">
@@ -161,6 +169,30 @@ function DistributionBars({
           </div>
         );
       })}
+      {/* DNF row: players who ran out of guesses on this puzzle. */}
+      <div className="flex items-center gap-2 text-xs">
+        <span
+          className="w-4 text-muted font-mono"
+          aria-label="did not finish"
+          title="Did not finish"
+        >
+          ✕
+        </span>
+        <div className="flex-1 bg-surface-2 rounded overflow-hidden h-5 relative">
+          <div
+            className={`h-full flex items-center justify-end px-2 text-[10px] font-mono ${
+              youLost ? "bg-bad/80 text-background" : "bg-bad/50 text-background"
+            }`}
+            style={{
+              width: `${
+                losses === 0 ? 0 : Math.max((losses / max) * 100, 12)
+              }%`,
+            }}
+          >
+            {losses || ""}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
