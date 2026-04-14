@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Countdown } from "@/components/Countdown";
 
 export default function Home() {
   return (
@@ -15,29 +16,35 @@ export default function Home() {
           <span className="digit-8">t</span>
           <span className="digit-3">h</span>
         </h1>
-        <p className="text-muted mb-10 text-sm">
+        <p className="text-muted mb-8 text-sm">
           A number-guessing Wordle. Pick your clue each round.
         </p>
 
-        <div className="grid gap-3">
+        <div className="grid gap-3 mb-8">
           <Link
-            href="/unlimited"
+            href="/daily"
             className="block bg-accent/80 text-background font-semibold py-4 rounded-xl active:scale-[0.99] transition"
           >
-            Play Unlimited
+            Today&apos;s Puzzle
           </Link>
-          <button
-            type="button"
-            disabled
-            className="block bg-surface text-muted font-semibold py-4 rounded-xl border border-border cursor-not-allowed"
-            title="Coming soon"
+          <Link
+            href="/unlimited"
+            className="block bg-surface-2 text-foreground font-semibold py-4 rounded-xl border border-border active:scale-[0.99] transition"
           >
-            Daily Puzzle — coming soon
-          </button>
+            Unlimited
+          </Link>
+          <Link
+            href="/archive"
+            className="block bg-surface text-muted font-semibold py-3 rounded-xl border border-border active:scale-[0.99] transition text-sm"
+          >
+            Archive
+          </Link>
         </div>
 
+        <Countdown label="Next daily in" />
+
         <p className="text-xs text-muted mt-10">
-          5 digits. 8 guesses. Repeats allowed.
+          5 digits · 8 guesses · repeats allowed
         </p>
       </div>
     </main>
