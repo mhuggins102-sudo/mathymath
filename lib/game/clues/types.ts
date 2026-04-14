@@ -4,6 +4,23 @@ export type ClueCategory = "positional" | "compositional";
 
 export type Cmp = "lt" | "eq" | "gt";
 
+/** Visual-state labels the UI uses. Kept here so clue files can declare
+ *  their own color legends without importing from the components layer. */
+export type DigitStateName =
+  | "idle"
+  | "match"
+  | "close"
+  | "warm"
+  | "cool"
+  | "cold"
+  | "hint"
+  | "entering";
+
+export interface LegendEntry {
+  state: DigitStateName;
+  label: string;
+}
+
 export type ClueResult =
   // Positional
   | { kind: "bullseyes"; hits: boolean[] }
@@ -33,6 +50,9 @@ export interface Clue<R extends ClueResult = ClueResult> {
   category: ClueCategory;
   description: string;
   weight: number;
+  /** Optional color legend. Rendered below the description in Help/Chooser
+   *  so color references don't need to live in the description text. */
+  legend?: LegendEntry[];
   compute(guess: string, target: string): R;
   example(target: string): { guess: string; result: R };
 }

@@ -2,13 +2,26 @@
 
 import { CLUES } from "@/lib/game/clues/registry";
 import { GuessRow } from "./GuessRow";
+import { ClueLegend } from "./ClueLegend";
 
 interface HelpModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const EXAMPLE_TARGET = "47381";
+/**
+ * A deliberately diverse example target:
+ *  - all 5 digits unique (0 gone — won't clash with the "5 unique digits"
+ *    hint and isn't a leading zero either)
+ *  - mix of even (4, 6, 2, 8) and odd (7)
+ *  - 2 prime digits (7, 2)
+ *  - range of 6 (max 8, min 2)
+ *  - median 6
+ *  - divisible by 2, 3, 4, 6, 9 — gives Divisible By something to pick
+ *  - sum 27
+ * Perfect for showing off every clue.
+ */
+const EXAMPLE_TARGET = "47628";
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
   if (!open) return null;
@@ -38,13 +51,14 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           <p>
             After each guess you&apos;ll be offered{" "}
             <strong className="text-foreground">two clue options</strong>.
-            Pick the one that will help you most. <span className="text-accent">Positional</span> clues
-            color the cells; <span className="text-warn">compositional</span> clues tell you something
-            about the whole number.
+            Pick the one that will help you most.{" "}
+            <span className="text-accent">Positional</span> clues color the
+            cells; <span className="text-warn">compositional</span> clues
+            tell you something about the whole number.
           </p>
           <p>
-            A clue type can only be chosen once per game — used types won&apos;t
-            appear as future options.
+            A clue type can only be chosen once per game — used types
+            won&apos;t appear as future options.
           </p>
         </div>
 
@@ -78,8 +92,13 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                 <p className="text-xs text-muted mb-2 leading-relaxed">
                   {clue.description}
                 </p>
-                <div className="scale-90 origin-left">
-                  <GuessRow guess={guess} digits={guess.length} result={result} />
+                {clue.legend && <ClueLegend entries={clue.legend} />}
+                <div className="scale-90 origin-left mt-2">
+                  <GuessRow
+                    guess={guess}
+                    digits={guess.length}
+                    result={result}
+                  />
                 </div>
               </div>
             );

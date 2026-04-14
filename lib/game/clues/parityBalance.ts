@@ -20,7 +20,9 @@ export const parityBalanceClue: Clue<{ kind: "parityBalance"; cmp: Cmp }> = {
     return { kind: "parityBalance", cmp };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    // All odd digits — shows a directional comparison on any target with
+    // at least one even digit.
+    const guess = "13579".slice(0, target.length).padEnd(target.length, "1");
     return { guess, result: this.compute(guess, target) };
   },
 };

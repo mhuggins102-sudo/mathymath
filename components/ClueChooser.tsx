@@ -1,6 +1,7 @@
 "use client";
 
 import type { Clue, ClueId } from "@/lib/game/clues/types";
+import { ClueLegend } from "./ClueLegend";
 
 interface ClueChooserProps {
   options: [Clue, Clue];
@@ -41,6 +42,7 @@ export function ClueChooser({ options, onChoose }: ClueChooserProps) {
             <p className="text-xs text-muted leading-relaxed">
               {clue.description}
             </p>
+            {clue.legend && <ClueLegend entries={clue.legend} />}
           </button>
         ))}
       </div>

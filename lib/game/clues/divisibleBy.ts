@@ -34,7 +34,7 @@ export const divisibleByClue: Clue<{
     return { kind: "divisibleBy", divisor, present: true };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    const guess = "36090".slice(0, target.length).padEnd(target.length, "3");
     return { guess, result: this.compute(guess, target) };
   },
 };

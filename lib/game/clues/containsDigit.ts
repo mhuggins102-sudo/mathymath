@@ -24,7 +24,7 @@ export const containsDigitClue: Clue<{
     return { kind: "containsDigit", digit, present };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    const guess = "98765".slice(0, target.length).padEnd(target.length, "9");
     return { guess, result: this.compute(guess, target) };
   },
 };

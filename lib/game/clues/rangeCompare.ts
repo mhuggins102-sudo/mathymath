@@ -19,7 +19,8 @@ export const rangeCompareClue: Clue<{ kind: "rangeCompare"; cmp: Cmp }> = {
     return { kind: "rangeCompare", cmp };
   },
   example(target) {
-    const guess = "5".repeat(target.length);
+    // "12345" has range 4 — narrower than most 5-digit targets.
+    const guess = "12345".slice(0, target.length).padEnd(target.length, "1");
     return { guess, result: this.compute(guess, target) };
   },
 };

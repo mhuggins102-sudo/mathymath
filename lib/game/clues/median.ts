@@ -20,7 +20,8 @@ export const medianClue: Clue<{ kind: "median"; cmp: Cmp }> = {
     return { kind: "median", cmp };
   },
   example(target) {
-    const guess = "5".repeat(target.length);
+    // "22222" has median 2 — target median is usually higher.
+    const guess = "22222".slice(0, target.length).padEnd(target.length, "2");
     return { guess, result: this.compute(guess, target) };
   },
 };

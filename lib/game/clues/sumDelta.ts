@@ -17,7 +17,8 @@ export const sumDeltaClue: Clue<{ kind: "sumDelta"; delta: number }> = {
     return { kind: "sumDelta", delta: digitSum(target) - digitSum(guess) };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    // "44444" has sum 20 — delta reads as a modest +/- on most targets.
+    const guess = "4".repeat(target.length);
     return { guess, result: this.compute(guess, target) };
   },
 };

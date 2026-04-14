@@ -14,7 +14,8 @@ export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
     return { kind: "digitOverlap", count };
   },
   example(target) {
-    const guess = "1".repeat(target.length);
+    // "12348" typically overlaps with 2-3 of the target's digits.
+    const guess = "12348".slice(0, target.length).padEnd(target.length, "1");
     return { guess, result: this.compute(guess, target) };
   },
 };

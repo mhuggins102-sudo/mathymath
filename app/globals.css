@@ -9,18 +9,18 @@
   --border: #2a2a3a;
   --accent: #7c8cff;
   --good: #52d977;   /* green = exact / match */
-  --close: #c4e157;  /* yellow-green = within 1 (distinct from pure green) */
+  --close: #80dbff;  /* pale sky blue = within 1 (visually distinct from green) */
   --warn: #f5c24b;   /* yellow = target higher / within 3 */
   --cool: #f0935f;   /* orange = within 5 */
   --bad: #ff6b6b;    /* red = target lower / far */
 }
 
 /* Colorblind palette: swaps red/green for a blue/orange/magenta scale that
-   is distinguishable across common forms of color vision deficiency
-   (Wong 2011-inspired, adapted). Applied to <html class="colorblind">. */
+   is distinguishable across common forms of color vision deficiency.
+   Applied to <html class="colorblind">. */
 html.colorblind {
   --good: #3fa9f5;   /* bright blue = correct */
-  --close: #80dbff;  /* pale sky = close (distinct from the saturated blue) */
+  --close: #80dbff;  /* pale sky = close (same hue as default) */
   --warn: #ffcc55;   /* yellow-orange = target higher */
   --cool: #ff8a5c;   /* orange = within 5 */
   --bad: #e06eb5;    /* magenta = target lower / far */

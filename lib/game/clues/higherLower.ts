@@ -10,8 +10,13 @@ export const higherLowerClue: Clue<{ kind: "higherLower"; cmp: Cmp[] }> = {
   name: "Higher or Lower",
   category: "positional",
   description:
-    "For each slot: green if your digit matches the target, yellow if the target's digit at that slot is higher than yours (go up), red if it's lower (go down).",
+    "For each slot, shows whether your digit matches the target's, or whether the target's digit at that slot is higher or lower than yours.",
   weight: 0.6,
+  legend: [
+    { state: "match", label: "match" },
+    { state: "warm", label: "target higher" },
+    { state: "cold", label: "target lower" },
+  ],
   compute(guess, target) {
     const out: Cmp[] = [];
     for (let i = 0; i < guess.length; i++) {
@@ -20,7 +25,10 @@ export const higherLowerClue: Clue<{ kind: "higherLower"; cmp: Cmp[] }> = {
     return { kind: "higherLower", cmp: out };
   },
   example(target) {
-    const guess = "5".repeat(target.length);
+    // Pick target's first digit + all 5s, so you usually see one match plus
+    // a mix of "target higher" (warm) and "target lower" (cold) on the rest.
+    const first = target[0] ?? "5";
+    const guess = (first + "5555").slice(0, target.length);
     return { guess, result: this.compute(guess, target) };
   },
 };

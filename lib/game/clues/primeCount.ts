@@ -22,7 +22,8 @@ export const primeCountClue: Clue<{ kind: "primeCount"; cmp: Cmp }> = {
     return { kind: "primeCount", cmp };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    // All prime digits (2,3,5,7) — likely more primes than the target.
+    const guess = "23573".slice(0, target.length).padEnd(target.length, "2");
     return { guess, result: this.compute(guess, target) };
   },
 };

@@ -5,7 +5,7 @@ export const maxDigitClue: Clue<{ kind: "maxDigit"; cmp: Cmp }> = {
   name: "Max Digit",
   category: "compositional",
   description:
-    "Compares the largest digit in your guess to the largest digit in the target. Green = equal, yellow = target's max is higher, red = target's max is lower.",
+    "Compares the largest digit in your guess to the largest digit in the target. target ↑ means the target's max is higher, target ↓ means lower, equal means the same.",
   weight: 0.9,
   compute(guess, target) {
     const gMax = Math.max(...[...guess].map(Number));
@@ -14,7 +14,9 @@ export const maxDigitClue: Clue<{ kind: "maxDigit"; cmp: Cmp }> = {
     return { kind: "maxDigit", cmp };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    // "12345" has max 5 — on most 5-digit targets that contain an 8 or 9
+    // this shows "target ↑".
+    const guess = "12345".slice(0, target.length).padEnd(target.length, "1");
     return { guess, result: this.compute(guess, target) };
   },
 };

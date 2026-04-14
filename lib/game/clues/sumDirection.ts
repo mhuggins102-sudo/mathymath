@@ -20,7 +20,8 @@ export const sumDirectionClue: Clue<{ kind: "sumDirection"; cmp: Cmp }> = {
     return { kind: "sumDirection", cmp };
   },
   example(target) {
-    const guess = "0".repeat(target.length);
+    // "44444" has sum 20 — on most targets this shows a directional result.
+    const guess = "4".repeat(target.length);
     return { guess, result: this.compute(guess, target) };
   },
 };
