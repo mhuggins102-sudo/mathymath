@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0d;
+  --foreground: #e8e8ed;
+  --muted: #9aa0a6;
+  --surface: #151520;
+  --surface-2: #1e1e2c;
+  --border: #2a2a3a;
+  --accent: #7c8cff;
+  --good: #52d977;
+  --bad: #ff6b6b;
+  --warn: #f5c24b;
+
+  /* digit-popping palette (dark-friendly) */
+  --d-0: #d0d0dc;
+  --d-1: #ff7aa8;
+  --d-2: #ffbe55;
+  --d-3: #ffd866;
+  --d-4: #a6f07a;
+  --d-5: #6be3c4;
+  --d-6: #6ec4ff;
+  --d-7: #9d8aff;
+  --d-8: #f17aff;
+  --d-9: #ff9565;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-warn: var(--warn);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+.digit-0 { color: var(--d-0); }
+.digit-1 { color: var(--d-1); }
+.digit-2 { color: var(--d-2); }
+.digit-3 { color: var(--d-3); }
+.digit-4 { color: var(--d-4); }
+.digit-5 { color: var(--d-5); }
+.digit-6 { color: var(--d-6); }
+.digit-7 { color: var(--d-7); }
+.digit-8 { color: var(--d-8); }
+.digit-9 { color: var(--d-9); }
+
+@keyframes pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop { animation: pop 160ms ease-out; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.shake { animation: shake 220ms ease-in-out; }
+
+@keyframes reveal {
+  0% { transform: rotateX(90deg); opacity: 0; }
+  100% { transform: rotateX(0deg); opacity: 1; }
+}
+.reveal { animation: reveal 260ms ease-out both; }
+
+@media (orientation: landscape) and (max-width: 900px) {
+  .portrait-only { display: flex !important; }
+}
