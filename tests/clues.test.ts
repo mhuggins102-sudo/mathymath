@@ -16,6 +16,7 @@ import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
 import { maxDigitClue } from "@/lib/game/clues/maxDigit";
 import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
+import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
 describe("Bullseyes", () => {
@@ -103,14 +104,20 @@ describe("Sum Direction + Sum Delta", () => {
 });
 
 describe("Digit Overlap", () => {
-  it("counts each guess digit that appears in target", () => {
-    // guess 23446 vs target 44215: target's digit set is {4,2,1,5};
-    // guess positions [2,3,4,4,6] -> 2:yes, 3:no, 4:yes, 4:yes, 6:no = 3
+  it("is a multiset intersection (caps repeats at the target's count)", () => {
+    // guess 22245 vs target 57221: target has two 2s, so the three 2s in
+    // the guess claim only 2. Plus the single 5. Total: 3.
+    expect(digitOverlapClue.compute("22245", "57221").count).toBe(3);
+  });
+  it("counts each distinct match when target holds all copies", () => {
+    // guess 23446 vs target 44215: target {4:2, 2:1, 1:1, 5:1};
+    //   one 2 matches, two 4s match → 3.
     expect(digitOverlapClue.compute("23446", "44215").count).toBe(3);
   });
-  it("repeated guess digits all count when present in target", () => {
-    // guess 11111 vs target 14321: all five 1s in guess count
-    expect(digitOverlapClue.compute("11111", "14321").count).toBe(5);
+  it("excess repeats in the guess don't count", () => {
+    // guess 11111 vs target 10234: target has only one 1, so only one
+    // of the guess's five 1s can claim it.
+    expect(digitOverlapClue.compute("11111", "10234").count).toBe(1);
   });
   it("disjoint is 0", () => {
     expect(digitOverlapClue.compute("11111", "22222").count).toBe(0);
@@ -216,11 +223,25 @@ describe("Divisible By", () => {
   });
 });
 
+describe("Total Deviation", () => {
+  it("sums per-slot absolute differences", () => {
+    // User's example: guess 55555 vs target 10994 -> 4+5+4+4+1 = 18.
+    expect(totalDeviationClue.compute("55555", "10994").value).toBe(18);
+  });
+  it("is 0 when every slot is exact", () => {
+    expect(totalDeviationClue.compute("47628", "47628").value).toBe(0);
+  });
+  it("maxes at 45 when every digit is maximally off", () => {
+    expect(totalDeviationClue.compute("00000", "99999").value).toBe(45);
+    expect(totalDeviationClue.compute("99999", "00000").value).toBe(45);
+  });
+});
+
 describe("Registry", () => {
-  it("has 17 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(17);
+  it("has 18 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(18);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(17);
+    expect(ids.size).toBe(18);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

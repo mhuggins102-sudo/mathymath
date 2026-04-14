@@ -5,12 +5,21 @@ export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
   name: "Digit Overlap",
   category: "compositional",
   description:
-    "For each digit in your guess, checks whether that digit appears anywhere in the target. Counts the matches.",
+    "How many of your digits have a match in the target. Duplicates are capped by the target's count — three 2s against a target with only two 2s scores 2, not 3.",
   weight: 1.0,
   compute(guess, target) {
-    const targetSet = new Set(target);
+    // Multiset intersection: each digit in the target can match at most
+    // one digit in the guess. We tick off matches as we go.
+    const remaining = new Array(10).fill(0);
+    for (const ch of target) remaining[Number(ch)]++;
     let count = 0;
-    for (const ch of guess) if (targetSet.has(ch)) count++;
+    for (const ch of guess) {
+      const d = Number(ch);
+      if (remaining[d] > 0) {
+        count++;
+        remaining[d]--;
+      }
+    }
     return { kind: "digitOverlap", count };
   },
   example(target) {
@@ -18,6 +27,6 @@ export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
     return { guess, result: this.compute(guess, target) };
   },
   explain(guess, result) {
-    return `${result.count} of your ${guess.length} digits appear somewhere in the target.`;
+    return `${result.count} of your ${guess.length} digits have a matching digit in the target.`;
   },
 };

@@ -40,7 +40,8 @@ export type ClueResult =
   | { kind: "distinctDigits"; count: number }
   | { kind: "maxDigit"; cmp: Cmp }
   | { kind: "median"; cmp: Cmp }
-  | { kind: "divisibleBy"; divisor: number | null; present: boolean };
+  | { kind: "divisibleBy"; divisor: number | null; present: boolean }
+  | { kind: "totalDeviation"; value: number };
 
 export type ClueId = ClueResult["kind"];
 

@@ -92,6 +92,11 @@ function subLabelFor(result: ClueResult): { text: string; className: string } | 
       return { text: `${result.count} shared`, className: "text-accent" };
     case "distinctDigits":
       return { text: `${result.count} unique`, className: "text-accent" };
+    case "totalDeviation":
+      return {
+        text: `${result.value} off`,
+        className: result.value === 0 ? "text-good" : "text-warn",
+      };
     case "containsDigit":
       return {
         text: `${result.digit}? ${result.present ? "yes" : "no"}`,

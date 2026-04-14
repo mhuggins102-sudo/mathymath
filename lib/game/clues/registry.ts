@@ -16,6 +16,7 @@ import { distinctDigitsClue } from "./distinctDigits";
 import { maxDigitClue } from "./maxDigit";
 import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
+import { totalDeviationClue } from "./totalDeviation";
 
 export const CLUES: readonly Clue[] = [
   bullseyesClue,
@@ -35,6 +36,7 @@ export const CLUES: readonly Clue[] = [
   maxDigitClue,
   medianClue,
   divisibleByClue,
+  totalDeviationClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));
