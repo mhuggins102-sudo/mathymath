@@ -14,12 +14,8 @@ import {
   type DailyPercentileData,
 } from "@/components/DailyResultPanel";
 import { buildShareText } from "@/lib/game/share";
-import {
-  dailyHistoryStats,
-  loadDailyHistory,
-  recordDailyResult,
-  type DailyHistoryStats,
-} from "@/lib/persistence/localStore";
+import { recordDailyResult } from "@/lib/persistence/localStore";
+import type { ClueId } from "@/lib/game/clues/types";
 
 interface DailyGameProps {
   date: string;
@@ -42,7 +38,6 @@ export function DailyGame({
   const [percentile, setPercentile] = useState<DailyPercentileData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [personalStats, setPersonalStats] = useState<DailyHistoryStats | null>(null);
   const submittedRef = useRef(false);
   const personalRecordedRef = useRef(false);
   const startedAtRef = useRef<number>(Date.now());
@@ -62,24 +57,15 @@ export function DailyGame({
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
   const submitDisabled = input.length !== state.digits || keypadDisabled;
 
-  // On first render, show personal stats already-accumulated across prior dailies
-  // even before this puzzle is resolved.
-  useEffect(() => {
-    setPersonalStats(dailyHistoryStats(loadDailyHistory()));
-  }, []);
-
-  // Record this daily's result locally (first write wins per date).
+  // Record this daily's result locally (first write wins per date). This
+  // feeds the Lifetime Stats view on the home page — it's not shown on the
+  // daily end screen itself.
   useEffect(() => {
     if (!hydrated) return;
     if (state.status === "playing") return;
     if (personalRecordedRef.current) return;
     personalRecordedRef.current = true;
-    const updated = recordDailyResult(
-      date,
-      state.guesses.length,
-      state.status === "won",
-    );
-    setPersonalStats(dailyHistoryStats(updated));
+    recordDailyResult(date, state.guesses.length, state.status === "won");
   }, [hydrated, state.status, state.guesses.length, date]);
 
   useEffect(() => {
@@ -97,7 +83,9 @@ export function DailyGame({
       puzzleDate: date,
       guessCount: state.guesses.length,
       won: state.status === "won",
-      chosenClues: state.guesses.map((g, i) => ({ guessIdx: i, clueId: g.clueId })),
+      chosenClues: state.guesses
+        .map((g, i) => ({ guessIdx: i, clueId: g.clueId }))
+        .filter((c): c is { guessIdx: number; clueId: ClueId } => !!c.clueId),
       durationMs: Date.now() - startedAtRef.current,
     };
 
@@ -201,7 +189,6 @@ export function DailyGame({
                 loading={statsLoading}
                 error={statsError}
                 maxGuesses={state.maxGuesses}
-                personal={personalStats}
                 onShare={handleShare}
               />
               {!isToday && (

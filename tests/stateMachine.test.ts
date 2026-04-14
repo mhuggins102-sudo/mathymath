@@ -21,14 +21,33 @@ describe("stateMachine", () => {
     expect(s.guesses[0].clueId).toBe(chosen.id);
   });
 
-  it("loses after maxGuesses wrong guesses", () => {
-    let s = initGameState({ target: "12345", seed: "t", maxGuesses: 2 });
+  it("loses after maxGuesses wrong guesses; final guess skips the clue chooser", () => {
+    let s = initGameState({ target: "12345", seed: "t", maxGuesses: 3 });
+    // Non-final wrong guesses: clue chooser appears.
     for (let i = 0; i < 2; i++) {
       s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
+      expect(s.pendingGuess).not.toBeNull();
       const opt = s.pendingGuess!.options[0];
       s = reduce(s, { type: "CHOOSE_CLUE", clueId: opt.id });
     }
+    // Final wrong guess: no clue offered, game ends immediately.
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
+    expect(s.pendingGuess).toBeNull();
     expect(s.status).toBe("lost");
+    expect(s.guesses).toHaveLength(3);
+    expect(s.guesses[2].clueId).toBeUndefined();
+    expect(s.guesses[2].result).toBeUndefined();
+  });
+
+  it("wins on exact match even on the final guess", () => {
+    let s = initGameState({ target: "12345", seed: "t", maxGuesses: 2 });
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
+    const opt = s.pendingGuess!.options[0];
+    s = reduce(s, { type: "CHOOSE_CLUE", clueId: opt.id });
+    // Now on the last guess slot.
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "12345" });
+    expect(s.status).toBe("won");
+    expect(s.guesses).toHaveLength(2);
   });
 
   it("ignores SUBMIT_GUESS while pending", () => {

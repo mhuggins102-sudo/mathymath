@@ -77,10 +77,13 @@ export function useGame(config: UseGameConfig): UseGameResult {
     const saved = loadGame(config.storageKey);
     if (saved && saved.target === config.target && saved.seed === config.seed) {
       // Replay saved guesses into a fresh reducer.
-      // (We keep the reducer simple by re-applying SUBMIT_GUESS + CHOOSE_CLUE.)
+      // Guesses without a clueId are final-guess losses — SUBMIT_GUESS
+      // short-circuits them into the lost state, no CHOOSE_CLUE needed.
       for (const g of saved.guesses) {
         dispatch({ type: "SUBMIT_GUESS", guess: g.guess });
-        dispatch({ type: "CHOOSE_CLUE", clueId: g.clueId as never });
+        if (g.clueId) {
+          dispatch({ type: "CHOOSE_CLUE", clueId: g.clueId as never });
+        }
       }
     }
     setHydrated(true);

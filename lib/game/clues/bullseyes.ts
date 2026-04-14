@@ -13,10 +13,16 @@ export const bullseyesClue: Clue<{ kind: "bullseyes"; hits: boolean[] }> = {
     return { kind: "bullseyes", hits };
   },
   example(target) {
-    // Craft a guess with a mix: ~2 exact matches and ~3 misses.
-    // Use target's 1st and 3rd digits, change the others.
     const t = [...target];
     const guess = [t[0], "3", t[2], "1", "9"].join("").slice(0, target.length);
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    const slots = result.hits
+      .map((h, i) => (h ? String(i + 1) : null))
+      .filter((v): v is string => v !== null);
+    if (slots.length === 0) return "No slots match the target exactly.";
+    if (slots.length === 1) return `Slot ${slots[0]} matches the target exactly.`;
+    return `Slots ${slots.join(", ")} match the target exactly.`;
   },
 };

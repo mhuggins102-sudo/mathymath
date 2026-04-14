@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Digit, type DigitState } from "./Digit";
-import type { ClueResult } from "@/lib/game/clues/types";
+import type { Clue, ClueResult, ClueResultFor } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 
 interface GuessRowProps {
@@ -10,6 +11,12 @@ interface GuessRowProps {
   result?: ClueResult;
   active?: boolean;
   pending?: boolean;
+  /**
+   * When true, the clue label is a button that toggles an in-row
+   * explanation panel (tap to see plain-language detail). Off by default
+   * so the Help modal renders plain rows.
+   */
+  interactive?: boolean;
 }
 
 /** Per-slot color state derived from the clue result. */
@@ -35,18 +42,17 @@ function cellStates(
       );
     case "thermometer":
       return result.tier.map((t) => {
-        if (t === 0) return "match"; // exact
-        if (t === 1) return "close"; // within 1 (distinct from exact)
-        if (t === 2) return "warm"; // within 3
-        if (t === 3) return "cool"; // within 5
-        return "cold"; // far
+        if (t === 0) return "match";
+        if (t === 1) return "close";
+        if (t === 2) return "warm";
+        if (t === 3) return "cool";
+        return "cold";
       });
     default:
       return new Array(digits).fill("idle");
   }
 }
 
-/** For Oracle, the revealed slot shows the target's digit instead of the guess. */
 function displayDigits(
   guess: string,
   digits: number,
@@ -60,12 +66,8 @@ function displayDigits(
   return out;
 }
 
-/** Minimal LEFT-side label: clue name + a compact value chip for compositional clues. */
-function ClueSideLabel({ result }: { result: ClueResult }) {
-  const meta = getClueById(result.kind);
-  let sub: React.ReactNode = null;
-  let subClass = "text-muted";
-
+/** Compact chip text + color for the sub-label next to the clue name. */
+function subLabelFor(result: ClueResult): { text: string; className: string } | null {
   switch (result.kind) {
     case "sumDirection":
     case "rangeCompare":
@@ -73,66 +75,98 @@ function ClueSideLabel({ result }: { result: ClueResult }) {
     case "parityBalance":
     case "primeCount":
     case "median":
-      sub =
-        result.cmp === "eq" ? "equal" : result.cmp === "gt" ? "target ↑" : "target ↓";
-      subClass =
-        result.cmp === "eq"
-          ? "text-good"
-          : result.cmp === "gt"
-          ? "text-warn"
-          : "text-bad";
-      break;
+      return {
+        text:
+          result.cmp === "eq" ? "equal" : result.cmp === "gt" ? "target ↑" : "target ↓",
+        className:
+          result.cmp === "eq"
+            ? "text-good"
+            : result.cmp === "gt"
+            ? "text-warn"
+            : "text-bad",
+      };
     case "sumDelta": {
-      if (result.delta === 0) {
-        sub = "equal";
-        subClass = "text-good";
-      } else if (result.delta > 0) {
-        sub = `target +${result.delta}`;
-        subClass = "text-warn";
-      } else {
-        sub = `target −${Math.abs(result.delta)}`;
-        subClass = "text-bad";
-      }
-      break;
+      if (result.delta === 0) return { text: "equal", className: "text-good" };
+      if (result.delta > 0)
+        return { text: `target +${result.delta}`, className: "text-warn" };
+      return { text: `target −${Math.abs(result.delta)}`, className: "text-bad" };
     }
     case "digitOverlap":
-      sub = `${result.count} shared`;
-      subClass = "text-accent";
-      break;
+      return { text: `${result.count} shared`, className: "text-accent" };
     case "distinctDigits":
-      sub = `${result.count} unique`;
-      subClass = "text-accent";
-      break;
+      return { text: `${result.count} unique`, className: "text-accent" };
     case "containsDigit":
-      sub = `${result.digit}? ${result.present ? "yes" : "no"}`;
-      subClass = result.present ? "text-good" : "text-bad";
-      break;
+      return {
+        text: `${result.digit}? ${result.present ? "yes" : "no"}`,
+        className: result.present ? "text-good" : "text-bad",
+      };
     case "divisibleBy":
-      if (result.present && result.divisor !== null) {
-        sub = `${result.divisor}? yes`;
-        subClass = "text-good";
-      } else {
-        sub = "divisible? no";
-        subClass = "text-bad";
-      }
-      break;
+      if (result.present && result.divisor !== null)
+        return { text: `${result.divisor}? yes`, className: "text-good" };
+      return { text: "divisible? no", className: "text-bad" };
     case "oracle":
-      sub = `slot ${result.slot + 1}`;
-      subClass = "text-muted";
-      break;
+      return { text: `slot ${result.slot + 1}`, className: "text-muted" };
     default:
-      sub = null;
+      return null;
   }
+}
 
-  return (
+function ClueSideLabel({
+  result,
+  guess,
+  interactive,
+}: {
+  result: ClueResult;
+  guess: string;
+  interactive: boolean;
+}) {
+  const meta = getClueById(result.kind) as Clue;
+  const sub = subLabelFor(result);
+  const [open, setOpen] = useState(false);
+  const explanation = interactive
+    ? (meta.explain as (g: string, r: ClueResult) => string)(
+        guess,
+        result as ClueResultFor<typeof result.kind>,
+      )
+    : null;
+
+  const labelBody = (
     <div className="flex flex-col justify-center text-right min-w-0">
       <span className="text-[11px] font-semibold text-foreground truncate leading-tight">
         {meta.name}
       </span>
       {sub && (
-        <span className={`text-[10px] font-mono ${subClass} truncate leading-tight`}>
-          {sub}
+        <span className={`text-[10px] font-mono ${sub.className} truncate leading-tight`}>
+          {sub.text}
         </span>
+      )}
+    </div>
+  );
+
+  if (!interactive) return labelBody;
+
+  return (
+    <div className="relative min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`Explain clue: ${meta.name}`}
+        className="w-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
+      >
+        {labelBody}
+      </button>
+      {open && explanation && (
+        <div
+          className="absolute right-0 top-full mt-1 z-30 w-60 rounded-md border border-border bg-surface-2 shadow-lg px-3 py-2 text-[11px] leading-snug text-foreground"
+          onClick={() => setOpen(false)}
+          role="tooltip"
+        >
+          <p className="mb-1 text-[9px] uppercase tracking-wider text-muted">
+            {meta.name}
+          </p>
+          <p>{explanation}</p>
+        </div>
       )}
     </div>
   );
@@ -144,6 +178,7 @@ export function GuessRow({
   result,
   active,
   pending,
+  interactive = false,
 }: GuessRowProps) {
   const states = cellStates(result, digits);
   const displayed = displayDigits(guess, digits, result);
@@ -158,7 +193,7 @@ export function GuessRow({
         {pending && !result ? (
           <p className="text-[10px] text-muted text-right">pick a clue below…</p>
         ) : result ? (
-          <ClueSideLabel result={result} />
+          <ClueSideLabel result={result} guess={guess} interactive={interactive} />
         ) : null}
       </div>
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">

@@ -17,6 +17,10 @@ export const containsDigitClue: Clue<{
   description:
     "Picks one specific digit (shown in the clue) and tells you yes or no: is it anywhere in the target?",
   weight: 1.0,
+  legend: [
+    { state: "match", label: "digit present" },
+    { state: "cold", label: "digit absent" },
+  ],
   compute(guess, target) {
     const rng = seededRng(`contains:${guess}:${target}`);
     const digit = Math.floor(rng() * 10);
@@ -26,5 +30,10 @@ export const containsDigitClue: Clue<{
   example(target) {
     const guess = "98765".slice(0, target.length).padEnd(target.length, "9");
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    return result.present
+      ? `The target contains at least one ${result.digit}.`
+      : `The target does NOT contain the digit ${result.digit}.`;
   },
 };

@@ -18,4 +18,7 @@ export const oracleClue: Clue<{ kind: "oracle"; slot: number; digit: number }> =
     const guess = "12345".slice(0, target.length).padEnd(target.length, "0");
     return { guess, result: this.compute(guess, target) };
   },
+  explain(_guess, result) {
+    return `The target's digit at slot ${result.slot + 1} is ${result.digit}.`;
+  },
 };

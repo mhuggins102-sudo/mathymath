@@ -11,8 +11,13 @@ export const sumDirectionClue: Clue<{ kind: "sumDirection"; cmp: Cmp }> = {
   name: "Sum Direction",
   category: "compositional",
   description:
-    "Is the target's digit sum higher, lower, or equal to your guess's digit sum? (Direction only — no magnitude.)",
+    "Is the target's digit sum higher, lower, or equal to your guess's? Direction only — no magnitude.",
   weight: 1.2,
+  legend: [
+    { state: "match", label: "equal" },
+    { state: "warm", label: "target higher" },
+    { state: "cold", label: "target lower" },
+  ],
   compute(guess, target) {
     const t = digitSum(target);
     const g = digitSum(guess);
@@ -20,8 +25,13 @@ export const sumDirectionClue: Clue<{ kind: "sumDirection"; cmp: Cmp }> = {
     return { kind: "sumDirection", cmp };
   },
   example(target) {
-    // "44444" has sum 20 — on most targets this shows a directional result.
     const guess = "4".repeat(target.length);
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(guess, result) {
+    const gs = digitSum(guess);
+    if (result.cmp === "eq") return `Target's digit sum equals ${gs} (same as yours).`;
+    if (result.cmp === "gt") return `Target's digit sum is greater than ${gs}.`;
+    return `Target's digit sum is less than ${gs}.`;
   },
 };

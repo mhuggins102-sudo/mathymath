@@ -21,7 +21,8 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   divisibleBy: "➗",
 };
 
-function perSlotLine(result: ClueResult, digits: number): string {
+function perSlotLine(result: ClueResult | undefined, digits: number): string {
+  if (!result) return "⬛".repeat(digits);
   switch (result.kind) {
     case "bullseyes":
       return result.hits.map((h) => (h ? "🟩" : "⬛")).join("");
@@ -69,7 +70,7 @@ export function buildShareText({
 }: ShareOptions): string {
   const header = `${title} ${won ? guessCount : "X"}/${maxGuesses}`;
   const lines = guesses.map((g) => {
-    const emoji = CLUE_EMOJI[g.clueId] ?? "•";
+    const emoji = g.clueId ? CLUE_EMOJI[g.clueId] : "⬜";
     return `${emoji} ${perSlotLine(g.result, digits)}`;
   });
   return [header, "", ...lines, "", "mathymath.app"].join("\n");

@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { Countdown } from "@/components/Countdown";
-import { SettingsButton } from "@/components/SettingsButton";
+import { HomeHeaderIcons } from "@/components/HomeHeaderIcons";
 
 export default function Home() {
   return (
-    <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
+    <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center relative">
+      <HomeHeaderIcons />
       <div className="max-w-md w-full">
-        <h1 className="text-4xl font-bold tracking-tight mb-2 font-mono">
+        <h1 className="text-4xl font-bold tracking-tight mb-3 font-mono">
           mathymath
         </h1>
-        <p className="text-muted mb-8 text-sm">
-          A number-guessing Wordle. Pick your clue each round.
+        <p className="text-muted mb-8 text-sm leading-relaxed">
+          A number-guessing Wordle.
+          <br />
+          Pick your clue each round.
         </p>
 
         <div className="grid gap-3 mb-8">
@@ -35,14 +38,6 @@ export default function Home() {
         </div>
 
         <Countdown label="Next daily in" />
-
-        <p className="text-xs text-muted mt-10">
-          5 digits · 8 guesses · repeats allowed
-        </p>
-
-        <div className="mt-4 flex items-center justify-center gap-3 text-xs">
-          <SettingsButton className="text-muted hover:text-foreground underline-offset-4 hover:underline" />
-        </div>
       </div>
     </main>
   );

@@ -11,14 +11,25 @@ export const sumDeltaClue: Clue<{ kind: "sumDelta"; delta: number }> = {
   name: "Sum Delta",
   category: "compositional",
   description:
-    "Shows the exact signed difference between the target's digit sum and your guess's digit sum (target − guess).",
+    "Exact signed difference between the target's digit sum and yours (target − guess).",
   weight: 0.9,
+  legend: [
+    { state: "match", label: "equal" },
+    { state: "warm", label: "target higher" },
+    { state: "cold", label: "target lower" },
+  ],
   compute(guess, target) {
     return { kind: "sumDelta", delta: digitSum(target) - digitSum(guess) };
   },
   example(target) {
-    // "44444" has sum 20 — delta reads as a modest +/- on most targets.
     const guess = "4".repeat(target.length);
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(guess, result) {
+    const gs = digitSum(guess);
+    const ts = gs + result.delta;
+    if (result.delta === 0) return `Target's digit sum is ${ts} (same as yours).`;
+    const sign = result.delta > 0 ? "+" : "−";
+    return `Target's digit sum is ${ts} (yours is ${gs}, off by ${sign}${Math.abs(result.delta)}).`;
   },
 };

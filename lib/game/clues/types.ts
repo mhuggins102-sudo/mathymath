@@ -55,6 +55,9 @@ export interface Clue<R extends ClueResult = ClueResult> {
   legend?: LegendEntry[];
   compute(guess: string, target: string): R;
   example(target: string): { guess: string; result: R };
+  /** Plain-language explanation of the result for this specific guess.
+   *  Rendered in the in-game popover when a player taps the clue name. */
+  explain(guess: string, result: R): string;
 }
 
 // Helper narrowing: given an id, narrow ClueResult.

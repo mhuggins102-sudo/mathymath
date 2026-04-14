@@ -15,9 +15,16 @@ export const within2Clue: Clue<{ kind: "within2"; mask: boolean[] }> = {
     return { kind: "within2", mask };
   },
   example(target) {
-    // "55555" lands within ±2 of roughly the middle of the digit range —
-    // gives a nice mix of marked and unmarked slots on most targets.
     const guess = "5".repeat(target.length);
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    const slots = result.mask
+      .map((m, i) => (m ? String(i + 1) : null))
+      .filter((v): v is string => v !== null);
+    if (slots.length === 0) return "No slots within ±2 of the target.";
+    if (slots.length === result.mask.length)
+      return "Every slot is within ±2 of the target.";
+    return `Slots ${slots.join(", ")} are within ±2 of the target.`;
   },
 };

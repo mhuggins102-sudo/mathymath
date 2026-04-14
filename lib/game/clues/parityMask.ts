@@ -15,9 +15,16 @@ export const parityMaskClue: Clue<{ kind: "parityMask"; matches: boolean[] }> = 
     return { kind: "parityMask", matches };
   },
   example(target) {
-    // Alternating parity "13246" shows a mix of parity matches/misses on
-    // most targets.
     const guess = "13246".slice(0, target.length).padEnd(target.length, "0");
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    const slots = result.matches
+      .map((m, i) => (m ? String(i + 1) : null))
+      .filter((v): v is string => v !== null);
+    if (slots.length === 0) return "No slots share parity with the target.";
+    if (slots.length === result.matches.length)
+      return "Every slot matches the target's parity.";
+    return `Slots ${slots.join(", ")} match the target's parity.`;
   },
 };

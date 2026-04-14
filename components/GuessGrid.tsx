@@ -27,6 +27,7 @@ export function GuessGrid({ state, currentInput }: GuessGridProps) {
         guess={g.guess}
         digits={state.digits}
         result={g.result}
+        interactive
       />,
     );
   }

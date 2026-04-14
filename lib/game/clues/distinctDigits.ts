@@ -14,8 +14,10 @@ export const distinctDigitsClue: Clue<{
     return { kind: "distinctDigits", count: new Set(target).size };
   },
   example(target) {
-    // The guess doesn't affect the result — it's a property of the target.
     const guess = "24680".slice(0, target.length).padEnd(target.length, "2");
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    return `Target uses ${result.count} distinct digit value${result.count === 1 ? "" : "s"}.`;
   },
 };

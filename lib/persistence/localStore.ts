@@ -7,8 +7,8 @@ const STORAGE_PREFIX = "mathymath:";
 
 const guessSchema = z.object({
   guess: z.string(),
-  clueId: z.string(),
-  result: z.unknown(),
+  clueId: z.string().optional(),
+  result: z.unknown().optional(),
 });
 
 const savedGameSchema = z.object({

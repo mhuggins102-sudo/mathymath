@@ -2,12 +2,14 @@ import type { Clue } from "./types";
 
 function tier(diff: number): number {
   const d = Math.abs(diff);
-  if (d === 0) return 0; // exact
-  if (d <= 1) return 1; // within 1
-  if (d <= 3) return 2; // within 3
-  if (d <= 5) return 3; // within 5
-  return 4; // far
+  if (d === 0) return 0;
+  if (d <= 1) return 1;
+  if (d <= 3) return 2;
+  if (d <= 5) return 3;
+  return 4;
 }
+
+const TIER_LABEL = ["exact", "within 1", "within 3", "within 5", "far off"];
 
 export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
   id: "thermometer",
@@ -28,9 +30,6 @@ export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
     return { kind: "thermometer", tier: tiers };
   },
   example(target) {
-    // Try to cover all 5 tiers. For target "47628": "46371" hits
-    //   exact / within 1 / within 3 / within 5 / far.
-    // Generic fallback: offset each slot by increasing amounts.
     const offsets = [0, 1, 3, 5, 8];
     const guess = [...target]
       .map((ch, i) => {
@@ -41,5 +40,13 @@ export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
       })
       .join("");
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    const counts = [0, 0, 0, 0, 0];
+    for (const t of result.tier) counts[t]++;
+    const parts = counts
+      .map((c, i) => (c > 0 ? `${c} ${TIER_LABEL[i]}` : null))
+      .filter((v): v is string => v !== null);
+    return parts.join(" · ");
   },
 };

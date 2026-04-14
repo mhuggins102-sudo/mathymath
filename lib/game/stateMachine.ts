@@ -6,10 +6,16 @@ export const DEFAULT_MAX_GUESSES = 8;
 
 export type GameStatus = "playing" | "won" | "lost";
 
+/**
+ * A resolved guess row. `clueId` and `result` are present whenever the
+ * player chose a clue. They are undefined for the final guess of a lost
+ * game (because no clue is offered on guess #maxGuesses — the game ends
+ * immediately on that submission).
+ */
 export interface ResolvedGuess {
   guess: string;
-  clueId: ClueId;
-  result: ClueResult;
+  clueId?: ClueId;
+  result?: ClueResult;
 }
 
 export interface GameState {
@@ -64,7 +70,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
       // Exact match = instant win; skip clue-choice modal.
       if (action.guess === state.target) {
-        const clueId = "bullseyes";
+        const clueId: ClueId = "bullseyes";
         const result = getClueById(clueId).compute(action.guess, state.target);
         return {
           ...state,
@@ -76,7 +82,20 @@ export function reduce(state: GameState, action: GameAction): GameState {
         };
       }
 
-      const usedClueIds = state.guesses.map((g) => g.clueId);
+      // Final guess and wrong → lose immediately without offering a clue.
+      // (Showing a clue right before the game ends would be pointless.)
+      const isFinalGuess = state.guesses.length + 1 >= state.maxGuesses;
+      if (isFinalGuess) {
+        return {
+          ...state,
+          guesses: [...state.guesses, { guess: action.guess }],
+          status: "lost",
+        };
+      }
+
+      const usedClueIds = state.guesses
+        .map((g) => g.clueId)
+        .filter((id): id is ClueId => id !== undefined);
       const options = pickTwoClues(state.seed, usedClueIds);
       return {
         ...state,
@@ -91,7 +110,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
       if (!clue) return state;
       const result = clue.compute(guess, state.target);
       const guesses = [...state.guesses, { guess, clueId: clue.id, result }];
-      const won = guess === state.target; // defensive; SUBMIT_GUESS short-circuits already
+      const won = guess === state.target;
       const lost = !won && guesses.length >= state.maxGuesses;
       return {
         ...state,

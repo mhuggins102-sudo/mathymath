@@ -25,10 +25,18 @@ export const higherLowerClue: Clue<{ kind: "higherLower"; cmp: Cmp[] }> = {
     return { kind: "higherLower", cmp: out };
   },
   example(target) {
-    // Pick target's first digit + all 5s, so you usually see one match plus
-    // a mix of "target higher" (warm) and "target lower" (cold) on the rest.
     const first = target[0] ?? "5";
     const guess = (first + "5555").slice(0, target.length);
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(_guess, result) {
+    const eq = result.cmp.filter((c) => c === "eq").length;
+    const gt = result.cmp.filter((c) => c === "gt").length;
+    const lt = result.cmp.filter((c) => c === "lt").length;
+    const parts: string[] = [];
+    if (eq > 0) parts.push(`${eq} match`);
+    if (gt > 0) parts.push(`${gt} need higher`);
+    if (lt > 0) parts.push(`${lt} need lower`);
+    return parts.join(" · ");
   },
 };

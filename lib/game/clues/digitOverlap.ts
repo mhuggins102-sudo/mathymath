@@ -5,7 +5,7 @@ export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
   name: "Digit Overlap",
   category: "compositional",
   description:
-    "For each digit in your guess, checks whether that digit appears anywhere in the target (any position). Counts the matches — so if you guess 23446 and the target is 44215, the overlap is 3 (both 4s and the 2 all appear in the target).",
+    "For each digit in your guess, checks whether that digit appears anywhere in the target. Counts the matches.",
   weight: 1.0,
   compute(guess, target) {
     const targetSet = new Set(target);
@@ -14,8 +14,10 @@ export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
     return { kind: "digitOverlap", count };
   },
   example(target) {
-    // "12348" typically overlaps with 2-3 of the target's digits.
     const guess = "12348".slice(0, target.length).padEnd(target.length, "1");
     return { guess, result: this.compute(guess, target) };
+  },
+  explain(guess, result) {
+    return `${result.count} of your ${guess.length} digits appear somewhere in the target.`;
   },
 };
