@@ -20,6 +20,9 @@ interface DailyResultPanelProps {
   error: string | null;
   maxGuesses: number;
   onShare?: () => void;
+  /** When provided, renders a "show puzzle" link at the bottom that
+   *  dismisses the panel so the player can see their finished grid. */
+  onDismiss?: () => void;
 }
 
 export function DailyResultPanel({
@@ -31,6 +34,7 @@ export function DailyResultPanel({
   error,
   maxGuesses,
   onShare,
+  onDismiss,
 }: DailyResultPanelProps) {
   // "Beat N% of players" = number of other players whose score was
   // strictly worse than yours (percentile as already computed by the API).
@@ -105,6 +109,16 @@ export function DailyResultPanel({
       )}
 
       <Countdown />
+
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="w-full text-xs text-muted hover:text-foreground underline underline-offset-4 py-1"
+        >
+          show puzzle
+        </button>
+      )}
     </div>
   );
 }

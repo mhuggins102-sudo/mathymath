@@ -43,55 +43,74 @@ export function LifetimeStatsModal({
       ? "Unlimited stats"
       : "Lifetime stats";
 
+  const content = (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">{title}</h2>
+        <button
+          type="button"
+          className="text-muted hover:text-foreground text-sm px-2 py-1"
+          onClick={onClose}
+        >
+          Close ✕
+        </button>
+      </div>
+      <div className="space-y-4">
+        {(mode === "daily" || mode === "both") && (
+          <Block
+            title="Daily"
+            showTitle={mode === "both"}
+            played={daily?.played ?? 0}
+            wins={daily?.wins ?? 0}
+            currentStreak={daily?.currentStreak ?? 0}
+            bestStreak={daily?.bestStreak ?? 0}
+            distribution={daily?.distribution ?? {}}
+          />
+        )}
+        {(mode === "unlimited" || mode === "both") && (
+          <Block
+            title="Unlimited"
+            showTitle={mode === "both"}
+            played={unlimited?.played ?? 0}
+            wins={unlimited?.wins ?? 0}
+            currentStreak={unlimited?.currentStreak ?? 0}
+            bestStreak={unlimited?.bestStreak ?? 0}
+            distribution={unlimited?.distribution ?? {}}
+          />
+        )}
+      </div>
+    </>
+  );
+
+  // Home ("both") uses the full-screen modal aesthetic shared with Help
+  // and Settings. In-game ("daily" / "unlimited") uses a centered card
+  // popup that closes on backdrop tap.
+  if (mode === "both") {
+    return (
+      <div
+        className="fixed inset-0 z-50 bg-background overflow-y-auto text-left"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="max-w-md mx-auto p-4 pb-20">{content}</div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 text-left"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
-        // Backdrop click closes; content clicks don't bubble.
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-xl border border-border shadow-2xl"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-xl border border-border shadow-2xl p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-base font-semibold">{title}</h2>
-          <button
-            type="button"
-            className="text-muted hover:text-foreground text-sm px-2 py-1"
-            onClick={onClose}
-          >
-            Close ✕
-          </button>
-        </div>
-
-        <div className="px-4 pb-4 space-y-4">
-          {(mode === "daily" || mode === "both") && (
-            <Block
-              title="Daily"
-              showTitle={mode === "both"}
-              played={daily?.played ?? 0}
-              wins={daily?.wins ?? 0}
-              currentStreak={daily?.currentStreak ?? 0}
-              bestStreak={daily?.bestStreak ?? 0}
-              distribution={daily?.distribution ?? {}}
-            />
-          )}
-          {(mode === "unlimited" || mode === "both") && (
-            <Block
-              title="Unlimited"
-              showTitle={mode === "both"}
-              played={unlimited?.played ?? 0}
-              wins={unlimited?.wins ?? 0}
-              currentStreak={unlimited?.currentStreak ?? 0}
-              bestStreak={unlimited?.bestStreak ?? 0}
-              distribution={unlimited?.distribution ?? {}}
-            />
-          )}
-        </div>
+        {content}
       </div>
     </div>
   );

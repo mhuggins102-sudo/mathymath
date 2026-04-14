@@ -17,23 +17,27 @@ export default function Home() {
         </p>
 
         <div className="grid gap-3 mb-8">
-          <Link
-            href="/daily"
-            className="block bg-accent/80 text-background font-semibold py-4 rounded-xl active:scale-[0.99] transition"
-          >
-            Today&apos;s Puzzle
-          </Link>
+          <div className="flex items-stretch gap-2">
+            <Link
+              href="/daily"
+              className="flex-1 bg-accent/80 text-background font-semibold py-4 rounded-xl active:scale-[0.99] transition text-center"
+            >
+              Today&apos;s Puzzle
+            </Link>
+            <Link
+              href="/archive"
+              aria-label="Archive — play past daily puzzles"
+              title="Archive"
+              className="bg-accent/80 text-background rounded-xl active:scale-[0.99] transition flex items-center justify-center w-14 text-xl"
+            >
+              📅
+            </Link>
+          </div>
           <Link
             href="/unlimited"
-            className="block bg-surface-2 text-foreground font-semibold py-4 rounded-xl border border-border active:scale-[0.99] transition"
+            className="block bg-surface-2 text-foreground font-semibold py-4 rounded-xl border border-border active:scale-[0.99] transition text-center"
           >
             Unlimited
-          </Link>
-          <Link
-            href="/archive"
-            className="block bg-surface text-muted font-semibold py-3 rounded-xl border border-border active:scale-[0.99] transition text-sm"
-          >
-            Archive
           </Link>
         </div>
 

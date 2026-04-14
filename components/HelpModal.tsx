@@ -27,7 +27,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 bg-background/95 overflow-y-auto text-left"
+      className="fixed inset-0 z-50 bg-background overflow-y-auto text-left"
       role="dialog"
       aria-modal="true"
     >
