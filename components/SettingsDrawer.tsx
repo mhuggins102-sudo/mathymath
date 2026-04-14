@@ -25,7 +25,7 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-background/95"
+      className="fixed inset-0 z-50 bg-background/95 text-left"
       role="dialog"
       aria-modal="true"
     >

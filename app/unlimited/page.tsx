@@ -9,8 +9,8 @@ import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { HelpModal } from "@/components/HelpModal";
-import { StatsPanel } from "@/components/StatsPanel";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
+import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
 
 function newSession() {
   return { target: generateRandomTarget(5), seed: uuidv4() };
@@ -22,6 +22,7 @@ export default function UnlimitedPage() {
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     setSession(newSession());
@@ -45,6 +46,8 @@ export default function UnlimitedPage() {
       setHelpOpen={setHelpOpen}
       settingsOpen={settingsOpen}
       setSettingsOpen={setSettingsOpen}
+      statsOpen={statsOpen}
+      setStatsOpen={setStatsOpen}
     />
   );
 }
@@ -56,6 +59,8 @@ function UnlimitedGame({
   setHelpOpen,
   settingsOpen,
   setSettingsOpen,
+  statsOpen,
+  setStatsOpen,
 }: {
   session: { target: string; seed: string };
   onNew: () => void;
@@ -63,6 +68,8 @@ function UnlimitedGame({
   setHelpOpen: (v: boolean) => void;
   settingsOpen: boolean;
   setSettingsOpen: (v: boolean) => void;
+  statsOpen: boolean;
+  setStatsOpen: (v: boolean) => void;
 }) {
   const {
     state,
@@ -72,7 +79,6 @@ function UnlimitedGame({
     backspace,
     submit,
     chooseClue,
-    unlimitedStats,
   } = useGame({
     target: session.target,
     seed: session.seed,
@@ -107,6 +113,14 @@ function UnlimitedGame({
             aria-label="Settings"
           >
             ⚙
+          </button>
+          <button
+            type="button"
+            className="text-muted text-base hover:text-foreground px-2"
+            onClick={() => setStatsOpen(true)}
+            aria-label="Unlimited stats"
+          >
+            📊
           </button>
           <button
             type="button"
@@ -154,12 +168,9 @@ function UnlimitedGame({
               >
                 New puzzle
               </button>
-              <div className="pt-2">
-                <StatsPanel
-                  stats={unlimitedStats}
-                  maxGuesses={state.maxGuesses}
-                />
-              </div>
+              <p className="text-xs text-muted">
+                Tap 📊 above to see your unlimited stats.
+              </p>
             </div>
           )}
         </div>
@@ -167,6 +178,11 @@ function UnlimitedGame({
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <LifetimeStatsModal
+        open={statsOpen}
+        onClose={() => setStatsOpen(false)}
+        mode="unlimited"
+      />
     </main>
   );
 }

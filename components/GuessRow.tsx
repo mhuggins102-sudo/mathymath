@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Digit, type DigitState } from "./Digit";
 import type { Clue, ClueResult, ClueResultFor } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
@@ -11,11 +11,9 @@ interface GuessRowProps {
   result?: ClueResult;
   active?: boolean;
   pending?: boolean;
-  /**
-   * When true, the clue label is a button that toggles an in-row
-   * explanation panel (tap to see plain-language detail). Off by default
-   * so the Help modal renders plain rows.
-   */
+  /** When true, the clue label is a button that expands a plain-language
+   *  explanation panel below the row. Off by default so Help-modal rows
+   *  render plain and non-interactive. */
   interactive?: boolean;
 }
 
@@ -66,7 +64,6 @@ function displayDigits(
   return out;
 }
 
-/** Compact chip text + color for the sub-label next to the clue name. */
 function subLabelFor(result: ClueResult): { text: string; className: string } | null {
   switch (result.kind) {
     case "sumDirection":
@@ -111,26 +108,14 @@ function subLabelFor(result: ClueResult): { text: string; className: string } | 
   }
 }
 
-function ClueSideLabel({
+function ClueLabelContent({
   result,
-  guess,
-  interactive,
 }: {
   result: ClueResult;
-  guess: string;
-  interactive: boolean;
 }) {
-  const meta = getClueById(result.kind) as Clue;
+  const meta = getClueById(result.kind);
   const sub = subLabelFor(result);
-  const [open, setOpen] = useState(false);
-  const explanation = interactive
-    ? (meta.explain as (g: string, r: ClueResult) => string)(
-        guess,
-        result as ClueResultFor<typeof result.kind>,
-      )
-    : null;
-
-  const labelBody = (
+  return (
     <div className="flex flex-col justify-center text-right min-w-0">
       <span className="text-[11px] font-semibold text-foreground truncate leading-tight">
         {meta.name}
@@ -139,34 +124,6 @@ function ClueSideLabel({
         <span className={`text-[10px] font-mono ${sub.className} truncate leading-tight`}>
           {sub.text}
         </span>
-      )}
-    </div>
-  );
-
-  if (!interactive) return labelBody;
-
-  return (
-    <div className="relative min-w-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-label={`Explain clue: ${meta.name}`}
-        className="w-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
-      >
-        {labelBody}
-      </button>
-      {open && explanation && (
-        <div
-          className="absolute right-0 top-full mt-1 z-30 w-60 rounded-md border border-border bg-surface-2 shadow-lg px-3 py-2 text-[11px] leading-snug text-foreground"
-          onClick={() => setOpen(false)}
-          role="tooltip"
-        >
-          <p className="mb-1 text-[9px] uppercase tracking-wider text-muted">
-            {meta.name}
-          </p>
-          <p>{explanation}</p>
-        </div>
       )}
     </div>
   );
@@ -182,38 +139,92 @@ export function GuessRow({
 }: GuessRowProps) {
   const states = cellStates(result, digits);
   const displayed = displayDigits(guess, digits, result);
+  const [expanded, setExpanded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on any click outside this row's interactive area. Runs only while
+  // expanded so we don't hold an idle listener.
+  useEffect(() => {
+    if (!expanded) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (containerRef.current && containerRef.current.contains(target)) return;
+      setExpanded(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [expanded]);
+
+  const meta = result ? (getClueById(result.kind) as Clue) : null;
+  const explanation =
+    interactive && result && meta
+      ? (meta.explain as (g: string, r: ClueResult) => string)(
+          guess,
+          result as ClueResultFor<typeof result.kind>,
+        )
+      : null;
+
+  const labelSlot = (() => {
+    if (pending && !result)
+      return <p className="text-[10px] text-muted text-right">pick a clue below…</p>;
+    if (!result) return null;
+    if (!interactive) return <ClueLabelContent result={result} />;
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-label={`Explain clue: ${meta?.name ?? ""}`}
+        className="w-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
+      >
+        <ClueLabelContent result={result} />
+      </button>
+    );
+  })();
 
   return (
-    <div
-      className={`w-full flex items-center gap-3 px-1 py-1.5 rounded-lg ${
-        active ? "bg-surface/40" : ""
-      }`}
-    >
-      <div className="flex-1 min-w-0">
-        {pending && !result ? (
-          <p className="text-[10px] text-muted text-right">pick a clue below…</p>
-        ) : result ? (
-          <ClueSideLabel result={result} guess={guess} interactive={interactive} />
-        ) : null}
+    <div ref={containerRef} className="w-full">
+      <div
+        className={`w-full flex items-center gap-3 px-1 py-1.5 rounded-lg ${
+          active ? "bg-surface/40" : ""
+        }`}
+      >
+        <div className="flex-1 min-w-0">{labelSlot}</div>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {displayed.map((v, i) => {
+            const state: DigitState = result
+              ? states[i]
+              : active && v !== null
+              ? "entering"
+              : "idle";
+            return (
+              <Digit
+                key={i}
+                value={v}
+                size="lg"
+                state={state}
+                animate={!!result}
+              />
+            );
+          })}
+        </div>
       </div>
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        {displayed.map((v, i) => {
-          const state: DigitState = result
-            ? states[i]
-            : active && v !== null
-            ? "entering"
-            : "idle";
-          return (
-            <Digit
-              key={i}
-              value={v}
-              size="lg"
-              state={state}
-              animate={!!result}
-            />
-          );
-        })}
-      </div>
+      {expanded && explanation && meta && (
+        <div
+          role="tooltip"
+          className="mx-1 mt-1 mb-1 bg-surface-2 rounded-md border border-border px-3 py-2 text-[11px] leading-snug text-foreground"
+        >
+          <p className="text-[9px] uppercase tracking-wider text-muted mb-1">
+            {meta.name}
+          </p>
+          <p>{explanation}</p>
+        </div>
+      )}
     </div>
   );
 }

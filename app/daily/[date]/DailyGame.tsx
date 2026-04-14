@@ -9,6 +9,7 @@ import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
+import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
 import {
   DailyResultPanel,
   type DailyPercentileData,
@@ -35,6 +36,7 @@ export function DailyGame({
   const clientId = useClientId();
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [percentile, setPercentile] = useState<DailyPercentileData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -151,6 +153,14 @@ export function DailyGame({
           </button>
           <button
             type="button"
+            className="text-muted text-base hover:text-foreground px-2"
+            onClick={() => setStatsOpen(true)}
+            aria-label="Daily stats"
+          >
+            📊
+          </button>
+          <button
+            type="button"
             className="text-muted text-sm hover:text-foreground px-2"
             onClick={() => setHelpOpen(true)}
             aria-label="Help"
@@ -160,51 +170,65 @@ export function DailyGame({
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col">
-        <GuessGrid state={state} currentInput={input} />
-
-        {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
-
-        <div className="mt-4">
-          {state.pendingGuess ? (
-            <ClueChooser
-              options={state.pendingGuess.options}
-              onChoose={chooseClue}
-            />
-          ) : state.status === "playing" ? (
-            <Keypad
-              onDigit={appendDigit}
-              onBackspace={backspace}
-              onSubmit={submit}
-              disabled={keypadDisabled}
-              submitDisabled={submitDisabled}
-            />
-          ) : (
-            <div className="space-y-3">
-              <DailyResultPanel
-                won={state.status === "won"}
-                guessCount={state.guesses.length}
-                target={state.target}
-                data={percentile}
-                loading={statsLoading}
-                error={statsError}
-                maxGuesses={state.maxGuesses}
-                onShare={handleShare}
-              />
-              {!isToday && (
-                <p className="text-center text-xs text-muted">
-                  <Link href="/archive" className="underline">
-                    ← Back to archive
-                  </Link>
-                </p>
-              )}
-            </div>
+      {state.status !== "playing" ? (
+        /* Terminal state: result panel ABOVE the finished puzzle. */
+        <div className="flex-1 flex flex-col gap-4">
+          <DailyResultPanel
+            won={state.status === "won"}
+            guessCount={state.guesses.length}
+            target={state.target}
+            data={percentile}
+            loading={statsLoading}
+            error={statsError}
+            maxGuesses={state.maxGuesses}
+            onShare={handleShare}
+          />
+          {!isToday && (
+            <p className="text-center text-xs text-muted">
+              <Link href="/archive" className="underline">
+                ← Back to archive
+              </Link>
+            </p>
           )}
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted text-center mb-2">
+              Your guesses
+            </p>
+            <GuessGrid state={state} currentInput={input} />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 flex flex-col">
+          <GuessGrid state={state} currentInput={input} />
+          {error && (
+            <p className="text-bad text-xs text-center mt-2 shake">{error}</p>
+          )}
+          <div className="mt-4">
+            {state.pendingGuess ? (
+              <ClueChooser
+                options={state.pendingGuess.options}
+                onChoose={chooseClue}
+              />
+            ) : (
+              <Keypad
+                onDigit={appendDigit}
+                onBackspace={backspace}
+                onSubmit={submit}
+                disabled={keypadDisabled}
+                submitDisabled={submitDisabled}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <LifetimeStatsModal
+        open={statsOpen}
+        onClose={() => setStatsOpen(false)}
+        mode="daily"
+      />
     </main>
   );
 }

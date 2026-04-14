@@ -4,9 +4,9 @@ import { HomeHeaderIcons } from "@/components/HomeHeaderIcons";
 
 export default function Home() {
   return (
-    <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center relative">
+    <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 relative">
       <HomeHeaderIcons />
-      <div className="max-w-md w-full">
+      <div className="max-w-md w-full text-center">
         <h1 className="text-4xl font-bold tracking-tight mb-3 font-mono">
           mathymath
         </h1>
