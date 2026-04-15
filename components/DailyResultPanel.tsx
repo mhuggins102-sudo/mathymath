@@ -70,7 +70,11 @@ export function DailyResultPanel({
       )}
       {data && (
         <div className="space-y-3">
-          {others > 0 ? (
+          {/* "You beat X%" is a win-only bragging line. It's suppressed
+              when the player lost (no % to brag about), when they won
+              but beat nobody (beatPct = 0 — awkward), and when they're
+              the first player on this puzzle (separate empty-state). */}
+          {others > 0 && won && beatPct !== null && beatPct > 0 ? (
             <div className="text-center">
               <p className="text-[10px] uppercase tracking-wider text-muted">
                 You beat
@@ -83,12 +87,12 @@ export function DailyResultPanel({
                 of {others} other player{others === 1 ? "" : "s"} today
               </p>
             </div>
-          ) : (
+          ) : others === 0 ? (
             <p className="text-center text-xs text-muted">
               You&apos;re the first player on this puzzle — percentile updates
               as more players finish.
             </p>
-          )}
+          ) : null}
 
           <DistributionBars
             distribution={data.aggregate.distribution}

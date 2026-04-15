@@ -242,22 +242,27 @@ export function DailyGame({
       </header>
 
       <div className="flex-1 flex flex-col">
-        {/* Gate on hydration — before we've read localStorage we don't
-            know if this is an in-progress game or a terminal one.
-            Rendering nothing until `hydrated` flips is cheaper than a
-            skeleton and, paired with onHydratedTerminal batching, means
-            the first painted content is the correct final state (either
-            the keypad or the popup overlaying the grid). */}
-        {hydrated && (
-          <GuessGrid
-            state={state}
-            currentInput={input}
-            certainDigits={certainDigits}
-            lockedSlots={lockedSlots}
-            pendingLockSlot={pendingLockSlot}
-            onTapCell={tapCell}
-          />
-        )}
+        {/* Grid rendering rules:
+              - Before hydration: render nothing (we don't know if this
+                daily is in-progress or already terminal; drawing the
+                empty initial state would flash before the auto-popup).
+              - Terminal + popup auto-open: also render nothing. The
+                Modal's backdrop is translucent (80%) and lets the grid
+                show through, which reads as a "flash" even though the
+                popup is technically open. Tapping "show puzzle" closes
+                the popup and the grid reveals cleanly underneath.
+              - Otherwise: render the grid normally. */}
+        {hydrated &&
+          !(state.status !== "playing" && resultsPopupOpen) && (
+            <GuessGrid
+              state={state}
+              currentInput={input}
+              certainDigits={certainDigits}
+              lockedSlots={lockedSlots}
+              pendingLockSlot={pendingLockSlot}
+              onTapCell={tapCell}
+            />
+          )}
         {error && (
           <p className="text-bad text-xs text-center mt-2 shake">{error}</p>
         )}
