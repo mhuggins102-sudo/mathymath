@@ -68,15 +68,26 @@ export function clearGame(key: string): void {
 // revealed target is only stored once the game ends (the server returns
 // it on win/loss so the "target was XXXXX" UI can render across reloads).
 
+const savedLockSchema = z.object({
+  slot: z.number().int().min(0).max(9),
+  digit: z.string().regex(/^[0-9]$/),
+  correct: z.boolean(),
+});
+
 const savedDailyGuessSchema = z.object({
   guess: z.string(),
   clueId: z.string().optional(),
   result: z.unknown().optional(),
+  locks: z.array(savedLockSchema).optional(),
 });
 
 const savedDailyPendingSchema = z.object({
   guess: z.string(),
   optionIds: z.tuple([z.string(), z.string()]),
+  /** Locks already resolved for correctness by the server on submit.
+   *  Stashed here so that CHOOSE_CLUE can merge them into the next
+   *  resolved guess, and so a refresh mid-pending preserves them. */
+  locks: z.array(savedLockSchema).optional(),
 });
 
 const savedDailyGameSchema = z.object({

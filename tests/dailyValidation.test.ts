@@ -196,4 +196,126 @@ describe("validateDailyHistory", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/invalid_guess/);
   });
+
+  it("accepts a correctly-claimed lock on guess 2", () => {
+    // Guess 1: honest. Guess 2: a correct lock at slot 0 (target[0] = "4").
+    const g1 = honestGuess([], "11111");
+    const g2 = honestGuess([g1.clueId], "22222");
+    const withLocks = {
+      ...g2,
+      locks: [{ slot: 0, digit: "4", correct: true }],
+    };
+    const r = validateDailyHistory({
+      target: TARGET,
+      digits: DIGITS,
+      maxGuesses: MAX,
+      seed: SEED,
+      history: [g1, withLocks],
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects a lie about lock correctness", () => {
+    const g1 = honestGuess([], "11111");
+    const g2 = honestGuess([g1.clueId], "22222");
+    // Target at slot 0 is "4", so claiming "9" with correct=true is a lie.
+    const tampered = {
+      ...g2,
+      locks: [{ slot: 0, digit: "9", correct: true }],
+    };
+    const r = validateDailyHistory({
+      target: TARGET,
+      digits: DIGITS,
+      maxGuesses: MAX,
+      seed: SEED,
+      history: [g1, tampered],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/lock_correctness_mismatch/);
+  });
+
+  it("rejects any lock on guess 1", () => {
+    const g1 = honestGuess([], "11111");
+    const withLock = {
+      ...g1,
+      locks: [{ slot: 0, digit: "4", correct: true }],
+    };
+    const r = validateDailyHistory({
+      target: TARGET,
+      digits: DIGITS,
+      maxGuesses: MAX,
+      seed: SEED,
+      history: [withLock],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/locks_on_first_guess/);
+  });
+
+  it("rejects exceeding the lock budget", () => {
+    // Player starts with 1 lock. Using 2 locks in one turn without an
+    // Extra Lock is over-budget.
+    const g1 = honestGuess([], "11111");
+    const g2 = honestGuess([g1.clueId], "22222");
+    const cheater = {
+      ...g2,
+      locks: [
+        { slot: 0, digit: "4", correct: true },
+        { slot: 1, digit: "7", correct: true },
+      ],
+    };
+    const r = validateDailyHistory({
+      target: TARGET,
+      digits: DIGITS,
+      maxGuesses: MAX,
+      seed: SEED,
+      history: [g1, cheater],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/locks_budget_exceeded/);
+  });
+
+  it("rejects two locks on the same slot", () => {
+    const g1 = honestGuess([], "11111");
+    const g2 = honestGuess([g1.clueId], "22222");
+    const dupe = {
+      ...g2,
+      locks: [
+        { slot: 0, digit: "4", correct: true },
+        { slot: 0, digit: "5", correct: false },
+      ],
+    };
+    const r = validateDailyHistory({
+      target: TARGET,
+      digits: DIGITS,
+      maxGuesses: MAX,
+      seed: SEED,
+      history: [g1, dupe],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/lock_duplicate_slot/);
+  });
+
+  it("a wrong lock spends the budget so the next turn has none", () => {
+    const g1 = honestGuess([], "11111");
+    const g2 = honestGuess([g1.clueId], "22222");
+    const wrongLock = {
+      ...g2,
+      locks: [{ slot: 0, digit: "9", correct: false }], // target[0]="4"
+    };
+    // Guess 3: try to use another lock. Budget is now 0.
+    const g3 = honestGuess([g1.clueId, g2.clueId], "33333");
+    const overBudget = {
+      ...g3,
+      locks: [{ slot: 1, digit: "7", correct: true }],
+    };
+    const r = validateDailyHistory({
+      target: TARGET,
+      digits: DIGITS,
+      maxGuesses: MAX,
+      seed: SEED,
+      history: [g1, wrongLock, overBudget],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/locks_budget_exceeded/);
+  });
 });

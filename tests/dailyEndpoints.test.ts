@@ -99,6 +99,68 @@ describe("POST /api/daily/[date]/submit-guess", () => {
     const body = await res.json();
     expect(body.target).toBeUndefined();
   });
+
+  it("rejects lock attempts on guess 1", async () => {
+    const res = await submitGuess(
+      mockRequest({
+        history: [],
+        guess: "11111",
+        lockAttempts: [{ slot: 0, digit: "1" }],
+      }),
+      { params: paramsP(DATE) },
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("locks_on_first_guess");
+  });
+
+  it("returns resolved locks with the pending response", async () => {
+    // Build a guess-2 request with one lock.
+    const pair = pickTwoClues(DATE, []);
+    const g1 = {
+      guess: "11111",
+      clueId: pair[0].id,
+      result: pair[0].compute("11111", TARGET),
+    };
+    const res = await submitGuess(
+      mockRequest({
+        history: [g1],
+        guess: "99999",
+        lockAttempts: [{ slot: 0, digit: TARGET[0] }], // always correct
+      }),
+      { params: paramsP(DATE) },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.kind).toBe("pending");
+    expect(body.locks).toEqual([
+      { slot: 0, digit: TARGET[0], correct: true },
+    ]);
+  });
+
+  it("rejects an over-budget lock attempt on guess 2", async () => {
+    const pair = pickTwoClues(DATE, []);
+    const g1 = {
+      guess: "11111",
+      clueId: pair[0].id,
+      result: pair[0].compute("11111", TARGET),
+    };
+    const res = await submitGuess(
+      mockRequest({
+        history: [g1],
+        guess: "99999",
+        // Player starts with 1 lock; 2 attempts exceeds budget.
+        lockAttempts: [
+          { slot: 0, digit: "1" },
+          { slot: 1, digit: "2" },
+        ],
+      }),
+      { params: paramsP(DATE) },
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("locks_budget_exceeded");
+  });
 });
 
 describe("POST /api/daily/[date]/choose-clue", () => {
