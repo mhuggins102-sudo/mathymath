@@ -16,6 +16,7 @@ import {
 } from "@/components/DailyResultPanel";
 import { Modal } from "@/components/Modal";
 import { buildShareText } from "@/lib/game/share";
+import { computeDailyNumber } from "@/lib/game/targetGenerator";
 import { recordDailyResult } from "@/lib/persistence/localStore";
 
 interface DailyGameProps {
@@ -53,6 +54,15 @@ export function DailyGame({
     digits,
     maxGuesses,
     storageKey: `daily:${date}`,
+    // Fires inside the hook's hydration effect when localStorage says
+    // this daily is already terminal. Setting both popup-open and the
+    // guard ref in the same effect tick batches with the hook's
+    // setState(fromSaved), so the Modal appears in the very first
+    // post-hydrate render — no flash of the resolved grid before it.
+    onHydratedTerminal: () => {
+      autoPoppedRef.current = true;
+      setResultsPopupOpen(true);
+    },
   });
 
   const {
@@ -173,13 +183,18 @@ export function DailyGame({
   }, [date, state]);
 
   const statusLabel = useMemo(() => {
-    if (!isToday) return `Daily — ${date}`;
+    // Today stays labelled "Today"; archive entries get their daily
+    // number (Daily #1 for the launch day onwards).
+    if (!isToday) return `Daily #${computeDailyNumber(date)}`;
     return "Today";
   }, [isToday, date]);
 
   return (
     <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
-      <header className="flex items-center justify-between mb-3">
+      {/* h-11 matches the icon-button size so the header bar is the
+          same height whether or not the right cluster is populated,
+          keeping the title's baseline aligned across pages. */}
+      <header className="flex items-center justify-between mb-3 h-11">
         <Link
           href={isToday ? "/" : "/archive"}
           className="text-muted text-sm hover:text-foreground"
@@ -227,27 +242,26 @@ export function DailyGame({
       </header>
 
       <div className="flex-1 flex flex-col">
-        <GuessGrid
-          state={state}
-          currentInput={input}
-          certainDigits={certainDigits}
-          lockedSlots={lockedSlots}
-          pendingLockSlot={pendingLockSlot}
-          onTapCell={tapCell}
-        />
+        {/* Gate on hydration — before we've read localStorage we don't
+            know if this is an in-progress game or a terminal one.
+            Rendering nothing until `hydrated` flips is cheaper than a
+            skeleton and, paired with onHydratedTerminal batching, means
+            the first painted content is the correct final state (either
+            the keypad or the popup overlaying the grid). */}
+        {hydrated && (
+          <GuessGrid
+            state={state}
+            currentInput={input}
+            certainDigits={certainDigits}
+            lockedSlots={lockedSlots}
+            pendingLockSlot={pendingLockSlot}
+            onTapCell={tapCell}
+          />
+        )}
         {error && (
           <p className="text-bad text-xs text-center mt-2 shake">{error}</p>
         )}
-        {state.status === "playing" && !state.pendingGuess && (
-          <p className="text-[10px] text-muted text-center mt-2">
-            {lockMode
-              ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-              : locksAvailable > 0
-              ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
-              : ""}
-          </p>
-        )}
-        {state.status === "playing" && (
+        {hydrated && state.status === "playing" && (
           <div className="mt-4">
             {state.pendingGuess ? (
               <ClueChooser
@@ -255,16 +269,28 @@ export function DailyGame({
                 onChoose={chooseClue}
               />
             ) : (
-              <Keypad
-                onDigit={appendDigit}
-                onBackspace={backspace}
-                onSubmit={submit}
-                disabled={keypadDisabled}
-                submitDisabled={submitDisabled}
-                lockMode={lockMode}
-                onLockCommit={commitLock}
-                lockCommitDisabled={!canCommitPendingLock}
-              />
+              <>
+                <Keypad
+                  onDigit={appendDigit}
+                  onBackspace={backspace}
+                  onSubmit={submit}
+                  disabled={keypadDisabled}
+                  submitDisabled={submitDisabled}
+                  lockMode={lockMode}
+                  onLockCommit={commitLock}
+                  lockCommitDisabled={!canCommitPendingLock}
+                />
+                {/* Lock hint sits BELOW the keypad so it doesn't push
+                    the keypad down as messages appear/disappear and is
+                    visible next to the thumbs. */}
+                <p className="text-[10px] text-muted text-center mt-2 min-h-4">
+                  {lockMode
+                    ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
+                    : locksAvailable > 0
+                    ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+                    : ""}
+                </p>
+              </>
             )}
           </div>
         )}

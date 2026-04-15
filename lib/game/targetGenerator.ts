@@ -77,3 +77,17 @@ export function randomDigitString(
 export function todayUtcISO(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
+
+/** Launch date of the daily mode. Dates before this aren't offered in
+ *  the archive and have no "Daily #N" meaning. Kept in one place so the
+ *  archive page's LAUNCH constant and the #N math agree. */
+export const LAUNCH_DATE_ISO = "2026-04-01";
+
+/** 1-indexed daily number: `2026-04-01` = Daily #1, `2026-04-02` = #2,
+ *  etc. Used to label archive entries in place of the raw date. */
+export function computeDailyNumber(dateISO: string): number {
+  const launch = Date.UTC(2026, 3, 1); // April = month index 3
+  const d = new Date(dateISO + "T00:00:00Z").getTime();
+  const diffDays = Math.floor((d - launch) / 86_400_000);
+  return diffDays + 1;
+}

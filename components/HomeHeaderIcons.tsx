@@ -22,7 +22,10 @@ export function HomeHeaderIcons() {
 
   return (
     <>
-      <div className="fixed top-2 right-2 z-20 flex items-center gap-0.5">
+      {/* top-3 right-3 aligns with the px-3 pt-3 of the game pages so
+          the menu cluster sits at the same viewport coordinates when
+          navigating between home and an in-game header. */}
+      <div className="fixed top-3 right-3 z-20 flex items-center gap-0.5">
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}

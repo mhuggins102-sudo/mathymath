@@ -244,10 +244,12 @@ function ClueLabelContent({
   const meta = getClueById(result.kind);
   const sub = subLabelFor(guess, result);
   // `h-full` + `justify-center` makes the two-line block genuinely
-  // vertically centered against the digit cells in the same row. Size
-  // bumps vs the prior 11/10px so the sub-label is readable.
+  // vertically centered against the digit cells in the same row.
+  // `text-left` balances the row: the label now hugs the main's left
+  // padding instead of right-aligning and leaving a big variable gap
+  // on the left that didn't match the right-edge padding.
   return (
-    <div className="flex flex-col justify-center text-right min-w-0 h-full">
+    <div className="flex flex-col justify-center text-left min-w-0 h-full">
       <span className="text-[12px] sm:text-[13px] font-semibold text-foreground truncate leading-tight">
         {meta.name}
       </span>
@@ -384,8 +386,8 @@ export function GuessRow({
   const labelSlot = (() => {
     if (pending && !result)
       return (
-        <div className="flex h-full items-center justify-end">
-          <p className="text-[11px] sm:text-[12px] text-muted text-right">
+        <div className="flex h-full items-center justify-start">
+          <p className="text-[11px] sm:text-[12px] text-muted text-left">
             pick a clue below…
           </p>
         </div>
@@ -398,7 +400,7 @@ export function GuessRow({
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`Explain clue: ${meta?.name ?? ""}`}
-        className="w-full h-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
+        className="w-full h-full text-left rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
       >
         <ClueLabelContent guess={guess} result={result} />
       </button>

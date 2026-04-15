@@ -114,7 +114,7 @@ function UnlimitedGame({
 
   return (
     <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
-      <header className="flex items-center justify-between mb-3">
+      <header className="flex items-center justify-between mb-3 h-11">
         <Link href="/" className="text-muted text-sm hover:text-foreground">
           ← home
         </Link>
@@ -159,16 +159,6 @@ function UnlimitedGame({
 
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
 
-        {state.status === "playing" && !state.pendingGuess && (
-          <p className="text-[10px] text-muted text-center mt-2">
-            {lockMode
-              ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-              : locksAvailable > 0
-              ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
-              : ""}
-          </p>
-        )}
-
         <div className="mt-4">
           {state.pendingGuess ? (
             <ClueChooser
@@ -176,16 +166,27 @@ function UnlimitedGame({
               onChoose={chooseClue}
             />
           ) : state.status === "playing" ? (
-            <Keypad
-              onDigit={appendDigit}
-              onBackspace={backspace}
-              onSubmit={submit}
-              disabled={keypadDisabled}
-              submitDisabled={submitDisabled}
-              lockMode={lockMode}
-              onLockCommit={commitLock}
-              lockCommitDisabled={!canCommitPendingLock}
-            />
+            <>
+              <Keypad
+                onDigit={appendDigit}
+                onBackspace={backspace}
+                onSubmit={submit}
+                disabled={keypadDisabled}
+                submitDisabled={submitDisabled}
+                lockMode={lockMode}
+                onLockCommit={commitLock}
+                lockCommitDisabled={!canCommitPendingLock}
+              />
+              {/* Lock hint sits below the keypad so it doesn't shift
+                  the keypad around as it appears/disappears. */}
+              <p className="text-[10px] text-muted text-center mt-2 min-h-4">
+                {lockMode
+                  ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
+                  : locksAvailable > 0
+                  ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+                  : ""}
+              </p>
+            </>
           ) : (
             <div className="text-center space-y-4">
               <p

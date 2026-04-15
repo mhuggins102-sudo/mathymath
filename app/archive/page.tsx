@@ -66,13 +66,15 @@ export default function ArchivePage() {
   );
 
   return (
-    <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-4 pt-4 pb-8">
-      <header className="flex items-center justify-between mb-4">
+    <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
+      {/* Padding + h-11 match the game pages so navigating
+          home → archive → daily doesn't shift the header bar. */}
+      <header className="flex items-center justify-between mb-3 h-11">
         <Link href="/" className="text-muted text-sm hover:text-foreground">
           ← home
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">Archive</h1>
-        <span className="text-sm text-muted w-12" />
+        <span className="w-11" />
       </header>
 
       <div className="flex items-center justify-between mb-4">
