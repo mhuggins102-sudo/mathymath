@@ -1,15 +1,17 @@
 import type { ClueResult } from "./clues/types";
+import type { LockRecord } from "./locks";
 
 /**
  * "Certain" digits: slots whose target value the player can know with
- * certainty from past resolved clues. Four sources reveal per-slot
- * certainty:
+ * certainty. Five sources reveal per-slot certainty:
  *
  *   - Bullseyes: every slot where hits[i] === true (the player's
  *     guess[i] is literally the target digit at that slot).
  *   - Higher or Lower: slots where cmp[i] === "eq" (same mechanism).
  *   - Thermometer: slots where tier[i] === 0 (exact).
  *   - Oracle: the revealed slot, with its digit.
+ *   - Correctly-resolved locks from past guesses: if the player locked
+ *     `digit` at `slot` and it resolved correct, target[slot] = digit.
  *
  * Other positional clues (Within 2, Parity Mask) only narrow a range
  * and do not reveal the digit. Compositional clues never reveal a
@@ -23,38 +25,45 @@ export function deriveCertainDigits(
     guess: string;
     clueId?: string;
     result?: ClueResult;
+    locks?: readonly LockRecord[];
   }[],
   digits: number,
 ): (string | null)[] {
   const out: (string | null)[] = new Array(digits).fill(null);
   for (const g of guesses) {
+    // Clue-driven reveals.
     const r = g.result;
-    if (!r) continue;
-    switch (r.kind) {
-      case "bullseyes":
-        for (let i = 0; i < digits; i++) {
-          if (r.hits[i]) out[i] = g.guess[i] ?? null;
-        }
-        break;
-      case "higherLower":
-        for (let i = 0; i < digits; i++) {
-          if (r.cmp[i] === "eq") out[i] = g.guess[i] ?? null;
-        }
-        break;
-      case "thermometer":
-        for (let i = 0; i < digits; i++) {
-          if (r.tier[i] === 0) out[i] = g.guess[i] ?? null;
-        }
-        break;
-      case "oracle":
-        // Oracle reveals the actual target digit at its slot regardless
-        // of what the player guessed there.
-        if (r.slot >= 0 && r.slot < digits) {
-          out[r.slot] = String(r.digit);
-        }
-        break;
-      default:
-        break;
+    if (r) {
+      switch (r.kind) {
+        case "bullseyes":
+          for (let i = 0; i < digits; i++) {
+            if (r.hits[i]) out[i] = g.guess[i] ?? null;
+          }
+          break;
+        case "higherLower":
+          for (let i = 0; i < digits; i++) {
+            if (r.cmp[i] === "eq") out[i] = g.guess[i] ?? null;
+          }
+          break;
+        case "thermometer":
+          for (let i = 0; i < digits; i++) {
+            if (r.tier[i] === 0) out[i] = g.guess[i] ?? null;
+          }
+          break;
+        case "oracle":
+          if (r.slot >= 0 && r.slot < digits) {
+            out[r.slot] = String(r.digit);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    // Lock-driven reveals: a correct lock pins target[slot] = digit.
+    for (const lock of g.locks ?? []) {
+      if (lock.correct && lock.slot >= 0 && lock.slot < digits) {
+        out[lock.slot] = lock.digit;
+      }
     }
   }
   return out;

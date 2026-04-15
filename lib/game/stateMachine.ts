@@ -1,6 +1,7 @@
 import type { Clue, ClueId, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
 import { pickTwoClues } from "./clueSelector";
+import type { LockRecord } from "./locks";
 
 export const DEFAULT_MAX_GUESSES = 8;
 
@@ -11,11 +12,16 @@ export type GameStatus = "playing" | "won" | "lost";
  * player chose a clue. They are undefined for the final guess of a lost
  * game (because no clue is offered on guess #maxGuesses — the game ends
  * immediately on that submission).
+ *
+ * `locks` records slots the player chose to "lock in" before submitting,
+ * with per-slot correctness resolved against the real target. Absent on
+ * guesses without any locks.
  */
 export interface ResolvedGuess {
   guess: string;
   clueId?: ClueId;
   result?: ClueResult;
+  locks?: LockRecord[];
 }
 
 export interface GameState {
