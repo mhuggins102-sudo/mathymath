@@ -17,7 +17,8 @@ export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
   category: "positional",
   description:
     "A heat scale per slot showing how close your digit is to the target's digit.",
-  weight: 0.8,
+  // 5 tiers × 5 slots = very high info.
+  weight: 0.5,
   legend: [
     { state: "match", label: "exact" },
     { state: "close", label: "within 1" },

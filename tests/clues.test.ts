@@ -5,7 +5,6 @@ import { within2Clue } from "@/lib/game/clues/within2";
 import { parityMaskClue } from "@/lib/game/clues/parityMask";
 import { oracleClue } from "@/lib/game/clues/oracle";
 import { thermometerClue } from "@/lib/game/clues/thermometer";
-import { sumDirectionClue } from "@/lib/game/clues/sumDirection";
 import { sumDeltaClue } from "@/lib/game/clues/sumDelta";
 import { digitOverlapClue } from "@/lib/game/clues/digitOverlap";
 import { parityBalanceClue } from "@/lib/game/clues/parityBalance";
@@ -13,10 +12,8 @@ import { primeCountClue } from "@/lib/game/clues/primeCount";
 import { rangeCompareClue } from "@/lib/game/clues/rangeCompare";
 import { containsDigitClue } from "@/lib/game/clues/containsDigit";
 import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
-import { maxDigitClue } from "@/lib/game/clues/maxDigit";
 import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
-import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
 describe("Bullseyes", () => {
@@ -90,15 +87,13 @@ describe("Thermometer", () => {
   });
 });
 
-describe("Sum Direction + Sum Delta", () => {
-  it("agrees on sign", () => {
+describe("Sum Delta", () => {
+  it("reports signed digit-sum delta (target - guess)", () => {
     const g = "12000";
     const t = "33333";
     expect(sumDeltaClue.compute(g, t).delta).toBe(15 - 3);
-    expect(sumDirectionClue.compute(g, t).cmp).toBe("gt");
   });
-  it("equal is eq", () => {
-    expect(sumDirectionClue.compute("12345", "54321").cmp).toBe("eq");
+  it("equal is 0", () => {
     expect(sumDeltaClue.compute("12345", "54321").delta).toBe(0);
   });
 });
@@ -169,17 +164,6 @@ describe("Distinct Digits", () => {
   });
 });
 
-describe("Max Digit", () => {
-  it("compares maxes", () => {
-    // guess max 9 vs target max 5 -> lt
-    expect(maxDigitClue.compute("19000", "12345").cmp).toBe("lt");
-    // guess max 5 vs target max 9 -> gt
-    expect(maxDigitClue.compute("12345", "90000").cmp).toBe("gt");
-    // equal maxes -> eq
-    expect(maxDigitClue.compute("12345", "54321").cmp).toBe("eq");
-  });
-});
-
 describe("Digit Range (rangeCompare)", () => {
   it("compares the spread (max-min) of digits", () => {
     // guess 12532 range = 5-1 = 4; target 51903 range = 9-0 = 9 => target ↑
@@ -223,25 +207,11 @@ describe("Divisible By", () => {
   });
 });
 
-describe("Total Deviation", () => {
-  it("sums per-slot absolute differences", () => {
-    // User's example: guess 55555 vs target 10994 -> 4+5+4+4+1 = 18.
-    expect(totalDeviationClue.compute("55555", "10994").value).toBe(18);
-  });
-  it("is 0 when every slot is exact", () => {
-    expect(totalDeviationClue.compute("47628", "47628").value).toBe(0);
-  });
-  it("maxes at 45 when every digit is maximally off", () => {
-    expect(totalDeviationClue.compute("00000", "99999").value).toBe(45);
-    expect(totalDeviationClue.compute("99999", "00000").value).toBe(45);
-  });
-});
-
 describe("Registry", () => {
-  it("has 18 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(18);
+  it("has 15 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(15);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(18);
+    expect(ids.size).toBe(15);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }
@@ -249,6 +219,12 @@ describe("Registry", () => {
   it("lookup by id works for every clue", () => {
     for (const c of CLUES) {
       expect(getClueById(c.id)).toBe(c);
+    }
+  });
+  it("retired clues are gone", () => {
+    const ids = new Set(CLUES.map((c) => c.id));
+    for (const retired of ["sumDirection", "totalDeviation", "maxDigit"]) {
+      expect(ids.has(retired as never)).toBe(false);
     }
   });
 });

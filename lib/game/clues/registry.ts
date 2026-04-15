@@ -5,7 +5,6 @@ import { within2Clue } from "./within2";
 import { parityMaskClue } from "./parityMask";
 import { oracleClue } from "./oracle";
 import { thermometerClue } from "./thermometer";
-import { sumDirectionClue } from "./sumDirection";
 import { sumDeltaClue } from "./sumDelta";
 import { digitOverlapClue } from "./digitOverlap";
 import { parityBalanceClue } from "./parityBalance";
@@ -13,11 +12,16 @@ import { primeCountClue } from "./primeCount";
 import { rangeCompareClue } from "./rangeCompare";
 import { containsDigitClue } from "./containsDigit";
 import { distinctDigitsClue } from "./distinctDigits";
-import { maxDigitClue } from "./maxDigit";
 import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
-import { totalDeviationClue } from "./totalDeviation";
 
+// Retired 2026-04-15 (see full-review doc):
+//   - sumDirectionClue — strictly dominated by sumDeltaClue (direction-only
+//     is a lossy subset of the signed delta).
+//   - totalDeviationClue — strictly dominated by thermometerClue (sum is a
+//     disaggregated form of the per-slot tiers).
+//   - maxDigitClue — overlaps rangeCompareClue (range = max − min); range
+//     encodes max-info plus more, so retiring max and keeping range wins.
 export const CLUES: readonly Clue[] = [
   bullseyesClue,
   higherLowerClue,
@@ -25,7 +29,6 @@ export const CLUES: readonly Clue[] = [
   parityMaskClue,
   oracleClue,
   thermometerClue,
-  sumDirectionClue,
   sumDeltaClue,
   digitOverlapClue,
   parityBalanceClue,
@@ -33,10 +36,8 @@ export const CLUES: readonly Clue[] = [
   rangeCompareClue,
   containsDigitClue,
   distinctDigitsClue,
-  maxDigitClue,
   medianClue,
   divisibleByClue,
-  totalDeviationClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));

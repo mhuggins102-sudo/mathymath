@@ -16,7 +16,9 @@ export const containsDigitClue: Clue<{
   category: "compositional",
   description:
     "Picks one specific digit (shown in the clue) and tells you yes or no: is it anywhere in the target?",
-  weight: 1.0,
+  // Single-bit yes/no clue; weight pushed up so it shows up more often
+  // than its info content alone would merit.
+  weight: 1.5,
   legend: [
     { state: "match", label: "digit present" },
     { state: "cold", label: "digit absent" },

@@ -6,7 +6,7 @@ export const within2Clue: Clue<{ kind: "within2"; mask: boolean[] }> = {
   category: "positional",
   description:
     "Marks each slot where your digit is within 2 of the target digit (direction unknown).",
-  weight: 1.0,
+  weight: 0.7,
   legend: [{ state: "match", label: "within ±2" }],
   compute(guess, target) {
     const mask = [...guess].map(

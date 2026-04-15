@@ -66,9 +66,7 @@ function displayDigits(
 
 function subLabelFor(result: ClueResult): { text: string; className: string } | null {
   switch (result.kind) {
-    case "sumDirection":
     case "rangeCompare":
-    case "maxDigit":
     case "parityBalance":
     case "primeCount":
     case "median":
@@ -92,8 +90,6 @@ function subLabelFor(result: ClueResult): { text: string; className: string } | 
       return { text: `${result.count} shared`, className: "text-accent" };
     case "distinctDigits":
       return { text: `${result.count} unique`, className: "text-accent" };
-    case "totalDeviation":
-      return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit":
       return {
         text: `${result.digit}? ${result.present ? "yes" : "no"}`,

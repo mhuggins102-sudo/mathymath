@@ -9,6 +9,7 @@ export const distinctDigitsClue: Clue<{
   category: "compositional",
   description:
     "Reveals how many different digit values appear in the target (1 = all repeats like 77777; 5 = all unique like 12345).",
+  // Medium-info (1..5 range). Pivot weight.
   weight: 1.0,
   compute(guess, target) {
     return { kind: "distinctDigits", count: new Set(target).size };

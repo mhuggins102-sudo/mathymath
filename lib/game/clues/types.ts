@@ -30,7 +30,6 @@ export type ClueResult =
   | { kind: "oracle"; slot: number; digit: number }
   | { kind: "thermometer"; tier: number[] } // 0=exact..4=far
   // Compositional
-  | { kind: "sumDirection"; cmp: Cmp }
   | { kind: "sumDelta"; delta: number } // target - guess
   | { kind: "digitOverlap"; count: number }
   | { kind: "parityBalance"; cmp: Cmp }
@@ -38,10 +37,8 @@ export type ClueResult =
   | { kind: "rangeCompare"; cmp: Cmp }
   | { kind: "containsDigit"; digit: number; present: boolean }
   | { kind: "distinctDigits"; count: number }
-  | { kind: "maxDigit"; cmp: Cmp }
   | { kind: "median"; cmp: Cmp }
-  | { kind: "divisibleBy"; divisor: number | null; present: boolean }
-  | { kind: "totalDeviation"; value: number };
+  | { kind: "divisibleBy"; divisor: number | null; present: boolean };
 
 export type ClueId = ClueResult["kind"];
 

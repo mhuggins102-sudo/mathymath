@@ -8,7 +8,6 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   parityMask: "⚖️",
   oracle: "🔮",
   thermometer: "🌡️",
-  sumDirection: "➕",
   sumDelta: "🔢",
   digitOverlap: "♻️",
   parityBalance: "⚪",
@@ -16,10 +15,8 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   rangeCompare: "🧭",
   containsDigit: "🔎",
   distinctDigits: "🎲",
-  maxDigit: "🔝",
   median: "🎚️",
   divisibleBy: "➗",
-  totalDeviation: "📐",
 };
 
 function perSlotLine(result: ClueResult | undefined, digits: number): string {

@@ -12,7 +12,7 @@ export const parityBalanceClue: Clue<{ kind: "parityBalance"; cmp: Cmp }> = {
   category: "compositional",
   description:
     "Compares the number of even digits in the target to your guess.",
-  weight: 1.2,
+  weight: 1.4,
   legend: [
     { state: "match", label: "same count" },
     { state: "warm", label: "target has more" },
