@@ -10,6 +10,11 @@ import {
   type SavedDailyGame,
 } from "@/lib/persistence/localStore";
 import { buzz } from "@/lib/settings";
+import {
+  buildGuessFromInput,
+  deriveCertainDigits,
+  inputCapacity,
+} from "@/lib/game/certain";
 
 /**
  * Client-side shape for a daily game. This deliberately mirrors the
@@ -47,6 +52,10 @@ export interface UseDailyGameResult {
   hydrated: boolean;
   /** True while a server round-trip is in flight. UI disables input. */
   loading: boolean;
+  /** Per-slot digits known-certain from prior clues (length = digits). */
+  certainDigits: (string | null)[];
+  /** Max typed-input length = digits − certain-slot count. */
+  inputCapacity: number;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
@@ -157,12 +166,17 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     saveDailyGame(config.storageKey, toSaved(state));
   }, [state, config.storageKey, hydrated]);
 
+  // `input` holds only typed-into-non-certain-slots. Certain digits
+  // (revealed by prior clues) are auto-filled on submit.
+  const certain = deriveCertainDigits(state.guesses, state.digits);
+  const capacity = inputCapacity(certain);
+
   const appendDigit = useCallback(
     (d: string) => {
       setError(null);
-      setInput((cur) => (cur.length >= state.digits ? cur : cur + d));
+      setInput((cur) => (cur.length >= capacity ? cur : cur + d));
     },
-    [state.digits],
+    [capacity],
   );
 
   const backspace = useCallback(() => {
@@ -173,7 +187,8 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const submit = useCallback(async () => {
     if (inFlightRef.current) return;
     if (state.status !== "playing" || state.pendingGuess) return;
-    const v = validateGuess(input, state.digits);
+    const fullGuess = buildGuessFromInput(certain, input);
+    const v = validateGuess(fullGuess, state.digits);
     if (!v.ok) {
       setError(v.error);
       return;
@@ -302,6 +317,8 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     error,
     hydrated,
     loading,
+    certainDigits: certain,
+    inputCapacity: capacity,
     appendDigit,
     backspace,
     submit,

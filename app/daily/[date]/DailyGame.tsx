@@ -65,11 +65,14 @@ export function DailyGame({
     chooseClue,
     hydrated,
     loading,
+    certainDigits,
+    inputCapacity,
   } = game;
 
   const keypadDisabled =
     state.status !== "playing" || !!state.pendingGuess || loading;
-  const submitDisabled = input.length !== state.digits || keypadDisabled;
+  // Submit is ready when typed input has filled every non-certain slot.
+  const submitDisabled = input.length !== inputCapacity || keypadDisabled;
 
   // Record this daily's result locally (first write wins per date). This
   // feeds the Lifetime Stats view on the home page — it's not shown on the
@@ -213,7 +216,11 @@ export function DailyGame({
       </header>
 
       <div className="flex-1 flex flex-col">
-        <GuessGrid state={state} currentInput={input} />
+        <GuessGrid
+          state={state}
+          currentInput={input}
+          certainDigits={certainDigits}
+        />
         {error && (
           <p className="text-bad text-xs text-center mt-2 shake">{error}</p>
         )}

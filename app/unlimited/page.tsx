@@ -79,6 +79,8 @@ function UnlimitedGame({
     backspace,
     submit,
     chooseClue,
+    certainDigits,
+    inputCapacity,
   } = useGame({
     target: session.target,
     seed: session.seed,
@@ -88,7 +90,8 @@ function UnlimitedGame({
   });
 
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
-  const submitDisabled = input.length !== state.digits || keypadDisabled;
+  // Submit enabled once typed input fills every non-certain slot.
+  const submitDisabled = input.length !== inputCapacity || keypadDisabled;
 
   const statusMessage = useMemo(() => {
     if (state.status === "won")
@@ -134,7 +137,11 @@ function UnlimitedGame({
       </header>
 
       <div className="flex-1 flex flex-col">
-        <GuessGrid state={state} currentInput={input} />
+        <GuessGrid
+          state={state}
+          currentInput={input}
+          certainDigits={certainDigits}
+        />
 
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
 
