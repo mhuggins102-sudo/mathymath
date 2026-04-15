@@ -8,6 +8,7 @@ import { validateDailyHistory } from "@/lib/api/dailyValidation";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+import { knownSlotsFromHistory } from "@/lib/game/certain";
 
 const DIGITS = 5;
 const MAX_GUESSES = DEFAULT_MAX_GUESSES;
@@ -106,7 +107,14 @@ export async function POST(
   }
 
   const clue = getClueById(clueId as (typeof offeredIds)[number]);
-  const result = clue.compute(pendingGuess, target);
+  // Oracle (and any future context-aware clue) sees the slots the
+  // player already knows going into THIS guess. Must be the pre-guess
+  // knowledge — the pending guess hasn't been committed to history yet.
+  const knownSlots = knownSlotsFromHistory(
+    parsed.data.history as Parameters<typeof knownSlotsFromHistory>[0],
+    DIGITS,
+  );
+  const result = clue.compute(pendingGuess, target, { knownSlots });
 
   return NextResponse.json({ kind: "continue", result });
 }

@@ -110,3 +110,18 @@ export function inputCapacity(
 ): number {
   return certain.length - certainCount(certain);
 }
+
+/** Indices of slots whose target digit is known — derived from the same
+ *  sources as deriveCertainDigits. Used to pass into Clue.compute as
+ *  context.knownSlots (so Oracle can avoid re-revealing). */
+export function knownSlotsFromHistory(
+  guesses: Parameters<typeof deriveCertainDigits>[0],
+  digits: number,
+): number[] {
+  const certain = deriveCertainDigits(guesses, digits);
+  const out: number[] = [];
+  for (let i = 0; i < certain.length; i++) {
+    if (certain[i] !== null) out.push(i);
+  }
+  return out;
+}

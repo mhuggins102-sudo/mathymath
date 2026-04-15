@@ -73,6 +73,41 @@ describe("Oracle", () => {
     const b = oracleClue.compute("12345", "74827");
     expect(a).toEqual(b);
   });
+  it("skips slots the player already knows (context.knownSlots)", () => {
+    const target = "74827";
+    // Pick a (guess,target) the plain call would map to some slot S.
+    const plain = oracleClue.compute("12345", target);
+    // Now pass that slot as already known. Oracle must pick a DIFFERENT
+    // slot — never re-reveal.
+    const withKnown = oracleClue.compute("12345", target, {
+      knownSlots: [plain.slot],
+    });
+    expect(withKnown.slot).not.toBe(plain.slot);
+    expect(withKnown.digit).toBe(Number(target[withKnown.slot]));
+  });
+  it("is deterministic per (guess, target, knownSlots)", () => {
+    const target = "74827";
+    const a = oracleClue.compute("12345", target, { knownSlots: [0, 2] });
+    const b = oracleClue.compute("12345", target, { knownSlots: [0, 2] });
+    expect(a).toEqual(b);
+    // Different known-set → potentially different slot.
+    const c = oracleClue.compute("12345", target, { knownSlots: [1, 3] });
+    // They MAY coincide by luck, but the determinism property still
+    // says each call is stable with its own knownSlots.
+    expect(c).toEqual(
+      oracleClue.compute("12345", target, { knownSlots: [1, 3] }),
+    );
+  });
+  it("falls back to the full pool if every slot is somehow already known", () => {
+    const target = "74827";
+    const r = oracleClue.compute("12345", target, {
+      knownSlots: [0, 1, 2, 3, 4],
+    });
+    // Just has to return SOMETHING valid rather than crash.
+    expect(r.slot).toBeGreaterThanOrEqual(0);
+    expect(r.slot).toBeLessThan(target.length);
+    expect(r.digit).toBe(Number(target[r.slot]));
+  });
 });
 
 describe("Thermometer", () => {

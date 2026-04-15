@@ -1,6 +1,7 @@
 import type { ClueId, ClueResult } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
+import { knownSlotsFromHistory } from "@/lib/game/certain";
 import {
   INITIAL_LOCKS,
   MAX_LOCKS,
@@ -168,7 +169,16 @@ export function validateDailyHistory(
       return { ok: false, error: `clue_not_offered_at_${i}` };
     }
     const clue = getClueById(g.clueId as ClueId);
-    const expected = clue.compute(g.guess, target);
+    // Context for clues that care about prior knowledge (Oracle today):
+    // derived from all guesses BEFORE this one — same information the
+    // client had when the clue resolved.
+    const priorKnownSlots = knownSlotsFromHistory(
+      history.slice(0, i) as Parameters<typeof knownSlotsFromHistory>[0],
+      digits,
+    );
+    const expected = clue.compute(g.guess, target, {
+      knownSlots: priorKnownSlots,
+    });
     if (!resultsMatch(g.result, expected)) {
       return { ok: false, error: `result_mismatch_at_${i}` };
     }
