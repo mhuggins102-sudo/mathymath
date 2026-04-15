@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Digit, type DigitState } from "./Digit";
+import { Digit, type DigitBadge, type DigitState } from "./Digit";
 import type { Clue, ClueResult, ClueResultFor } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 
@@ -20,6 +20,18 @@ interface GuessRowProps {
    *  clue reveal), certain slots render in the match state and the
    *  player's typed `guess` fills only the non-certain slots. */
   certainDigits?: (string | null)[];
+  /** Locks committed this turn (active row only). The slot cells render
+   *  in locked-pending state with a 🔒 badge. */
+  lockedSlots?: readonly { slot: number; digit: string }[];
+  /** Slot currently in lock-entry mode (active row only). That cell
+   *  gets the `selected` ring. */
+  pendingLockSlot?: number | null;
+  /** Lock records carried on this RESOLVED row so we can badge each
+   *  locked cell with correct / wrong after submit. */
+  locks?: readonly { slot: number; digit: string; correct: boolean }[];
+  /** Fires when a cell on the active row is tapped. Only connected
+   *  when the parent wants to expose the lock tap interaction. */
+  onTapCell?: (slot: number) => void;
 }
 
 /** Per-slot color state derived from the clue result. */
@@ -250,26 +262,89 @@ export function GuessRow({
   pending,
   interactive = false,
   certainDigits,
+  lockedSlots,
+  pendingLockSlot,
+  locks,
+  onTapCell,
 }: GuessRowProps) {
-  // Three rendering modes:
-  //   1. Resolved row (has `result`): paint from the clue result.
-  //   2. Pending row (pending + active, no result yet): `guess` is the
-  //      full submitted string; paint certain slots as match, the rest
-  //      as entering.
-  //   3. Entering row (active, no result, no pending): `guess` is just
-  //      the player's typed string of length 0..capacity; interleave
-  //      with certainDigits for display.
-  const isActiveNoResult = active && !result;
-  const displayed = result
-    ? displayDigits(guess, digits, result)
-    : isActiveNoResult && pending
-    ? // Pending-row guess already contains certain digits (assembled on
-      // submit), so just use it as-is.
-      displayDigits(guess, digits, undefined)
-    : displayDigitsActive(guess, digits, certainDigits);
-  const states = result
-    ? cellStates(result, digits)
-    : cellStatesActive(digits, certainDigits, displayed);
+  // ---------------------------------------------------------------
+  // Project a per-cell view for each render mode:
+  //   1. Resolved row: paint from clue result, overlay lock correctness
+  //      badges and flip lock-correct cells to match state.
+  //   2. Pending row (submitted but awaiting clue): full guess is in
+  //      `guess`; certain slots match, locked slots show locked-pending.
+  //   3. Entering row: interleave certain + locks + typed input.
+  // ---------------------------------------------------------------
+  const displayed: (string | null)[] = new Array(digits).fill(null);
+  const states: DigitState[] = new Array(digits).fill("idle");
+  const badges: (DigitBadge | undefined)[] = new Array(digits).fill(undefined);
+  const selected: boolean[] = new Array(digits).fill(false);
+
+  if (result) {
+    const d = displayDigits(guess, digits, result);
+    const s = cellStates(result, digits);
+    for (let i = 0; i < digits; i++) {
+      displayed[i] = d[i];
+      states[i] = s[i];
+    }
+    // Post-submit lock badges + override for correct locks (they're
+    // always visually match regardless of what the chosen clue says
+    // about that slot).
+    for (const l of locks ?? []) {
+      if (l.slot < 0 || l.slot >= digits) continue;
+      badges[l.slot] = l.correct ? "lock-correct" : "lock-wrong";
+      if (l.correct) states[l.slot] = "match";
+    }
+  } else if (pending) {
+    // Pending row: guess is already the full submitted string (the
+    // reducer assembled certain + locks + typed on submit).
+    const d = displayDigits(guess, digits, undefined);
+    for (let i = 0; i < digits; i++) {
+      displayed[i] = d[i];
+      const c = certainDigits?.[i] ?? null;
+      if (c !== null) states[i] = "match";
+      else if (d[i] !== null) states[i] = "entering";
+    }
+    // Locked slots on the pending row: flip state + badge so they read
+    // as "locked, correctness TBD".
+    for (const l of lockedSlots ?? []) {
+      states[l.slot] = "locked-pending";
+      badges[l.slot] = "lock-pending";
+    }
+  } else if (active) {
+    // Entering row: interleave certain + committed locks + typed input.
+    const overlay: (string | null)[] = new Array(digits).fill(null);
+    for (let i = 0; i < digits; i++) {
+      overlay[i] = certainDigits?.[i] ?? null;
+    }
+    for (const l of lockedSlots ?? []) overlay[l.slot] = l.digit;
+    const d = displayDigitsActive(guess, digits, overlay);
+    for (let i = 0; i < digits; i++) {
+      displayed[i] = d[i];
+      const c = certainDigits?.[i] ?? null;
+      const lk = lockedSlots?.find((l) => l.slot === i);
+      if (c !== null) states[i] = "match";
+      else if (lk) {
+        states[i] = "locked-pending";
+        badges[i] = "lock-pending";
+      } else if (d[i] !== null) states[i] = "entering";
+    }
+    // Lock-entry mode: ring the selected cell. If it doesn't yet have
+    // a digit, paint it as locked-pending (empty) so the UI hints that
+    // the next number press will fill it.
+    if (pendingLockSlot != null && pendingLockSlot >= 0 && pendingLockSlot < digits) {
+      selected[pendingLockSlot] = true;
+      const hasDigit = lockedSlots?.some((l) => l.slot === pendingLockSlot);
+      if (!hasDigit) {
+        states[pendingLockSlot] = "locked-pending";
+        badges[pendingLockSlot] = "lock-pending";
+      }
+    }
+  } else {
+    // No result + not active — defensive fallback (shouldn't render).
+    const d = displayDigits(guess, digits, undefined);
+    for (let i = 0; i < digits; i++) displayed[i] = d[i];
+  }
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -332,10 +407,12 @@ export function GuessRow({
         <div className="min-w-[6rem] shrink-0">{labelSlot}</div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {displayed.map((v, i) => {
-            // `states[i]` is authoritative — it already accounts for
-            // certain slots (rendered as `match`) and the active-row
-            // entering/idle logic. `animate` is only ON for resolved
-            // rows so the typing row doesn't pulse on every keystroke.
+            // Active (entering) rows make their non-certain cells
+            // tappable when the parent provides `onTapCell`. Certain
+            // cells are never tappable — they're immutable.
+            const isCertain = (certainDigits?.[i] ?? null) !== null;
+            const tappable =
+              active && !result && !pending && onTapCell && !isCertain;
             return (
               <Digit
                 key={i}
@@ -343,6 +420,10 @@ export function GuessRow({
                 size="lg"
                 state={states[i]}
                 animate={!!result}
+                badge={badges[i]}
+                selected={selected[i]}
+                onClick={tappable ? () => onTapCell!(i) : undefined}
+                ariaLabel={tappable ? `Select slot ${i + 1} to lock` : undefined}
               />
             );
           })}

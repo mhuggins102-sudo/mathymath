@@ -12,8 +12,17 @@ import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
 export interface GuessGridState {
   digits: number;
   status: "playing" | "won" | "lost";
-  guesses: Array<{ guess: string; clueId?: ClueId; result?: ClueResult }>;
-  pendingGuess: { guess: string; options: [Clue, Clue] } | null;
+  guesses: Array<{
+    guess: string;
+    clueId?: ClueId;
+    result?: ClueResult;
+    locks?: readonly { slot: number; digit: string; correct: boolean }[];
+  }>;
+  pendingGuess: {
+    guess: string;
+    options: [Clue, Clue];
+    locks?: readonly { slot: number; digit: string; correct: boolean }[];
+  } | null;
 }
 
 interface GuessGridProps {
@@ -23,6 +32,14 @@ interface GuessGridProps {
    *  active (entering) row auto-fills these cells in the match state
    *  and the player's typed input fills only non-certain slots. */
   certainDigits?: (string | null)[];
+  /** Locks committed this turn (not yet submitted). Drives the
+   *  locked-pending visual on the active row. */
+  lockedSlots?: readonly { slot: number; digit: string }[];
+  /** Slot currently in lock-entry mode. */
+  pendingLockSlot?: number | null;
+  /** Tap handler for cells on the active row (initiates / cancels a
+   *  lock selection). */
+  onTapCell?: (slot: number) => void;
 }
 
 /**
@@ -37,6 +54,9 @@ export function GuessGrid({
   state,
   currentInput,
   certainDigits,
+  lockedSlots,
+  pendingLockSlot,
+  onTapCell,
 }: GuessGridProps) {
   const rows: React.ReactNode[] = [];
 
@@ -48,16 +68,17 @@ export function GuessGrid({
         guess={g.guess}
         digits={state.digits}
         result={g.result}
+        locks={g.locks}
         interactive
       />,
     );
   }
 
   if (state.pendingGuess) {
-    // Pending row: the full (certain + typed) guess has already been
-    // assembled by useGame on submit, so we just render it. certainDigits
-    // is passed so cells that are certain paint in match state even
-    // though there's no clue result yet.
+    // Pending row: the full (certain + locks + typed) guess has already
+    // been assembled by the reducer on submit. The pendingGuess.locks
+    // drive the locked-pending badges; certainDigits paints certain
+    // slots even before the clue is picked.
     rows.push(
       <GuessRow
         key="pending"
@@ -66,12 +87,12 @@ export function GuessGrid({
         pending
         active
         certainDigits={certainDigits}
+        lockedSlots={state.pendingGuess.locks}
       />,
     );
   } else if (state.status === "playing") {
     // Active typing row: currentInput is just the player's typed string,
-    // not a full guess. GuessRow will interleave certainDigits into the
-    // rendered cells.
+    // not a full guess. GuessRow interleaves certain + locks + typed.
     rows.push(
       <GuessRow
         key="current"
@@ -79,6 +100,9 @@ export function GuessGrid({
         digits={state.digits}
         active
         certainDigits={certainDigits}
+        lockedSlots={lockedSlots}
+        pendingLockSlot={pendingLockSlot}
+        onTapCell={onTapCell}
       />,
     );
   }
