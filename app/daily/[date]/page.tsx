@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { generateDailyTarget, todayUtcISO } from "@/lib/game/targetGenerator";
+import { todayUtcISO } from "@/lib/game/targetGenerator";
 import { DailyGame } from "./DailyGame";
 
 function isValidISODate(s: string): boolean {
@@ -18,12 +18,15 @@ export default async function DailyPage({
   const today = todayUtcISO();
   if (date > today) notFound();
 
-  const target = generateDailyTarget(date, 5);
-
+  // NOTE: the target is NOT generated here and NOT passed to the client.
+  // The daily flow is server-mediated — each guess hits the
+  // /api/daily/[date]/(submit-guess|choose-clue) endpoints which derive
+  // the target server-side, replay the client's history to catch
+  // tampering, and return just the next piece of state. The target is
+  // only revealed in responses on terminal game states.
   return (
     <DailyGame
       date={date}
-      target={target}
       isToday={date === today}
       digits={5}
       maxGuesses={8}
