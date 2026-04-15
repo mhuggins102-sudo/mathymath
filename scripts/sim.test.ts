@@ -70,6 +70,8 @@ function resultKey(r: ClueResult): string {
       return `M:${r.cmp}`;
     case "divisibleBy":
       return `DB:${r.divisor ?? "n"}:${r.present ? 1 : 0}`;
+    case "totalDeviation":
+      return `TD:${r.value}`;
   }
 }
 
@@ -110,6 +112,16 @@ interface SimStats {
   guessCount: number;
   cluePicks: ClueId[];
   reductionsByClue: Map<ClueId, number[]>;
+  /** For each chooser decision in this game: details about the two
+   *  offered clues vs. which one the greedy solver picked. */
+  decisions: Array<{
+    pickedWeight: number;
+    otherWeight: number;
+    /** Expected remaining candidate count for the chosen clue. */
+    pickedExp: number;
+    /** Expected remaining candidate count for the option NOT chosen. */
+    otherExp: number;
+  }>;
 }
 
 function playOne(target: string, seed: string, budget: number): SimStats {
@@ -120,6 +132,7 @@ function playOne(target: string, seed: string, budget: number): SimStats {
     guessCount: 0,
     cluePicks: [],
     reductionsByClue: new Map(),
+    decisions: [],
   };
 
   for (let g = 0; g < budget; g++) {
@@ -135,9 +148,19 @@ function playOne(target: string, seed: string, budget: number): SimStats {
     const options = pickTwoClues(seed, chosen);
     const e0 = expectedRemaining(candidates, guess, options[0].id);
     const e1 = expectedRemaining(candidates, guess, options[1].id);
-    const pick = e0 <= e1 ? options[0] : options[1];
+    const pickedIdx = e0 <= e1 ? 0 : 1;
+    const pick = options[pickedIdx];
+    const other = options[1 - pickedIdx];
+    const pickedExp = pickedIdx === 0 ? e0 : e1;
+    const otherExp = pickedIdx === 0 ? e1 : e0;
     chosen.push(pick.id);
     stats.cluePicks.push(pick.id);
+    stats.decisions.push({
+      pickedWeight: pick.weight,
+      otherWeight: other.weight,
+      pickedExp,
+      otherExp,
+    });
 
     const result = pick.compute(guess, target);
     const before = candidates.length;
@@ -232,6 +255,71 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
         const cat = row.category === "positional" ? "P" : "C";
         console.log(
           `  [${cat}] ${row.name.padEnd(16)} w=${row.weight.toFixed(1)}  picks=${String(row.picks).padStart(5)}  remaining=${ratioStr}`,
+        );
+      }
+
+      // --- chooser meaningfulness ---
+      //
+      // For every decision the solver made, compare:
+      //   - the WEIGHT of the picked vs the unpicked option. A lower
+      //     weight = rarer = designed-as-stronger. If the solver usually
+      //     picks the lower-weight clue, the weight ranking is agreeing
+      //     with real info value in-context.
+      //   - the expected-remaining RATIO between the two. Close to 1.0
+      //     means the two options are near-equally informative (the
+      //     decision has texture); close to 0 means one crushes the
+      //     other (the choice is obvious).
+      let decisionsTotal = 0;
+      let lowerWeightPicked = 0;
+      let equalWeight = 0;
+      const closenessBuckets = {
+        "obvious (≤25%)": 0,
+        "strong (25-50%)": 0,
+        "lean (50-75%)": 0,
+        "close (75-100%]": 0,
+        "equal (ties)": 0,
+      };
+      for (const r of runStats) {
+        for (const d of r.decisions) {
+          decisionsTotal += 1;
+          if (d.pickedWeight === d.otherWeight) equalWeight += 1;
+          else if (d.pickedWeight < d.otherWeight) lowerWeightPicked += 1;
+          // closeness = smaller expected / larger expected
+          const minE = Math.min(d.pickedExp, d.otherExp);
+          const maxE = Math.max(d.pickedExp, d.otherExp);
+          if (maxE === 0) {
+            closenessBuckets["equal (ties)"] += 1;
+          } else {
+            const c = minE / maxE;
+            if (c === 1) closenessBuckets["equal (ties)"] += 1;
+            else if (c <= 0.25) closenessBuckets["obvious (≤25%)"] += 1;
+            else if (c <= 0.5) closenessBuckets["strong (25-50%)"] += 1;
+            else if (c <= 0.75) closenessBuckets["lean (50-75%)"] += 1;
+            else closenessBuckets["close (75-100%]"] += 1;
+          }
+        }
+      }
+      console.log("\n--- chooser meaningfulness ---");
+      console.log(`total decisions:         ${decisionsTotal}`);
+      const nonTie = decisionsTotal - equalWeight;
+      console.log(
+        `lower-weight option picked: ${lowerWeightPicked} / ${nonTie} non-tie (${(
+          (lowerWeightPicked / Math.max(1, nonTie)) *
+          100
+        ).toFixed(1)}%)`,
+      );
+      console.log(`equal-weight decisions:  ${equalWeight}`);
+      console.log(
+        "\n  Expected-remaining ratio (min/max) distribution:",
+      );
+      console.log(
+        "    (lower = one option crushes the other; higher = real call)",
+      );
+      for (const [label, count] of Object.entries(closenessBuckets)) {
+        const pct = ((count / Math.max(1, decisionsTotal)) * 100).toFixed(1);
+        const bar = "█".repeat(Math.round((count / decisionsTotal) * 40));
+        console.log(
+          `    ${label.padEnd(18)}  ${String(count).padStart(5)}  ${pct.padStart(5)}%  ${bar}`,
         );
       }
 

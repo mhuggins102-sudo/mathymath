@@ -14,6 +14,7 @@ import { containsDigitClue } from "@/lib/game/clues/containsDigit";
 import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
 import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
+import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
 describe("Bullseyes", () => {
@@ -207,11 +208,24 @@ describe("Divisible By", () => {
   });
 });
 
+describe("Total Deviation", () => {
+  it("sums per-slot absolute differences", () => {
+    expect(totalDeviationClue.compute("55555", "10994").value).toBe(18);
+  });
+  it("is 0 when every slot is exact", () => {
+    expect(totalDeviationClue.compute("47628", "47628").value).toBe(0);
+  });
+  it("maxes at 45 when every digit is maximally off", () => {
+    expect(totalDeviationClue.compute("00000", "99999").value).toBe(45);
+    expect(totalDeviationClue.compute("99999", "00000").value).toBe(45);
+  });
+});
+
 describe("Registry", () => {
-  it("has 15 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(15);
+  it("has 16 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(16);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(15);
+    expect(ids.size).toBe(16);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }
@@ -223,7 +237,7 @@ describe("Registry", () => {
   });
   it("retired clues are gone", () => {
     const ids = new Set(CLUES.map((c) => c.id));
-    for (const retired of ["sumDirection", "totalDeviation", "maxDigit"]) {
+    for (const retired of ["sumDirection", "maxDigit"]) {
       expect(ids.has(retired as never)).toBe(false);
     }
   });

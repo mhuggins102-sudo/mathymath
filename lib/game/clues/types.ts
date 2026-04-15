@@ -38,7 +38,8 @@ export type ClueResult =
   | { kind: "containsDigit"; digit: number; present: boolean }
   | { kind: "distinctDigits"; count: number }
   | { kind: "median"; cmp: Cmp }
-  | { kind: "divisibleBy"; divisor: number | null; present: boolean };
+  | { kind: "divisibleBy"; divisor: number | null; present: boolean }
+  | { kind: "totalDeviation"; value: number };
 
 export type ClueId = ClueResult["kind"];
 

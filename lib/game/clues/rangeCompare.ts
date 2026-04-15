@@ -11,7 +11,7 @@ export const rangeCompareClue: Clue<{ kind: "rangeCompare"; cmp: Cmp }> = {
   category: "compositional",
   description:
     "Compares the range of digits (max − min) in your guess to the target's.",
-  weight: 1.2,
+  weight: 1.1,
   legend: [
     { state: "match", label: "same range" },
     { state: "warm", label: "target wider" },

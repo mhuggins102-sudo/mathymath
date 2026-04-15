@@ -12,8 +12,8 @@ export const sumDeltaClue: Clue<{ kind: "sumDelta"; delta: number }> = {
   category: "compositional",
   description:
     "Exact signed difference between the target's digit sum and yours (target − guess).",
-  // Exact signed digit-sum delta = strong compositional clue.
-  weight: 0.6,
+  // Exact signed digit-sum delta = strongest compositional clue.
+  weight: 0.5,
   legend: [
     { state: "match", label: "equal" },
     { state: "warm", label: "target higher" },

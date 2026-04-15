@@ -14,14 +14,16 @@ import { containsDigitClue } from "./containsDigit";
 import { distinctDigitsClue } from "./distinctDigits";
 import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
+import { totalDeviationClue } from "./totalDeviation";
 
 // Retired 2026-04-15 (see full-review doc):
 //   - sumDirectionClue — strictly dominated by sumDeltaClue (direction-only
 //     is a lossy subset of the signed delta).
-//   - totalDeviationClue — strictly dominated by thermometerClue (sum is a
-//     disaggregated form of the per-slot tiers).
 //   - maxDigitClue — overlaps rangeCompareClue (range = max − min); range
 //     encodes max-info plus more, so retiring max and keeping range wins.
+// totalDeviationClue was briefly retired (overlaps thermometer) but put
+// back: the collapsed-to-a-number feel is different from thermometer's
+// per-slot heat grid and the chooser rhythm benefits from having it.
 export const CLUES: readonly Clue[] = [
   bullseyesClue,
   higherLowerClue,
@@ -38,6 +40,7 @@ export const CLUES: readonly Clue[] = [
   distinctDigitsClue,
   medianClue,
   divisibleByClue,
+  totalDeviationClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));
