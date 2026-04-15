@@ -67,7 +67,40 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
   return out;
 }
 
-type Scheme = "current" | "deck";
+type Scheme = "current" | "deck" | "deck_1p1c";
+
+/** Build the deck for a scheme variant that guarantees the first pair
+ *  is exactly 1 positional + 1 compositional/special, shuffled within
+ *  the pair. The rest of the deck is 5 remaining positional + 10
+ *  remaining compositional/special, shuffled together. */
+function buildDeck1P1C(seed: string): ClueId[] {
+  const positional = CLUES.filter((c) => c.category === "positional");
+  const other = CLUES.filter((c) => c.category !== "positional");
+
+  const rngP = seededRng(`deck1p1cP:${seed}`);
+  const shuffledP = fisherYates(
+    positional.map((c) => c.id),
+    rngP,
+  );
+  const rngC = seededRng(`deck1p1cC:${seed}`);
+  const shuffledC = fisherYates(
+    other.map((c) => c.id),
+    rngC,
+  );
+
+  // Pair 1 = the two top cards (one from each deck) shuffled within
+  // the pair so the order is random even though composition is fixed.
+  const rngPair = seededRng(`deck1p1cPair:${seed}`);
+  const pair1 = fisherYates([shuffledP[0], shuffledC[0]], rngPair);
+
+  const rngRest = seededRng(`deck1p1cRest:${seed}`);
+  const rest = fisherYates(
+    [...shuffledP.slice(1), ...shuffledC.slice(1)],
+    rngRest,
+  );
+
+  return [...pair1, ...rest];
+}
 
 function pairFor(
   scheme: Scheme,
@@ -79,9 +112,9 @@ function pairFor(
   if (scheme === "current") {
     return pickTwoClues(seed, chosenClueIds);
   }
-  // deck scheme: positions (roundIndex*2, roundIndex*2+1) of the
-  // pre-built deck. Fall back to the last two ids if we ran off the
-  // end (shouldn't happen — deck has 17, budget ≤ 8 → max 14 draws).
+  // deck* schemes: read positions (roundIndex*2, roundIndex*2+1) of
+  // the pre-built deck. Fall back to the last two ids if we ran off
+  // the end (shouldn't happen — deck has 17, budget ≤ 8 → max 14 draws).
   const base = roundIndex * 2;
   const d = deck!;
   const aId = d[base] ?? d[d.length - 2];
@@ -182,6 +215,10 @@ interface SimStats {
     "positional" | "compositional" | "special",
     "positional" | "compositional" | "special",
   ] | null;
+  /** Category of the clue the solver picked on pair 1 (null if game
+   *  ended before pair 1 was offered — rare). Used to answer "is the
+   *  P card always picked when pair 1 is mixed?". */
+  pair1Picked: "positional" | "compositional" | "special" | null;
   /** For each chooser decision in this game: details about the two
    *  offered clues vs. which one the greedy solver picked. */
   decisions: Array<{
@@ -203,7 +240,12 @@ function playOne(
 ): SimStats {
   let candidates = ALL.slice();
   const chosen: ClueId[] = [];
-  const deck = scheme === "deck" ? buildDeck(seed) : null;
+  const deck =
+    scheme === "deck"
+      ? buildDeck(seed)
+      : scheme === "deck_1p1c"
+        ? buildDeck1P1C(seed)
+        : null;
   const stats: SimStats = {
     won: false,
     guessCount: 0,
@@ -211,6 +253,7 @@ function playOne(
     reductionsByClue: new Map(),
     cluesOffered: new Set(),
     pair1Categories: null,
+    pair1Picked: null,
     decisions: [],
   };
 
@@ -258,6 +301,9 @@ function playOne(
     const otherExp = pickedIdx === 0 ? e1 : e0;
     chosen.push(pick.id);
     stats.cluePicks.push(pick.id);
+    if (stats.pair1Picked === null && stats.pair1Categories !== null) {
+      stats.pair1Picked = pick.category;
+    }
     stats.decisions.push({
       pickedWeight: pick.weight,
       otherWeight: other.weight,
@@ -296,9 +342,13 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
       }
       const strategy = strategyEnv as "greedy" | "weight";
       const schemeEnv = (process.env.SIM_SCHEME ?? "current").toLowerCase();
-      if (schemeEnv !== "current" && schemeEnv !== "deck") {
+      if (
+        schemeEnv !== "current" &&
+        schemeEnv !== "deck" &&
+        schemeEnv !== "deck_1p1c"
+      ) {
         throw new Error(
-          `SIM_SCHEME must be "current" or "deck"; got ${schemeEnv}`,
+          `SIM_SCHEME must be "current" | "deck" | "deck_1p1c"; got ${schemeEnv}`,
         );
       }
       const scheme = schemeEnv as Scheme;
@@ -317,6 +367,10 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
       if (scheme === "deck") {
         console.log(
           "  (deck: strict P+P on top, rest shuffled; offered-but-unpicked cards are discarded permanently)",
+        );
+      } else if (scheme === "deck_1p1c") {
+        console.log(
+          "  (deck_1p1c: top pair = exactly 1P+1CS shuffled; rest shuffled; poof)",
         );
       } else {
         console.log(
@@ -396,6 +450,25 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
       console.log(
         `  0 positional: ${p1_0P} / ${N} (${((p1_0P / N) * 100).toFixed(1)}%)`,
       );
+
+      // Pair-1 picked breakdown, restricted to mixed (1P+1CS) pairs —
+      // the interesting case. In deck_1p1c this is 100% of games, so
+      // the denominator matches N. In the current scheme it answers
+      // "when pair 1 was mixed, how often did the solver take the P?".
+      let mixedGames = 0;
+      let mixedPickedP = 0;
+      for (const r of runStats) {
+        if (!r.pair1Categories) continue;
+        const ps = r.pair1Categories.filter((c) => c === "positional").length;
+        if (ps !== 1) continue;
+        mixedGames += 1;
+        if (r.pair1Picked === "positional") mixedPickedP += 1;
+      }
+      if (mixedGames > 0) {
+        console.log(
+          `  mixed pair 1 (1P+1CS): solver picked P in ${mixedPickedP}/${mixedGames} (${((mixedPickedP / mixedGames) * 100).toFixed(1)}%)`,
+        );
+      }
 
       console.log(
         "\n--- per-clue (offered rate, picks, avg remaining after pick) ---",
