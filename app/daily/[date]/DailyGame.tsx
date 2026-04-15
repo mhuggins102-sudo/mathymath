@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useGame } from "@/lib/hooks/useGame";
+import { useDailyGame } from "@/lib/hooks/useDailyGame";
 import { useClientId } from "@/lib/hooks/useClientId";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
@@ -17,11 +17,9 @@ import {
 import { Modal } from "@/components/Modal";
 import { buildShareText } from "@/lib/game/share";
 import { recordDailyResult } from "@/lib/persistence/localStore";
-import type { ClueId } from "@/lib/game/clues/types";
 
 interface DailyGameProps {
   date: string;
-  target: string;
   isToday: boolean;
   digits: number;
   maxGuesses: number;
@@ -29,7 +27,6 @@ interface DailyGameProps {
 
 export function DailyGame({
   date,
-  target,
   isToday,
   digits,
   maxGuesses,
@@ -51,19 +48,27 @@ export function DailyGame({
   const personalRecordedRef = useRef(false);
   const startedAtRef = useRef<number>(Date.now());
 
-  const game = useGame({
-    target,
-    seed: date,
+  const game = useDailyGame({
+    date,
     digits,
     maxGuesses,
     storageKey: `daily:${date}`,
-    trackStats: false,
   });
 
-  const { state, input, error, appendDigit, backspace, submit, chooseClue, hydrated } =
-    game;
+  const {
+    state,
+    input,
+    error,
+    appendDigit,
+    backspace,
+    submit,
+    chooseClue,
+    hydrated,
+    loading,
+  } = game;
 
-  const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
+  const keypadDisabled =
+    state.status !== "playing" || !!state.pendingGuess || loading;
   const submitDisabled = input.length !== state.digits || keypadDisabled;
 
   // Record this daily's result locally (first write wins per date). This
@@ -98,14 +103,17 @@ export function DailyGame({
     setStatsLoading(true);
     setStatsError(null);
 
+    // Results endpoint now receives the full history so the server can
+    // re-validate against the real target (integrity gate). The
+    // derived {won, guessCount, chosenClues} are computed server-side.
     const payload = {
       clientId,
       puzzleDate: date,
-      guessCount: state.guesses.length,
-      won: state.status === "won",
-      chosenClues: state.guesses
-        .map((g, i) => ({ guessIdx: i, clueId: g.clueId }))
-        .filter((c): c is { guessIdx: number; clueId: ClueId } => !!c.clueId),
+      history: state.guesses.map((g) => ({
+        guess: g.guess,
+        clueId: g.clueId,
+        result: g.result,
+      })),
       durationMs: Date.now() - startedAtRef.current,
     };
 
@@ -130,6 +138,8 @@ export function DailyGame({
       guessCount: state.guesses.length,
       maxGuesses: state.maxGuesses,
       digits: state.digits,
+      // buildShareText expects ResolvedGuess[]; DailyGameState guesses
+      // match that structurally (guess + clueId + result).
       guesses: state.guesses,
     });
     try {
@@ -239,7 +249,7 @@ export function DailyGame({
         <DailyResultPanel
           won={state.status === "won"}
           guessCount={state.guesses.length}
-          target={state.target}
+          target={state.revealedTarget ?? ""}
           data={percentile}
           loading={statsLoading}
           error={statsError}

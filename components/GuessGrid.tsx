@@ -1,10 +1,23 @@
 "use client";
 
 import { GuessRow } from "./GuessRow";
-import type { GameState } from "@/lib/game/stateMachine";
+import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
+
+/**
+ * Structural state shape GuessGrid needs — narrower than the full
+ * GameState so that the daily-mode state (which has no `target`) is
+ * also assignable. Unlimited mode passes its full GameState; daily mode
+ * passes DailyGameState. Both satisfy this shape.
+ */
+export interface GuessGridState {
+  digits: number;
+  status: "playing" | "won" | "lost";
+  guesses: Array<{ guess: string; clueId?: ClueId; result?: ClueResult }>;
+  pendingGuess: { guess: string; options: [Clue, Clue] } | null;
+}
 
 interface GuessGridProps {
-  state: GameState;
+  state: GuessGridState;
   currentInput: string;
 }
 

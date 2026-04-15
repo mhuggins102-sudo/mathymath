@@ -1,0 +1,104 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  generateDailyTarget,
+  todayUtcISO,
+} from "@/lib/game/targetGenerator";
+import { validateDailyHistory } from "@/lib/api/dailyValidation";
+import { getClueById } from "@/lib/game/clues/registry";
+import { pickTwoClues } from "@/lib/game/clueSelector";
+import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+
+const DIGITS = 5;
+const MAX_GUESSES = DEFAULT_MAX_GUESSES;
+
+const historyGuessSchema = z.object({
+  guess: z.string(),
+  clueId: z.string().optional(),
+  result: z.unknown().optional(),
+});
+
+const bodySchema = z.object({
+  history: z.array(historyGuessSchema).max(MAX_GUESSES),
+  guess: z.string().length(DIGITS).regex(/^[0-9]+$/),
+});
+
+/**
+ * POST /api/daily/[date]/submit-guess
+ *
+ * Client sends its full resolved history plus a new guess. Server
+ * re-derives the target from `date`, replays the history to catch
+ * tampering, and returns the next state:
+ *   - { kind: "won", result, target }      exact match
+ *   - { kind: "lost", target }              final slot used + wrong
+ *   - { kind: "pending", options }          non-final wrong, offer a pair
+ *
+ * Target is ONLY included in the response on terminal states. During
+ * ongoing play the client never receives it.
+ */
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ date: string }> },
+) {
+  const { date } = await params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return NextResponse.json({ error: "invalid_date" }, { status: 400 });
+  }
+  if (date > todayUtcISO()) {
+    return NextResponse.json({ error: "future_date" }, { status: 400 });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "invalid_body", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const target = generateDailyTarget(date, DIGITS);
+  const validation = validateDailyHistory({
+    target,
+    digits: DIGITS,
+    maxGuesses: MAX_GUESSES,
+    seed: date,
+    history: parsed.data.history,
+  });
+  if (!validation.ok) {
+    // 409: client history is internally inconsistent (likely tampering,
+    // otherwise a very stale cached state).
+    return NextResponse.json({ error: validation.error }, { status: 409 });
+  }
+  if (validation.status !== "playing") {
+    return NextResponse.json({ error: "game_over" }, { status: 409 });
+  }
+
+  const { guess } = parsed.data;
+
+  // Exact match → auto-win with bullseyes. Game is over, so reveal the
+  // target (it's the guess anyway, but we echo it for consistency).
+  if (guess === target) {
+    const result = getClueById("bullseyes").compute(guess, target);
+    return NextResponse.json({ kind: "won", result, target });
+  }
+
+  // Final wrong guess → no clue, game ends.
+  const isFinalSlot = parsed.data.history.length + 1 >= MAX_GUESSES;
+  if (isFinalSlot) {
+    return NextResponse.json({ kind: "lost", target });
+  }
+
+  // Non-final wrong guess → offer a pair. Only the ids travel over the
+  // wire; the client reconstructs the Clue objects via getClueById.
+  const options = pickTwoClues(date, validation.chosenClueIds);
+  return NextResponse.json({
+    kind: "pending",
+    options: [options[0].id, options[1].id],
+  });
+}

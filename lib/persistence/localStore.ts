@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import type { GameState } from "@/lib/game/stateMachine";
+import type { ClueResult } from "@/lib/game/clues/types";
 
 const STORAGE_PREFIX = "mathymath:";
 
@@ -58,6 +59,66 @@ export function loadGame(key: string): SavedGame | null {
 export function clearGame(key: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(STORAGE_PREFIX + key);
+}
+
+// --- Daily mode persistence ---
+//
+// Daily games are server-mediated: the target never crosses the wire
+// during play, so the client-persisted shape does NOT include it. The
+// revealed target is only stored once the game ends (the server returns
+// it on win/loss so the "target was XXXXX" UI can render across reloads).
+
+const savedDailyGuessSchema = z.object({
+  guess: z.string(),
+  clueId: z.string().optional(),
+  result: z.unknown().optional(),
+});
+
+const savedDailyPendingSchema = z.object({
+  guess: z.string(),
+  optionIds: z.tuple([z.string(), z.string()]),
+});
+
+const savedDailyGameSchema = z.object({
+  version: z.literal(1),
+  date: z.string(),
+  digits: z.number(),
+  maxGuesses: z.number(),
+  guesses: z.array(savedDailyGuessSchema),
+  pendingGuess: savedDailyPendingSchema.nullable(),
+  status: z.enum(["playing", "won", "lost"]),
+  revealedTarget: z.string().nullable(),
+});
+
+export type SavedDailyGame = z.infer<typeof savedDailyGameSchema>;
+
+export interface SavedDailyGuess {
+  guess: string;
+  clueId?: string;
+  result?: ClueResult;
+}
+
+export function saveDailyGame(key: string, value: SavedDailyGame): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      STORAGE_PREFIX + key,
+      JSON.stringify(value),
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export function loadDailyGame(key: string): SavedDailyGame | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(STORAGE_PREFIX + key);
+  if (!raw) return null;
+  try {
+    return savedDailyGameSchema.parse(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 
 // --- Personal stats (unlimited mode) ---
