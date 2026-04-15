@@ -57,4 +57,63 @@ describe("stateMachine", () => {
     s = reduce(s, { type: "SUBMIT_GUESS", guess: "22222" });
     expect(s).toBe(before);
   });
+
+  it("resolves lock attempts against the real target", () => {
+    let s = initGameState({ target: "12345", seed: "t" });
+    s = reduce(s, {
+      type: "SUBMIT_GUESS",
+      guess: "99999",
+      locks: [
+        { slot: 0, digit: "1" }, // correct (target[0] = "1")
+        { slot: 2, digit: "7" }, // wrong (target[2] = "3")
+      ],
+    });
+    // The pending guess carries resolved locks through to CHOOSE_CLUE.
+    expect(s.pendingGuess).not.toBeNull();
+    expect(s.pendingGuess!.locks).toEqual([
+      { slot: 0, digit: "1", correct: true },
+      { slot: 2, digit: "7", correct: false },
+    ]);
+    // After picking a clue, the locks land on the resolved guess.
+    const chosen = s.pendingGuess!.options[0];
+    s = reduce(s, { type: "CHOOSE_CLUE", clueId: chosen.id });
+    expect(s.guesses[0].locks).toEqual([
+      { slot: 0, digit: "1", correct: true },
+      { slot: 2, digit: "7", correct: false },
+    ]);
+  });
+
+  it("records locks on an exact-match win", () => {
+    let s = initGameState({ target: "12345", seed: "t" });
+    s = reduce(s, {
+      type: "SUBMIT_GUESS",
+      guess: "12345",
+      locks: [{ slot: 0, digit: "1" }],
+    });
+    expect(s.status).toBe("won");
+    expect(s.guesses[0].locks).toEqual([
+      { slot: 0, digit: "1", correct: true },
+    ]);
+  });
+
+  it("records locks on a final-wrong-guess loss", () => {
+    let s = initGameState({ target: "12345", seed: "t", maxGuesses: 1 });
+    s = reduce(s, {
+      type: "SUBMIT_GUESS",
+      guess: "99999",
+      locks: [{ slot: 3, digit: "4" }], // correct
+    });
+    expect(s.status).toBe("lost");
+    expect(s.guesses[0].locks).toEqual([
+      { slot: 3, digit: "4", correct: true },
+    ]);
+  });
+
+  it("leaves `locks` undefined when no attempts were made", () => {
+    let s = initGameState({ target: "12345", seed: "t" });
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
+    const chosen = s.pendingGuess!.options[0];
+    s = reduce(s, { type: "CHOOSE_CLUE", clueId: chosen.id });
+    expect(s.guesses[0].locks).toBeUndefined();
+  });
 });

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   DEFAULT_MAX_GUESSES,
   type GameAction,
   type GameState,
+  type LockAttempt,
   initGameState,
   reduce,
 } from "@/lib/game/stateMachine";
@@ -14,6 +15,10 @@ import {
   deriveCertainDigits,
   inputCapacity,
 } from "@/lib/game/certain";
+import {
+  canUseLockOnGuess,
+  locksAvailable as computeLocksAvailable,
+} from "@/lib/game/locks";
 import {
   clearGame,
   loadGame,
@@ -45,12 +50,31 @@ export interface UseGameResult {
    *  entries are the known char "0".."9" or null). */
   certainDigits: (string | null)[];
   /** Max typed-input length: state.digits minus the number of certain
-   *  slots. The consumer uses this for submit-disabled gating. */
+   *  slots minus the number of committed locks this turn. */
   inputCapacity: number;
+  /** Locks the player has committed for the current turn (before submit). */
+  lockedSlots: readonly LockAttempt[];
+  /** Slot currently selected for lock entry, or null if not in lock mode. */
+  pendingLockSlot: number | null;
+  /** Locks the player has REMAINING this game (cap minus spent). */
+  locksAvailable: number;
+  /** True iff the player is allowed to start a new lock on this turn:
+   *  past guess 1, at least one lock remaining, below-max this turn. */
+  canStartLock: boolean;
+  /** True iff the pending lock has a digit and can be committed. */
+  canCommitPendingLock: boolean;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
   chooseClue: (id: string) => void;
+  /** Player tapped cell `slot`. Enters lock-selection on an empty or
+   *  typed non-certain cell; cancels lock-selection (and drops any
+   *  pending digit) when the same cell is tapped again. Tapping a
+   *  different cell while one is already pending is a no-op (see Q8). */
+  tapCell: (slot: number) => void;
+  /** Commit the currently-pending lock (fires when the "Lock"
+   *  transformed-Enter button is pressed). No-op otherwise. */
+  commitLock: () => void;
   reset: (params: { target: string; seed: string }) => void;
 }
 
@@ -122,39 +146,164 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setUnlimitedStats(updated);
   }, [state.status, state.guesses.length, config.trackStats]);
 
-  // `input` stores only the digits the player has TYPED into non-certain
-  // slots — certain slots (revealed by prior clues) are auto-filled on
-  // submit. `capacity` is how many typed digits the input can hold.
+  // ----- Input + lock state ------------------------------------------------
+  //
+  // Model:
+  //   - `input` is the string of digits typed this turn, each char
+  //     projected LTR onto non-certain, non-locked slots.
+  //   - `lockedSlots` records slots the player has locked this turn
+  //     (digit committed; correctness TBD on submit).
+  //   - `pendingLockSlot` is the slot currently in lock-selection mode,
+  //     or null for normal typing. While non-null, Enter becomes Lock:
+  //     number keys write the pending digit, backspace clears it, and
+  //     tapping the same cell cancels.
   const certain = deriveCertainDigits(state.guesses, state.digits);
-  const capacity = inputCapacity(certain);
+  const [lockedSlots, setLockedSlots] = useState<LockAttempt[]>([]);
+  const [pendingLockSlot, setPendingLockSlot] = useState<number | null>(null);
+
+  // Reset lock state whenever we move to a new committed guess slot,
+  // including the reducer clearing pendingGuess after CHOOSE_CLUE.
+  const guessesLen = state.guesses.length;
+  const hasPending = !!state.pendingGuess;
+  useEffect(() => {
+    setLockedSlots([]);
+    setPendingLockSlot(null);
+  }, [guessesLen, hasPending]);
+
+  // capacity for typed input = digits − certain − locks committed this turn.
+  const capacity = inputCapacity(certain) - lockedSlots.length;
+
+  const locksAvailableCount = computeLocksAvailable(state.guesses);
+  const canUseLocks = canUseLockOnGuess(state.guesses.length);
+  const canStartLock =
+    canUseLocks && lockedSlots.length < locksAvailableCount;
+  const pendingLockDigit = useMemo(() => {
+    if (pendingLockSlot === null) return null;
+    return (
+      lockedSlots.find((l) => l.slot === pendingLockSlot)?.digit ?? null
+    );
+  }, [pendingLockSlot, lockedSlots]);
+  const canCommitPendingLock =
+    pendingLockSlot !== null && pendingLockDigit !== null;
+
+  /** Given a slot, return the index in `input` that projects to it —
+   *  null if the slot is certain, locked, or past the current input
+   *  length. Used when the player taps a typed cell to re-purpose it
+   *  as a lock: we need to remove that character from `input`. */
+  const typedIndexForSlot = useCallback(
+    (slot: number): number | null => {
+      let idx = 0;
+      for (let i = 0; i < state.digits; i++) {
+        if (certain[i] !== null) continue;
+        if (lockedSlots.some((l) => l.slot === i)) continue;
+        if (i === slot) return idx < input.length ? idx : null;
+        idx++;
+      }
+      return null;
+    },
+    [state.digits, certain, lockedSlots, input],
+  );
 
   const appendDigit = useCallback(
     (d: string) => {
       setError(null);
+      if (pendingLockSlot !== null) {
+        // Lock-entry mode: set or overwrite the pending slot's digit.
+        setLockedSlots((cur) => {
+          const others = cur.filter((l) => l.slot !== pendingLockSlot);
+          return [...others, { slot: pendingLockSlot, digit: d }];
+        });
+        return;
+      }
+      // Normal typing: fill the next available slot.
       setInput((cur) => (cur.length >= capacity ? cur : cur + d));
     },
-    [capacity],
+    [pendingLockSlot, capacity],
   );
 
   const backspace = useCallback(() => {
     setError(null);
+    if (pendingLockSlot !== null) {
+      // In lock-entry mode, backspace clears the pending slot's digit
+      // but keeps the slot selected for re-entry.
+      setLockedSlots((cur) => cur.filter((l) => l.slot !== pendingLockSlot));
+      return;
+    }
     setInput((cur) => cur.slice(0, -1));
-  }, []);
+  }, [pendingLockSlot]);
+
+  const tapCell = useCallback(
+    (slot: number) => {
+      setError(null);
+      if (slot < 0 || slot >= state.digits) return;
+      if (certain[slot] !== null) return; // immutable
+      // Cancel: same cell tapped again → drop pending and any digit.
+      if (pendingLockSlot === slot) {
+        setLockedSlots((cur) => cur.filter((l) => l.slot !== slot));
+        setPendingLockSlot(null);
+        return;
+      }
+      // Different cell while one is already pending → ignore (Q8: no
+      // switching while a lock is in progress).
+      if (pendingLockSlot !== null) return;
+      // Cannot start a new lock without budget or on guess 1.
+      const isAlreadyLocked = lockedSlots.some((l) => l.slot === slot);
+      if (!canUseLocks) return;
+      if (!isAlreadyLocked && lockedSlots.length >= locksAvailableCount)
+        return;
+      // If the slot currently shows a typed char, remove that index
+      // from input so it stops projecting to this slot.
+      const idx = typedIndexForSlot(slot);
+      if (idx !== null) {
+        setInput((cur) => cur.slice(0, idx) + cur.slice(idx + 1));
+      }
+      setPendingLockSlot(slot);
+    },
+    [
+      state.digits,
+      certain,
+      pendingLockSlot,
+      lockedSlots,
+      canUseLocks,
+      locksAvailableCount,
+      typedIndexForSlot,
+    ],
+  );
+
+  const commitLock = useCallback(() => {
+    if (pendingLockSlot === null) return;
+    if (pendingLockDigit === null) return;
+    // The lock stays in lockedSlots; we just exit lock-entry mode so
+    // number keys resume typing and the Enter label reverts.
+    setPendingLockSlot(null);
+    buzz(18);
+  }, [pendingLockSlot, pendingLockDigit]);
 
   const submit = useCallback(() => {
-    // Build the full guess by interleaving the player's typed input with
-    // the known certain digits, then validate as usual.
-    const fullGuess = buildGuessFromInput(certain, input);
+    // Refuse to submit from inside lock-entry mode (user should commit
+    // or cancel the pending lock first). Avoids confusing half-states.
+    if (pendingLockSlot !== null) return;
+    // Build the full guess by interleaving typed input with certain
+    // digits AND locked slots.
+    const overlay: (string | null)[] = certain.slice();
+    for (const l of lockedSlots) overlay[l.slot] = l.digit;
+    const fullGuess = buildGuessFromInput(overlay, input);
     const v = validateGuess(fullGuess, state.digits);
     if (!v.ok) {
       setError(v.error);
       return;
     }
     setError(null);
-    dispatch({ type: "SUBMIT_GUESS", guess: v.digits });
+    dispatch({
+      type: "SUBMIT_GUESS",
+      guess: v.digits,
+      locks: lockedSlots.length > 0 ? lockedSlots : undefined,
+    });
     setInput("");
+    // lockedSlots clears via the guessesLen effect after the reducer
+    // transitions out of the current input state.
     buzz(12);
-  }, [input, state.digits, certain]);
+  }, [pendingLockSlot, input, state.digits, certain, lockedSlots]);
 
   const chooseClue = useCallback((id: string) => {
     dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
@@ -186,10 +335,17 @@ export function useGame(config: UseGameConfig): UseGameResult {
     unlimitedStats,
     certainDigits: certain,
     inputCapacity: capacity,
+    lockedSlots,
+    pendingLockSlot,
+    locksAvailable: locksAvailableCount,
+    canStartLock,
+    canCommitPendingLock,
     appendDigit,
     backspace,
     submit,
     chooseClue,
+    tapCell,
+    commitLock,
     reset,
   };
 }

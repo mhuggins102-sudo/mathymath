@@ -24,22 +24,33 @@ export interface ResolvedGuess {
   locks?: LockRecord[];
 }
 
+/** A lock the player committed before submit, sans correctness — the
+ *  reducer resolves correctness against the real target and promotes
+ *  the attempt to a full LockRecord in the stored history. */
+export interface LockAttempt {
+  slot: number;
+  digit: string;
+}
+
 export interface GameState {
   target: string;
   digits: number;
   maxGuesses: number;
   seed: string;
   guesses: ResolvedGuess[];
-  /** Current pending guess waiting for the player to choose a clue. */
+  /** Current pending guess waiting for the player to choose a clue.
+   *  `locks` travels with the pending guess so the chosen clue handler
+   *  can append them to the resolved history alongside the clue result. */
   pendingGuess: {
     guess: string;
     options: [Clue, Clue];
+    locks?: LockRecord[];
   } | null;
   status: GameStatus;
 }
 
 export type GameAction =
-  | { type: "SUBMIT_GUESS"; guess: string }
+  | { type: "SUBMIT_GUESS"; guess: string; locks?: readonly LockAttempt[] }
   | { type: "CHOOSE_CLUE"; clueId: ClueId }
   | { type: "RESET"; target: string; seed: string; digits?: number; maxGuesses?: number };
 
@@ -74,6 +85,18 @@ export function reduce(state: GameState, action: GameAction): GameState {
       if (state.status !== "playing" || state.pendingGuess) return state;
       if (action.guess.length !== state.digits) return state;
 
+      // Resolve any lock attempts against the real target. Stored on the
+      // guess only when there actually were attempts; otherwise we leave
+      // `locks` undefined so existing rows don't gain an empty array.
+      const attempts = action.locks ?? [];
+      const resolvedLocks: LockRecord[] = attempts.map((l) => ({
+        slot: l.slot,
+        digit: l.digit,
+        correct: state.target[l.slot] === l.digit,
+      }));
+      const locksField =
+        resolvedLocks.length > 0 ? { locks: resolvedLocks } : {};
+
       // Exact match = instant win; skip clue-choice modal.
       if (action.guess === state.target) {
         const clueId: ClueId = "bullseyes";
@@ -82,7 +105,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
           ...state,
           guesses: [
             ...state.guesses,
-            { guess: action.guess, clueId, result },
+            { guess: action.guess, clueId, result, ...locksField },
           ],
           status: "won",
         };
@@ -94,7 +117,10 @@ export function reduce(state: GameState, action: GameAction): GameState {
       if (isFinalGuess) {
         return {
           ...state,
-          guesses: [...state.guesses, { guess: action.guess }],
+          guesses: [
+            ...state.guesses,
+            { guess: action.guess, ...locksField },
+          ],
           status: "lost",
         };
       }
@@ -105,17 +131,29 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const options = pickTwoClues(state.seed, usedClueIds);
       return {
         ...state,
-        pendingGuess: { guess: action.guess, options },
+        pendingGuess: {
+          guess: action.guess,
+          options,
+          ...(resolvedLocks.length > 0 ? { locks: resolvedLocks } : {}),
+        },
       };
     }
 
     case "CHOOSE_CLUE": {
       if (!state.pendingGuess) return state;
-      const { guess, options } = state.pendingGuess;
+      const { guess, options, locks } = state.pendingGuess;
       const clue = options.find((c) => c.id === action.clueId);
       if (!clue) return state;
       const result = clue.compute(guess, state.target);
-      const guesses = [...state.guesses, { guess, clueId: clue.id, result }];
+      const guesses = [
+        ...state.guesses,
+        {
+          guess,
+          clueId: clue.id,
+          result,
+          ...(locks && locks.length > 0 ? { locks } : {}),
+        },
+      ];
       const won = guess === state.target;
       const lost = !won && guesses.length >= state.maxGuesses;
       return {
