@@ -64,27 +64,90 @@ function displayDigits(
   return out;
 }
 
-function subLabelFor(result: ClueResult): { text: string; className: string } | null {
+// --- player-side digit stats (used to render cmp-clue sub-labels) ---
+//
+// These mirror the helpers in the corresponding clue files but operate
+// on the player's own guess so we can show the implied bound next to
+// the direction symbol, e.g. "↑ 3" for "target has more than your 3".
+
+function computeRange(s: string): number {
+  const ds = [...s].map(Number);
+  return Math.max(...ds) - Math.min(...ds);
+}
+
+function computeEvenCount(s: string): number {
+  let n = 0;
+  for (const ch of s) if (Number(ch) % 2 === 0) n++;
+  return n;
+}
+
+const PRIME_SET = new Set([2, 3, 5, 7]);
+function computePrimeCount(s: string): number {
+  let n = 0;
+  for (const ch of s) if (PRIME_SET.has(Number(ch))) n++;
+  return n;
+}
+
+function computeMedian(s: string): number {
+  const sorted = [...s].map(Number).sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+function computeDigitSum(s: string): number {
+  let sum = 0;
+  for (const ch of s) sum += Number(ch);
+  return sum;
+}
+
+/**
+ * Builds the short in-row sub-label that sits under the clue name.
+ * Comparison clues show a direction symbol plus the player's own value
+ * so the implied bound reads cleanly ("↑ 3" = "target has more than 3").
+ * Sum Delta keeps its exact magnitude.
+ *
+ * Exported so the unit test can assert text output without rendering.
+ */
+export function subLabelFor(
+  guess: string,
+  result: ClueResult,
+): { text: string; className: string } | null {
   switch (result.kind) {
     case "rangeCompare":
     case "parityBalance":
     case "primeCount":
-    case "median":
-      return {
-        text:
-          result.cmp === "eq" ? "equal" : result.cmp === "gt" ? "target ↑" : "target ↓",
-        className:
-          result.cmp === "eq"
-            ? "text-good"
-            : result.cmp === "gt"
-            ? "text-warn"
-            : "text-bad",
-      };
+    case "median": {
+      const own =
+        result.kind === "rangeCompare"
+          ? computeRange(guess)
+          : result.kind === "parityBalance"
+          ? computeEvenCount(guess)
+          : result.kind === "primeCount"
+          ? computePrimeCount(guess)
+          : computeMedian(guess);
+      const symbol =
+        result.cmp === "eq" ? "=" : result.cmp === "gt" ? "↑" : "↓";
+      const className =
+        result.cmp === "eq"
+          ? "text-good"
+          : result.cmp === "gt"
+          ? "text-warn"
+          : "text-bad";
+      return { text: `${symbol} ${own}`, className };
+    }
     case "sumDelta": {
-      if (result.delta === 0) return { text: "equal", className: "text-good" };
-      if (result.delta > 0)
-        return { text: `target +${result.delta}`, className: "text-warn" };
-      return { text: `target −${Math.abs(result.delta)}`, className: "text-bad" };
+      // Sum Delta carries the exact signed distance; show the player's
+      // own sum on ties and the delta (with explicit sign) otherwise.
+      if (result.delta === 0) {
+        const own = computeDigitSum(guess);
+        return { text: `= ${own}`, className: "text-good" };
+      }
+      if (result.delta > 0) {
+        return { text: `↑ +${result.delta}`, className: "text-warn" };
+      }
+      return {
+        text: `↓ −${Math.abs(result.delta)}`,
+        className: "text-bad",
+      };
     }
     case "digitOverlap":
       return { text: `${result.count} shared`, className: "text-accent" };
@@ -109,12 +172,14 @@ function subLabelFor(result: ClueResult): { text: string; className: string } | 
 }
 
 function ClueLabelContent({
+  guess,
   result,
 }: {
+  guess: string;
   result: ClueResult;
 }) {
   const meta = getClueById(result.kind);
-  const sub = subLabelFor(result);
+  const sub = subLabelFor(guess, result);
   return (
     <div className="flex flex-col justify-center text-right min-w-0">
       <span className="text-[11px] font-semibold text-foreground truncate leading-tight">
@@ -173,7 +238,7 @@ export function GuessRow({
     if (pending && !result)
       return <p className="text-[10px] text-muted text-right">pick a clue below…</p>;
     if (!result) return null;
-    if (!interactive) return <ClueLabelContent result={result} />;
+    if (!interactive) return <ClueLabelContent guess={guess} result={result} />;
     return (
       <button
         type="button"
@@ -182,7 +247,7 @@ export function GuessRow({
         aria-label={`Explain clue: ${meta?.name ?? ""}`}
         className="w-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
       >
-        <ClueLabelContent result={result} />
+        <ClueLabelContent guess={guess} result={result} />
       </button>
     );
   })();
