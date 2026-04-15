@@ -6,7 +6,7 @@ export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
   category: "compositional",
   description:
     "How many of your digits have a match in the target. Duplicates are capped by the target's count — three 2s against a target with only two 2s scores 2, not 3.",
-  weight: 1.0,
+  weight: 0.9,
   compute(guess, target) {
     // Multiset intersection: each digit in the target can match at most
     // one digit in the guess. We tick off matches as we go.

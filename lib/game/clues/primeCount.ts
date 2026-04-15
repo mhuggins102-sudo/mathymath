@@ -14,7 +14,7 @@ export const primeCountClue: Clue<{ kind: "primeCount"; cmp: Cmp }> = {
   category: "compositional",
   description:
     "Compares the number of prime digits (2, 3, 5, 7) in the target to your guess.",
-  weight: 1.2,
+  weight: 1.3,
   legend: [
     { state: "match", label: "same count" },
     { state: "warm", label: "target has more" },

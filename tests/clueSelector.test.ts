@@ -17,6 +17,13 @@ describe("pickTwoClues", () => {
     const b = pickTwoClues("2026-04-14", ["oracle"]);
     expect(a.map((c) => c.id).sort()).not.toEqual(b.map((c) => c.id).sort());
   });
+  it("same CHOSEN SET via different paths yields the same next pair", () => {
+    // Two players who arrived at {bullseyes, oracle} via opposite orders
+    // have identical knowledge — they should see the same next options.
+    const a = pickTwoClues("2026-04-14", ["bullseyes", "oracle"]);
+    const b = pickTwoClues("2026-04-14", ["oracle", "bullseyes"]);
+    expect(a.map((c) => c.id).sort()).toEqual(b.map((c) => c.id).sort());
+  });
   it("never re-offers an already-chosen clue", () => {
     const chosen: ClueId[] = [];
     // Walk through 7 guesses picking the first option each time; no id should repeat.

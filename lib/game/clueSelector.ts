@@ -6,10 +6,12 @@ import { seededRng, weightedSample } from "./seededRng";
  * Picks two distinct clue options given the seed and the history of
  * already-chosen clue ids.
  *
- * Determinism: same (seed, chosenClueIds sequence) always yields the same
- * ordered pair. This makes daily puzzles fair — any two players who have
- * taken the same clue path up to guess N see the identical two options on
- * guess N+1.
+ * Determinism: the seed is built from `(seed, sorted set of chosen ids,
+ * count)`. Sorting ensures that two players who arrived at the same SET of
+ * chosen clues via different orderings see the same next pair — they have
+ * the same information, so they deserve the same options. The count is
+ * included so each guess index draws fresh randomness even when the sorted
+ * set happens to repeat (which it shouldn't, but belt-and-suspenders).
  *
  * Exclusion: clues whose ids appear in `chosenClueIds` are removed from the
  * pool, so no clue type can be offered twice in a single game.
@@ -18,11 +20,14 @@ export function pickTwoClues(
   seed: string,
   chosenClueIds: readonly ClueId[],
 ): [Clue, Clue] {
-  const rng = seededRng(`clues:${seed}:${chosenClueIds.join(",")}`);
+  const sortedKey = [...chosenClueIds].sort().join(",");
+  const rng = seededRng(
+    `clues:${seed}:${chosenClueIds.length}:${sortedKey}`,
+  );
   const pool: Clue[] = CLUES.filter((c) => !chosenClueIds.includes(c.id));
   if (pool.length < 2) {
-    // Shouldn't happen with 12 clues and <= 10 guesses, but fall back safely
-    // by replaying the full registry if somehow exhausted.
+    // Shouldn't happen — the roster is larger than the max picks per game.
+    // Fall back to the full registry so the reducer always has a pair.
     const fallback = CLUES.slice();
     const [a, b] = weightedSample(
       fallback,

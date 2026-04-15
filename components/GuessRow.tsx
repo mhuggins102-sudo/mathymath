@@ -66,9 +66,7 @@ function displayDigits(
 
 function subLabelFor(result: ClueResult): { text: string; className: string } | null {
   switch (result.kind) {
-    case "sumDirection":
     case "rangeCompare":
-    case "maxDigit":
     case "parityBalance":
     case "primeCount":
     case "median":

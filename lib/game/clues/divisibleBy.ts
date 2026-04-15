@@ -21,7 +21,9 @@ export const divisibleByClue: Clue<{
   category: "compositional",
   description:
     "Picks one value between 2 and 9 that evenly divides the target (shown in the clue) and confirms it — e.g. '5? Yes'. If no value from 2 to 9 divides the target, reports no.",
-  weight: 1.0,
+  // Single-bit yes/no clue with narrative flavor ("divisible by 7? yes!").
+  // Highest weight in the roster — it's the most-common filler clue.
+  weight: 1.4,
   legend: [
     { state: "match", label: "divisible" },
     { state: "cold", label: "not divisible" },

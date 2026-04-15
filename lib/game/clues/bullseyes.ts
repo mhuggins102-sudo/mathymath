@@ -6,7 +6,7 @@ export const bullseyesClue: Clue<{ kind: "bullseyes"; hits: boolean[] }> = {
   category: "positional",
   description:
     "Marks each slot where your digit exactly matches the target digit in that position.",
-  weight: 1.0,
+  weight: 0.7,
   legend: [{ state: "match", label: "exact match" }],
   compute(guess, target) {
     const hits = [...guess].map((ch, i) => ch === target[i]);

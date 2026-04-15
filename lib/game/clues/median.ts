@@ -11,7 +11,7 @@ export const medianClue: Clue<{ kind: "median"; cmp: Cmp }> = {
   category: "compositional",
   description:
     "Compares the median digit (the middle digit when sorted) of your guess to the target's.",
-  weight: 1.0,
+  weight: 1.1,
   legend: [
     { state: "match", label: "same median" },
     { state: "warm", label: "target higher" },
