@@ -15,6 +15,7 @@ import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
 import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
 import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
+import { extraLockClue } from "@/lib/game/clues/extraLock";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
 describe("Bullseyes", () => {
@@ -256,11 +257,26 @@ describe("Total Deviation", () => {
   });
 });
 
+describe("Extra Lock (special)", () => {
+  it("is in the special category with a flat result", () => {
+    expect(extraLockClue.category).toBe("special");
+    expect(extraLockClue.compute("12345", "54321")).toEqual({
+      kind: "extraLock",
+    });
+  });
+  it("reveals nothing about the target", () => {
+    // compute should be independent of target/guess content.
+    const a = extraLockClue.compute("00000", "74827");
+    const b = extraLockClue.compute("99999", "11111");
+    expect(a).toEqual(b);
+  });
+});
+
 describe("Registry", () => {
-  it("has 16 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(16);
+  it("has 17 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(17);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(16);
+    expect(ids.size).toBe(17);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

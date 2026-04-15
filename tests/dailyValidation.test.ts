@@ -10,14 +10,20 @@ const DIGITS = 5;
 const MAX = 8;
 
 /** Build one "honest" resolved guess by asking the real clue pipeline
- *  what the next offered pair is, picking the first option, and
- *  computing the real result against the target. */
+ *  what the next offered pair is, picking an option, and computing the
+ *  real result against the target. Prefers clues whose compute is
+ *  purely a function of (guess, target) — skipping Special (would
+ *  grant +1 lock and skew budget math) and Oracle (result depends on
+ *  context.knownSlots, which this helper doesn't thread). Falls back
+ *  to the first option if neither fits. */
 function honestGuess(
   chosen: ClueId[],
   guess: string,
 ): { guess: string; clueId: ClueId; result: unknown } {
   const pair = pickTwoClues(SEED, chosen);
-  const clue = pair[0];
+  const clue =
+    pair.find((c) => c.category !== "special" && c.id !== "oracle") ??
+    pair[0];
   const result = clue.compute(guess, TARGET);
   return { guess, clueId: clue.id, result };
 }

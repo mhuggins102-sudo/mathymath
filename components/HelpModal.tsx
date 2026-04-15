@@ -52,7 +52,15 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             Pick the one that will help you most.{" "}
             <span className="text-accent">Positional</span> clues color the
             cells; <span className="text-warn">compositional</span> clues
-            tell you something about the whole number.
+            tell you something about the whole number;{" "}
+            <span className="text-good">special</span> cards change the
+            rules (e.g. grant an extra lock).
+          </p>
+          <p>
+            You also start each game with one{" "}
+            <span className="text-foreground">🔒 lock</span> — from guess 2
+            on, tap a cell to pin a digit you&apos;re sure of. Correct locks
+            stay; wrong locks are spent.
           </p>
           <p>
             A clue type can only be chosen once per game — used types
@@ -81,7 +89,9 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                     className={`text-[10px] uppercase px-2 py-0.5 rounded ${
                       clue.category === "positional"
                         ? "bg-accent/20 text-accent"
-                        : "bg-warn/20 text-warn"
+                        : clue.category === "compositional"
+                        ? "bg-warn/20 text-warn"
+                        : "bg-good/20 text-good"
                     }`}
                   >
                     {clue.category}

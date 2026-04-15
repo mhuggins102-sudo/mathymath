@@ -226,6 +226,9 @@ export function subLabelFor(
       return { text: "divisible? no", className: "text-bad" };
     case "oracle":
       return { text: `slot ${result.slot + 1}`, className: "text-muted" };
+    case "extraLock":
+      // Special card — not a target clue. Surface the reward instead.
+      return { text: "+1 🔒", className: "text-good" };
     default:
       return null;
   }

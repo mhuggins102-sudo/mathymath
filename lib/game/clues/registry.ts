@@ -15,6 +15,7 @@ import { distinctDigitsClue } from "./distinctDigits";
 import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
 import { totalDeviationClue } from "./totalDeviation";
+import { extraLockClue } from "./extraLock";
 
 // Retired 2026-04-15 (see full-review doc):
 //   - sumDirectionClue — strictly dominated by sumDeltaClue (direction-only
@@ -41,6 +42,7 @@ export const CLUES: readonly Clue[] = [
   medianClue,
   divisibleByClue,
   totalDeviationClue,
+  extraLockClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));

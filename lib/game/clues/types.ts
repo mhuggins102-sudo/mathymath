@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type ClueCategory = "positional" | "compositional";
+export type ClueCategory = "positional" | "compositional" | "special";
 
 export type Cmp = "lt" | "eq" | "gt";
 
@@ -39,7 +39,10 @@ export type ClueResult =
   | { kind: "distinctDigits"; count: number }
   | { kind: "median"; cmp: Cmp }
   | { kind: "divisibleBy"; divisor: number | null; present: boolean }
-  | { kind: "totalDeviation"; value: number };
+  | { kind: "totalDeviation"; value: number }
+  // Special — meta-action cards that don't reveal target info but
+  // change game resources. extraLock grants +1 lock (see locks.ts).
+  | { kind: "extraLock" };
 
 export type ClueId = ClueResult["kind"];
 

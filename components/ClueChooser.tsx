@@ -33,7 +33,9 @@ export function ClueChooser({ options, onChoose }: ClueChooserProps) {
                 className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
                   clue.category === "positional"
                     ? "bg-accent/20 text-accent"
-                    : "bg-warn/20 text-warn"
+                    : clue.category === "compositional"
+                    ? "bg-warn/20 text-warn"
+                    : "bg-good/20 text-good"
                 }`}
               >
                 {clue.category}
