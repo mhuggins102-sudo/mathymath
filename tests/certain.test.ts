@@ -93,6 +93,42 @@ describe("deriveCertainDigits", () => {
     ]);
   });
 
+  it("a correct lock reveals its slot", () => {
+    const history = [
+      {
+        guess: "11111",
+        clueId: "sumDelta" as const,
+        result: { kind: "sumDelta" as const, delta: 0 },
+        locks: [{ slot: 2, digit: "7", correct: true }],
+      },
+    ];
+    expect(deriveCertainDigits(history, DIGITS)).toEqual([
+      null,
+      null,
+      "7",
+      null,
+      null,
+    ]);
+  });
+
+  it("an incorrect lock reveals nothing", () => {
+    const history = [
+      {
+        guess: "11111",
+        clueId: "sumDelta" as const,
+        result: { kind: "sumDelta" as const, delta: 3 },
+        locks: [{ slot: 2, digit: "7", correct: false }],
+      },
+    ];
+    expect(deriveCertainDigits(history, DIGITS)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
   it("non-revealing clues (Within 2, Parity Mask, compositional) leave all null", () => {
     const history = [
       {
