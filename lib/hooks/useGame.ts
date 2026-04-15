@@ -10,6 +10,11 @@ import {
 } from "@/lib/game/stateMachine";
 import { validateGuess } from "@/lib/game/validator";
 import {
+  buildGuessFromInput,
+  deriveCertainDigits,
+  inputCapacity,
+} from "@/lib/game/certain";
+import {
   clearGame,
   loadGame,
   loadUnlimitedStats,
@@ -36,6 +41,12 @@ export interface UseGameResult {
   hydrated: boolean;
   /** Non-null only when trackStats is enabled and stats have been loaded. */
   unlimitedStats: PersonalStats | null;
+  /** Digits that are known-certain from prior clues (length = state.digits,
+   *  entries are the known char "0".."9" or null). */
+  certainDigits: (string | null)[];
+  /** Max typed-input length: state.digits minus the number of certain
+   *  slots. The consumer uses this for submit-disabled gating. */
+  inputCapacity: number;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
@@ -111,12 +122,18 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setUnlimitedStats(updated);
   }, [state.status, state.guesses.length, config.trackStats]);
 
+  // `input` stores only the digits the player has TYPED into non-certain
+  // slots — certain slots (revealed by prior clues) are auto-filled on
+  // submit. `capacity` is how many typed digits the input can hold.
+  const certain = deriveCertainDigits(state.guesses, state.digits);
+  const capacity = inputCapacity(certain);
+
   const appendDigit = useCallback(
     (d: string) => {
       setError(null);
-      setInput((cur) => (cur.length >= state.digits ? cur : cur + d));
+      setInput((cur) => (cur.length >= capacity ? cur : cur + d));
     },
-    [state.digits],
+    [capacity],
   );
 
   const backspace = useCallback(() => {
@@ -125,7 +142,10 @@ export function useGame(config: UseGameConfig): UseGameResult {
   }, []);
 
   const submit = useCallback(() => {
-    const v = validateGuess(input, state.digits);
+    // Build the full guess by interleaving the player's typed input with
+    // the known certain digits, then validate as usual.
+    const fullGuess = buildGuessFromInput(certain, input);
+    const v = validateGuess(fullGuess, state.digits);
     if (!v.ok) {
       setError(v.error);
       return;
@@ -134,7 +154,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
     dispatch({ type: "SUBMIT_GUESS", guess: v.digits });
     setInput("");
     buzz(12);
-  }, [input, state.digits]);
+  }, [input, state.digits, certain]);
 
   const chooseClue = useCallback((id: string) => {
     dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
@@ -164,6 +184,8 @@ export function useGame(config: UseGameConfig): UseGameResult {
     error,
     hydrated,
     unlimitedStats,
+    certainDigits: certain,
+    inputCapacity: capacity,
     appendDigit,
     backspace,
     submit,

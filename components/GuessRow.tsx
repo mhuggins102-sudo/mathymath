@@ -15,6 +15,11 @@ interface GuessRowProps {
    *  explanation panel below the row. Off by default so Help-modal rows
    *  render plain and non-interactive. */
   interactive?: boolean;
+  /** Per-slot digits known-certain from prior clues (length = digits).
+   *  When provided AND the row is active (entering or pending before
+   *  clue reveal), certain slots render in the match state and the
+   *  player's typed `guess` fills only the non-certain slots. */
+  certainDigits?: (string | null)[];
 }
 
 /** Per-slot color state derived from the clue result. */
@@ -60,6 +65,49 @@ function displayDigits(
   for (let i = 0; i < digits; i++) out.push(guess[i] ?? null);
   if (result?.kind === "oracle") {
     out[result.slot] = String(result.digit);
+  }
+  return out;
+}
+
+/**
+ * Project-for-active-rows projection: given the player's typed input
+ * (a string of length 0..capacity) and the per-slot certain overlay,
+ * return a `digits`-long array where certain slots carry their known
+ * digit and non-certain slots consume the typed input in order.
+ * This is what the entering / pending rows render.
+ */
+function displayDigitsActive(
+  typed: string,
+  digits: number,
+  certain: readonly (string | null)[] | undefined,
+): (string | null)[] {
+  const out: (string | null)[] = [];
+  let idx = 0;
+  for (let i = 0; i < digits; i++) {
+    const c = certain?.[i] ?? null;
+    if (c !== null) {
+      out.push(c);
+    } else {
+      out.push(typed[idx++] ?? null);
+    }
+  }
+  return out;
+}
+
+/** Per-slot state for active / pending rows. Certain slots paint match
+ *  (they're target digits); non-certain typed slots paint entering;
+ *  empty non-certain slots stay idle. */
+function cellStatesActive(
+  digits: number,
+  certain: readonly (string | null)[] | undefined,
+  displayed: readonly (string | null)[],
+): DigitState[] {
+  const out: DigitState[] = [];
+  for (let i = 0; i < digits; i++) {
+    const c = certain?.[i] ?? null;
+    if (c !== null) out.push("match");
+    else if (displayed[i] !== null) out.push("entering");
+    else out.push("idle");
   }
   return out;
 }
@@ -201,9 +249,27 @@ export function GuessRow({
   active,
   pending,
   interactive = false,
+  certainDigits,
 }: GuessRowProps) {
-  const states = cellStates(result, digits);
-  const displayed = displayDigits(guess, digits, result);
+  // Three rendering modes:
+  //   1. Resolved row (has `result`): paint from the clue result.
+  //   2. Pending row (pending + active, no result yet): `guess` is the
+  //      full submitted string; paint certain slots as match, the rest
+  //      as entering.
+  //   3. Entering row (active, no result, no pending): `guess` is just
+  //      the player's typed string of length 0..capacity; interleave
+  //      with certainDigits for display.
+  const isActiveNoResult = active && !result;
+  const displayed = result
+    ? displayDigits(guess, digits, result)
+    : isActiveNoResult && pending
+    ? // Pending-row guess already contains certain digits (assembled on
+      // submit), so just use it as-is.
+      displayDigits(guess, digits, undefined)
+    : displayDigitsActive(guess, digits, certainDigits);
+  const states = result
+    ? cellStates(result, digits)
+    : cellStatesActive(digits, certainDigits, displayed);
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -266,17 +332,16 @@ export function GuessRow({
         <div className="min-w-[6rem] shrink-0">{labelSlot}</div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {displayed.map((v, i) => {
-            const state: DigitState = result
-              ? states[i]
-              : active && v !== null
-              ? "entering"
-              : "idle";
+            // `states[i]` is authoritative — it already accounts for
+            // certain slots (rendered as `match`) and the active-row
+            // entering/idle logic. `animate` is only ON for resolved
+            // rows so the typing row doesn't pulse on every keystroke.
             return (
               <Digit
                 key={i}
                 value={v}
                 size="lg"
-                state={state}
+                state={states[i]}
                 animate={!!result}
               />
             );
