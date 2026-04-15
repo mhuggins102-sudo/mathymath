@@ -124,7 +124,12 @@ interface SimStats {
   }>;
 }
 
-function playOne(target: string, seed: string, budget: number): SimStats {
+function playOne(
+  target: string,
+  seed: string,
+  budget: number,
+  strategy: "greedy" | "weight",
+): SimStats {
   let candidates = ALL.slice();
   const chosen: ClueId[] = [];
   const stats: SimStats = {
@@ -148,7 +153,20 @@ function playOne(target: string, seed: string, budget: number): SimStats {
     const options = pickTwoClues(seed, chosen);
     const e0 = expectedRemaining(candidates, guess, options[0].id);
     const e1 = expectedRemaining(candidates, guess, options[1].id);
-    const pickedIdx = e0 <= e1 ? 0 : 1;
+
+    // Strategy determines the pick; the off-strategy metrics (pickedExp /
+    // otherExp / weight comparison) are still recorded for reporting.
+    let pickedIdx: 0 | 1;
+    if (strategy === "greedy") {
+      pickedIdx = e0 <= e1 ? 0 : 1;
+    } else {
+      // "weight" strategy: always take the lower-weight option. On ties,
+      // fall back to whichever the selector offered first (options[0]).
+      if (options[0].weight < options[1].weight) pickedIdx = 0;
+      else if (options[1].weight < options[0].weight) pickedIdx = 1;
+      else pickedIdx = 0;
+    }
+
     const pick = options[pickedIdx];
     const other = options[1 - pickedIdx];
     const pickedExp = pickedIdx === 0 ? e0 : e1;
@@ -185,7 +203,25 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
     () => {
       const N = Number(process.env.SIM_N ?? 2000);
       const BUDGET = Number(process.env.SIM_BUDGET ?? 8);
-      console.log(`\nSimulating ${N} daily puzzles with budget=${BUDGET}`);
+      const strategyEnv = (process.env.SIM_STRATEGY ?? "greedy").toLowerCase();
+      if (strategyEnv !== "greedy" && strategyEnv !== "weight") {
+        throw new Error(
+          `SIM_STRATEGY must be "greedy" or "weight"; got ${strategyEnv}`,
+        );
+      }
+      const strategy = strategyEnv as "greedy" | "weight";
+      console.log(
+        `\nSimulating ${N} daily puzzles  budget=${BUDGET}  strategy=${strategy}`,
+      );
+      if (strategy === "weight") {
+        console.log(
+          "  (always picks the lower-weight option; ties → first offered)",
+        );
+      } else {
+        console.log(
+          "  (greedy: picks whichever option most reduces the candidate set)",
+        );
+      }
       console.log(
         `Candidate pool after degenerate filter: ${ALL.length} / 100000`,
       );
@@ -197,7 +233,7 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
       for (let i = 0; i < N; i++) {
         const date = `sim-${i}`;
         const target = generateDailyTarget(date, DIGITS);
-        const r = playOne(target, date, BUDGET);
+        const r = playOne(target, date, BUDGET, strategy);
         runStats.push(r);
         for (const id of r.cluePicks) {
           pickCount.set(id, (pickCount.get(id) ?? 0) + 1);
