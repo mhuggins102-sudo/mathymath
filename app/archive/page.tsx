@@ -113,8 +113,11 @@ export default function ArchivePage() {
           const disabled = future || preLaunch;
           const played = playedSet.has(c.iso);
           const isToday = c.iso === todayIso;
+          // min-h-11 + min-w-11 keeps every cell at the WCAG 2.5.5 / Apple
+          // HIG 44px minimum tap target even at 360px viewport width where
+          // aspect-square alone renders cells around 43px.
           const cls = [
-            "aspect-square rounded-md flex items-center justify-center text-sm font-mono",
+            "aspect-square min-h-11 min-w-11 rounded-md flex items-center justify-center text-sm font-mono",
             disabled ? "text-muted/40 bg-surface" : "bg-surface-2 hover:bg-surface-2/80",
             isToday ? "ring-2 ring-accent" : "",
             played ? "text-good" : "",

@@ -15,12 +15,14 @@ export function HomeHeaderIcons() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
+  // 44×44 tap targets (Apple HIG / WCAG 2.5.5 minimum). The cluster of
+  // three lives in an empty corner so the extra size costs no layout.
   const btn =
-    "text-muted hover:text-foreground px-2 py-1 transition text-base";
+    "inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition text-base";
 
   return (
     <>
-      <div className="fixed top-3 right-3 z-20 flex items-center gap-1">
+      <div className="fixed top-2 right-2 z-20 flex items-center gap-0.5">
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}

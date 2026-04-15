@@ -3,6 +3,7 @@
 import { CLUES } from "@/lib/game/clues/registry";
 import { GuessRow } from "./GuessRow";
 import { ClueLegend } from "./ClueLegend";
+import { Modal } from "./Modal";
 
 interface HelpModalProps {
   open: boolean;
@@ -24,19 +25,16 @@ interface HelpModalProps {
 const EXAMPLE_TARGET = "47628";
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
-  if (!open) return null;
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background overflow-y-auto text-left"
-      role="dialog"
-      aria-modal="true"
-    >
+    <Modal open={open} onClose={onClose} titleId="help-modal-title" variant="full">
       <div className="max-w-md mx-auto p-4 pb-24">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">How to play</h2>
+          <h2 id="help-modal-title" className="text-xl font-semibold">
+            How to play
+          </h2>
           <button
             type="button"
-            className="text-muted hover:text-foreground text-sm px-2 py-1"
+            className="inline-flex items-center justify-center min-h-11 px-3 rounded-md text-muted hover:text-foreground active:bg-surface-2 text-sm"
             onClick={onClose}
           >
             Close ✕
@@ -105,6 +103,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           })}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -15,12 +15,15 @@
   --bad: #ff6b6b;    /* red = target lower / far */
 }
 
-/* Colorblind palette: swaps red/green for a blue/orange/magenta scale that
-   is distinguishable across common forms of color vision deficiency.
-   Applied to <html class="colorblind">. */
+/* Colorblind palette: swaps red/green for a blue/cyan/yellow/magenta scale
+   that is distinguishable across common forms of color vision deficiency.
+   Applied to <html class="colorblind">.
+   Note: --close intentionally lands on a near-white lavender so it does NOT
+   share a hue with the blue --good; in an earlier palette both sat on the
+   blue axis and "exact" vs "within 1" cells were hard to tell apart. */
 html.colorblind {
   --good: #3fa9f5;   /* bright blue = correct */
-  --close: #80dbff;  /* pale sky = close (same hue as default) */
+  --close: #e4e4f0;  /* near-white lavender = within 1 (off the blue axis) */
   --warn: #ffcc55;   /* yellow-orange = target higher */
   --cool: #ff8a5c;   /* orange = within 5 */
   --bad: #e06eb5;    /* magenta = target lower / far */
@@ -53,6 +56,15 @@ body {
   user-select: none;
   -webkit-user-select: none;
   overscroll-behavior: none;
+}
+
+/* Keyboard focus ring. The site runs on a dark background where the default
+   browser outline sometimes disappears entirely — this guarantees a visible
+   focus indicator for keyboard users without affecting mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .digit-0,

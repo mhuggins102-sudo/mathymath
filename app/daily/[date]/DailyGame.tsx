@@ -14,6 +14,7 @@ import {
   DailyResultPanel,
   type DailyPercentileData,
 } from "@/components/DailyResultPanel";
+import { Modal } from "@/components/Modal";
 import { buildShareText } from "@/lib/game/share";
 import { recordDailyResult } from "@/lib/persistence/localStore";
 import type { ClueId } from "@/lib/game/clues/types";
@@ -162,11 +163,11 @@ export function DailyGame({
           ← {isToday ? "home" : "back"}
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">{statusLabel}</h1>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {state.status !== "playing" && (
             <button
               type="button"
-              className="text-muted text-base hover:text-foreground px-2"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
               onClick={() => setResultsPopupOpen(true)}
               aria-label="Show results"
               title="Show results"
@@ -176,7 +177,7 @@ export function DailyGame({
           )}
           <button
             type="button"
-            className="text-muted text-base hover:text-foreground px-2"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setSettingsOpen(true)}
             aria-label="Settings"
           >
@@ -184,7 +185,7 @@ export function DailyGame({
           </button>
           <button
             type="button"
-            className="text-muted text-base hover:text-foreground px-2"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setStatsOpen(true)}
             aria-label="Daily stats"
           >
@@ -192,7 +193,7 @@ export function DailyGame({
           </button>
           <button
             type="button"
-            className="text-muted text-lg font-semibold hover:text-foreground px-2"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-lg font-semibold hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setHelpOpen(true)}
             aria-label="Help"
           >
@@ -229,33 +230,24 @@ export function DailyGame({
       {/* Result popup: overlays the page when the game is terminal. The
           player taps "show puzzle" to dismiss it and inspect their grid,
           or 🏆 in the header to re-open. */}
-      {state.status !== "playing" && resultsPopupOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 text-left"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setResultsPopupOpen(false);
-          }}
-        >
-          <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <DailyResultPanel
-              won={state.status === "won"}
-              guessCount={state.guesses.length}
-              target={state.target}
-              data={percentile}
-              loading={statsLoading}
-              error={statsError}
-              maxGuesses={state.maxGuesses}
-              onShare={handleShare}
-              onDismiss={() => setResultsPopupOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        open={state.status !== "playing" && resultsPopupOpen}
+        onClose={() => setResultsPopupOpen(false)}
+        ariaLabel={state.status === "won" ? "You won" : "Out of guesses"}
+        variant="overlay"
+      >
+        <DailyResultPanel
+          won={state.status === "won"}
+          guessCount={state.guesses.length}
+          target={state.target}
+          data={percentile}
+          loading={statsLoading}
+          error={statsError}
+          maxGuesses={state.maxGuesses}
+          onShare={handleShare}
+          onDismiss={() => setResultsPopupOpen(false)}
+        />
+      </Modal>
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />

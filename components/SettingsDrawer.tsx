@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useSettings } from "@/lib/hooks/useSettings";
 import { clearAllLocalData } from "@/lib/persistence/localStore";
+import { Modal } from "./Modal";
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -21,20 +22,16 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
     window.location.reload();
   }, []);
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background overflow-y-auto text-left"
-      role="dialog"
-      aria-modal="true"
-    >
+    <Modal open={open} onClose={onClose} titleId="settings-title" variant="full">
       <div className="max-w-md mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Settings</h2>
+          <h2 id="settings-title" className="text-xl font-semibold">
+            Settings
+          </h2>
           <button
             type="button"
-            className="text-muted hover:text-foreground text-sm px-2 py-1"
+            className="inline-flex items-center justify-center min-h-11 px-3 rounded-md text-muted hover:text-foreground active:bg-surface-2 text-sm"
             onClick={onClose}
           >
             Close ✕
@@ -74,7 +71,7 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
           </p>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -9,6 +9,7 @@ import {
   type PersonalStats,
 } from "@/lib/persistence/localStore";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+import { Modal } from "./Modal";
 
 export type StatsMode = "daily" | "unlimited" | "both";
 
@@ -34,8 +35,6 @@ export function LifetimeStatsModal({
     if (mode !== "daily") setUnlimited(loadUnlimitedStats());
   }, [open, mode]);
 
-  if (!open) return null;
-
   const title =
     mode === "daily"
       ? "Daily stats"
@@ -43,13 +42,17 @@ export function LifetimeStatsModal({
       ? "Unlimited stats"
       : "Lifetime stats";
 
+  const titleId = `stats-title-${mode}`;
+
   const content = (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">{title}</h2>
+        <h2 id={titleId} className="text-xl font-semibold">
+          {title}
+        </h2>
         <button
           type="button"
-          className="text-muted hover:text-foreground text-sm px-2 py-1"
+          className="inline-flex items-center justify-center min-h-11 px-3 rounded-md text-muted hover:text-foreground active:bg-surface-2 text-sm"
           onClick={onClose}
         >
           Close ✕
@@ -87,32 +90,18 @@ export function LifetimeStatsModal({
   // popup that closes on backdrop tap.
   if (mode === "both") {
     return (
-      <div
-        className="fixed inset-0 z-50 bg-background overflow-y-auto text-left"
-        role="dialog"
-        aria-modal="true"
-      >
+      <Modal open={open} onClose={onClose} titleId={titleId} variant="full">
         <div className="max-w-md mx-auto p-4 pb-20">{content}</div>
-      </div>
+      </Modal>
     );
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 text-left"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-xl border border-border shadow-2xl p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal open={open} onClose={onClose} titleId={titleId} variant="overlay">
+      <div className="bg-surface rounded-xl border border-border shadow-2xl p-4">
         {content}
       </div>
-    </div>
+    </Modal>
   );
 }
 
