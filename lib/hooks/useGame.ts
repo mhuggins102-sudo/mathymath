@@ -161,14 +161,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const [lockedSlots, setLockedSlots] = useState<LockAttempt[]>([]);
   const [pendingLockSlot, setPendingLockSlot] = useState<number | null>(null);
 
-  // Reset lock state whenever we move to a new committed guess slot,
-  // including the reducer clearing pendingGuess after CHOOSE_CLUE.
-  const guessesLen = state.guesses.length;
-  const hasPending = !!state.pendingGuess;
-  useEffect(() => {
-    setLockedSlots([]);
-    setPendingLockSlot(null);
-  }, [guessesLen, hasPending]);
+  // Lock state is cleared INLINE in submit() — see the dispatches
+  // there. This avoids an extra render cycle that used to run after
+  // the reducer transitioned to pending (a useEffect watching
+  // guessesLen/hasPending then fired a redundant setLockedSlots([])).
+  // With many locks, that extra cycle was perceivable as a delay
+  // between pressing Enter and the clue chooser appearing.
 
   // capacity for typed input = digits − certain − locks committed this turn.
   const capacity = inputCapacity(certain) - lockedSlots.length;
@@ -300,8 +298,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
       locks: lockedSlots.length > 0 ? lockedSlots : undefined,
     });
     setInput("");
-    // lockedSlots clears via the guessesLen effect after the reducer
-    // transitions out of the current input state.
+    // Clear the turn's lock state in the SAME sync context as the
+    // dispatch so React batches both into one render — the clue
+    // chooser shows on the first post-submit paint with no perceptible
+    // lag, even when two locks are in play.
+    setLockedSlots([]);
+    setPendingLockSlot(null);
     buzz(12);
   }, [pendingLockSlot, input, state.digits, certain, lockedSlots]);
 

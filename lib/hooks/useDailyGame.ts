@@ -215,14 +215,11 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     saveDailyGame(config.storageKey, toSaved(state));
   }, [state, config.storageKey, hydrated]);
 
-  // Reset the current-turn lock state whenever the committed state
-  // changes (submit landed, clue chosen, etc.).
-  const guessesLen = state.guesses.length;
-  const hasPending = !!state.pendingGuess;
-  useEffect(() => {
-    setLockedSlots([]);
-    setPendingLockSlot(null);
-  }, [guessesLen, hasPending]);
+  // Lock state is cleared INLINE in submit() below — batched with the
+  // setState(pendingGuess) so the clue chooser shows on the first
+  // post-submit render. An earlier effect-based clear was visible as a
+  // slight delay between Enter press and clue options appearing, more
+  // pronounced with two locks.
 
   // `input` holds only typed-into-non-certain-non-locked-slots.
   const certain = deriveCertainDigits(state.guesses, state.digits);
@@ -405,6 +402,12 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       } else {
         setError("unexpected_response");
       }
+      // Clear the turn's lock state here, in the same sync context as
+      // setState, so React batches them into one render. Prior code
+      // used an effect that fired after `hasPending` flipped, which
+      // cost a visible extra frame (more noticeable with two locks).
+      setLockedSlots([]);
+      setPendingLockSlot(null);
     } catch {
       setError("network_error");
     } finally {
