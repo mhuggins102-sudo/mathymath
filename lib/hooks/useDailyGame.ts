@@ -56,6 +56,12 @@ export interface UseDailyGameConfig {
   digits: number;
   maxGuesses: number;
   storageKey: string;
+  /** Called synchronously inside the localStorage-hydration effect when
+   *  the saved game turned out to be already terminal (won or lost).
+   *  The consumer uses this to, e.g., open the result popup in the
+   *  same batched update as the state transition — so the resolved
+   *  grid doesn't flash underneath before the Modal covers it. */
+  onHydratedTerminal?: (status: "won" | "lost") => void;
 }
 
 export interface UseDailyGameResult {
@@ -184,10 +190,20 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // Prevents double-submits from racing with a pending network call.
   const inFlightRef = useRef(false);
 
-  // Hydrate from localStorage on mount.
+  // Hydrate from localStorage on mount. When the saved state is
+  // already terminal, fire onHydratedTerminal from inside this same
+  // effect so the consumer's popup-open setState batches with our
+  // setState(fromSaved) — one render transition, no flash of the
+  // resolved grid before the Modal covers it.
+  const onHydratedTerminal = config.onHydratedTerminal;
   useEffect(() => {
     const saved = loadDailyGame(config.storageKey);
-    if (saved) setState(fromSaved(saved, config));
+    if (saved) {
+      setState(fromSaved(saved, config));
+      if (saved.status !== "playing") {
+        onHydratedTerminal?.(saved.status);
+      }
+    }
     setHydrated(true);
     // config is stable for the lifetime of a given daily page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
