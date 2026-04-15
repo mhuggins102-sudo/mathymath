@@ -1,0 +1,96 @@
+import { describe, it, expect } from "vitest";
+import { subLabelFor } from "@/components/GuessRow";
+
+describe("subLabelFor — cmp clues show symbol + player's own value", () => {
+  it("Digit Range (rangeCompare)", () => {
+    // guess "12345": max=5, min=1, range=4.
+    expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "eq" })).toEqual({
+      text: "= 4",
+      className: "text-good",
+    });
+    expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "gt" })).toEqual({
+      text: "↑ 4",
+      className: "text-warn",
+    });
+    expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "lt" })).toEqual({
+      text: "↓ 4",
+      className: "text-bad",
+    });
+  });
+
+  it("Parity Balance", () => {
+    // guess "24680": 5 evens.
+    expect(subLabelFor("24680", { kind: "parityBalance", cmp: "eq" })).toEqual({
+      text: "= 5",
+      className: "text-good",
+    });
+    expect(subLabelFor("13579", { kind: "parityBalance", cmp: "gt" })).toEqual({
+      text: "↑ 0",
+      className: "text-warn",
+    });
+  });
+
+  it("Prime Count", () => {
+    // guess "23579": primes are 2,3,5,7 → 4.
+    expect(subLabelFor("23579", { kind: "primeCount", cmp: "eq" })).toEqual({
+      text: "= 4",
+      className: "text-good",
+    });
+    expect(subLabelFor("14680", { kind: "primeCount", cmp: "lt" })).toEqual({
+      // no prime digits in 14680 → 0
+      text: "↓ 0",
+      className: "text-bad",
+    });
+  });
+
+  it("Median", () => {
+    // guess "12345" sorted = [1,2,3,4,5], median (floor(5/2)=2) → 3.
+    expect(subLabelFor("12345", { kind: "median", cmp: "eq" })).toEqual({
+      text: "= 3",
+      className: "text-good",
+    });
+    expect(subLabelFor("99111", { kind: "median", cmp: "gt" })).toEqual({
+      // sorted [1,1,1,9,9] → median index 2 → 1
+      text: "↑ 1",
+      className: "text-warn",
+    });
+  });
+});
+
+describe("subLabelFor — Sum Delta uses exact delta (Option B)", () => {
+  it("equal: shows player's own sum", () => {
+    expect(subLabelFor("12345", { kind: "sumDelta", delta: 0 })).toEqual({
+      text: "= 15",
+      className: "text-good",
+    });
+  });
+  it("positive delta: up-arrow + signed number", () => {
+    expect(subLabelFor("11111", { kind: "sumDelta", delta: 7 })).toEqual({
+      text: "↑ +7",
+      className: "text-warn",
+    });
+  });
+  it("negative delta: down-arrow + signed number", () => {
+    expect(subLabelFor("99999", { kind: "sumDelta", delta: -12 })).toEqual({
+      text: "↓ −12",
+      className: "text-bad",
+    });
+  });
+});
+
+describe("subLabelFor — other clues unchanged", () => {
+  it("Digit Overlap", () => {
+    expect(subLabelFor("11111", { kind: "digitOverlap", count: 3 })).toEqual({
+      text: "3 shared",
+      className: "text-accent",
+    });
+  });
+  it("Contains Digit (yes/no)", () => {
+    expect(
+      subLabelFor("11111", { kind: "containsDigit", digit: 7, present: true }),
+    ).toEqual({ text: "7? yes", className: "text-good" });
+    expect(
+      subLabelFor("11111", { kind: "containsDigit", digit: 7, present: false }),
+    ).toEqual({ text: "7? no", className: "text-bad" });
+  });
+});
