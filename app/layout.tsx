@@ -16,6 +16,20 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0d",
 };
 
+// Inline pre-paint script: reads the saved settings blob and stamps the
+// colorblind class on <html> before first paint. Prevents a red/green flash
+// for colorblind-mode users on cold load. Kept tiny and defensive so a
+// malformed localStorage value can never throw and block render.
+const NO_FLASH_SCRIPT = `
+try {
+  var raw = window.localStorage.getItem("mathymath:settings");
+  if (raw) {
+    var s = JSON.parse(raw);
+    if (s && s.colorblind) document.documentElement.classList.add("colorblind");
+  }
+} catch (e) {}
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,6 +37,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <SettingsHydrator />
         <div

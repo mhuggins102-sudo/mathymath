@@ -105,10 +105,10 @@ function UnlimitedGame({
           ← home
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">Unlimited</h1>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
-            className="text-muted text-base hover:text-foreground px-2"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setSettingsOpen(true)}
             aria-label="Settings"
           >
@@ -116,7 +116,7 @@ function UnlimitedGame({
           </button>
           <button
             type="button"
-            className="text-muted text-base hover:text-foreground px-2"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setStatsOpen(true)}
             aria-label="Unlimited stats"
           >
@@ -124,7 +124,7 @@ function UnlimitedGame({
           </button>
           <button
             type="button"
-            className="text-muted text-lg font-semibold hover:text-foreground px-2"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-lg font-semibold hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setHelpOpen(true)}
             aria-label="Help"
           >
