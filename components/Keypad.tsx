@@ -6,6 +6,14 @@ interface KeypadProps {
   onSubmit: () => void;
   disabled?: boolean;
   submitDisabled?: boolean;
+  /** When true, the Enter button renders as "Lock" and invokes
+   *  `onLockCommit` instead of `onSubmit`. Number keys still flow
+   *  through `onDigit` (the hook routes them to the pending lock). */
+  lockMode?: boolean;
+  onLockCommit?: () => void;
+  /** Gated separately from `submitDisabled` — the Lock button is only
+   *  enabled when the pending lock has a digit set. */
+  lockCommitDisabled?: boolean;
 }
 
 const ROW_1 = ["1", "2", "3", "4", "5"];
@@ -17,6 +25,9 @@ export function Keypad({
   onSubmit,
   disabled,
   submitDisabled,
+  lockMode = false,
+  onLockCommit,
+  lockCommitDisabled,
 }: KeypadProps) {
   const btn =
     "h-12 select-none rounded-md bg-surface-2 text-foreground font-semibold active:scale-95 active:bg-surface transition disabled:opacity-40 disabled:active:scale-100";
@@ -61,10 +72,11 @@ export function Keypad({
         <button
           type="button"
           className={`${btn} col-span-3 bg-accent/70 text-background`}
-          onClick={onSubmit}
-          disabled={disabled || submitDisabled}
+          onClick={lockMode ? onLockCommit : onSubmit}
+          disabled={disabled || (lockMode ? lockCommitDisabled : submitDisabled)}
+          aria-label={lockMode ? "Lock this digit" : "Submit guess"}
         >
-          Enter
+          {lockMode ? "Lock" : "Enter"}
         </button>
       </div>
     </div>

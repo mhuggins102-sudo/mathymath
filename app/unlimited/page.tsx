@@ -81,6 +81,12 @@ function UnlimitedGame({
     chooseClue,
     certainDigits,
     inputCapacity,
+    lockedSlots,
+    pendingLockSlot,
+    locksAvailable,
+    canCommitPendingLock,
+    tapCell,
+    commitLock,
   } = useGame({
     target: session.target,
     seed: session.seed,
@@ -90,8 +96,13 @@ function UnlimitedGame({
   });
 
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
-  // Submit enabled once typed input fills every non-certain slot.
-  const submitDisabled = input.length !== inputCapacity || keypadDisabled;
+  // Submit enabled once typed input fills every non-certain slot AND
+  // no lock is still pending (must be committed or cancelled first).
+  const submitDisabled =
+    input.length !== inputCapacity ||
+    pendingLockSlot !== null ||
+    keypadDisabled;
+  const lockMode = pendingLockSlot !== null;
 
   const statusMessage = useMemo(() => {
     if (state.status === "won")
@@ -141,9 +152,22 @@ function UnlimitedGame({
           state={state}
           currentInput={input}
           certainDigits={certainDigits}
+          lockedSlots={lockedSlots}
+          pendingLockSlot={pendingLockSlot}
+          onTapCell={tapCell}
         />
 
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
+
+        {state.status === "playing" && !state.pendingGuess && (
+          <p className="text-[10px] text-muted text-center mt-2">
+            {lockMode
+              ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
+              : locksAvailable > 0
+              ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+              : ""}
+          </p>
+        )}
 
         <div className="mt-4">
           {state.pendingGuess ? (
@@ -158,6 +182,9 @@ function UnlimitedGame({
               onSubmit={submit}
               disabled={keypadDisabled}
               submitDisabled={submitDisabled}
+              lockMode={lockMode}
+              onLockCommit={commitLock}
+              lockCommitDisabled={!canCommitPendingLock}
             />
           ) : (
             <div className="text-center space-y-4">
