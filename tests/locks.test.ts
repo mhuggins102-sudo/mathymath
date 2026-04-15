@@ -60,6 +60,10 @@ describe("locksAvailable", () => {
       ]),
     ).toBe(2);
   });
+  it("EXTRA_LOCK_CLUE_ID matches the registered extraLock clue id", async () => {
+    const { extraLockClue } = await import("@/lib/game/clues/extraLock");
+    expect(extraLockClue.id).toBe(EXTRA_LOCK_CLUE_ID);
+  });
   it("Extra Lock after spending can restore up to cap", () => {
     const wrong: LockRecord = { slot: 1, digit: "7", correct: false };
     // Start 1, spend 1 → 0 remaining, Extra Lock → cap 2 − 1 spent = 1.
