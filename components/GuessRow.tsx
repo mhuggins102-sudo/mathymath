@@ -240,13 +240,16 @@ function ClueLabelContent({
 }) {
   const meta = getClueById(result.kind);
   const sub = subLabelFor(guess, result);
+  // `h-full` + `justify-center` makes the two-line block genuinely
+  // vertically centered against the digit cells in the same row. Size
+  // bumps vs the prior 11/10px so the sub-label is readable.
   return (
-    <div className="flex flex-col justify-center text-right min-w-0">
-      <span className="text-[11px] font-semibold text-foreground truncate leading-tight">
+    <div className="flex flex-col justify-center text-right min-w-0 h-full">
+      <span className="text-[12px] sm:text-[13px] font-semibold text-foreground truncate leading-tight">
         {meta.name}
       </span>
       {sub && (
-        <span className={`text-[10px] font-mono ${sub.className} truncate leading-tight`}>
+        <span className={`text-[11px] sm:text-[12px] font-mono ${sub.className} truncate leading-tight`}>
           {sub.text}
         </span>
       )}
@@ -377,7 +380,13 @@ export function GuessRow({
 
   const labelSlot = (() => {
     if (pending && !result)
-      return <p className="text-[10px] text-muted text-right">pick a clue below…</p>;
+      return (
+        <div className="flex h-full items-center justify-end">
+          <p className="text-[11px] sm:text-[12px] text-muted text-right">
+            pick a clue below…
+          </p>
+        </div>
+      );
     if (!result) return null;
     if (!interactive) return <ClueLabelContent guess={guess} result={result} />;
     return (
@@ -386,7 +395,7 @@ export function GuessRow({
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={`Explain clue: ${meta?.name ?? ""}`}
-        className="w-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
+        className="w-full h-full text-right rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
       >
         <ClueLabelContent guess={guess} result={result} />
       </button>
@@ -403,8 +412,11 @@ export function GuessRow({
         {/* `min-w-[6rem]` keeps every row's label column the same size so
              digits line up across rows; `shrink-0` (instead of `flex-1`)
              means the row no longer stretches label whitespace out to the
-             right — the content hugs the left with slack on the right. */}
-        <div className="min-w-[6rem] shrink-0">{labelSlot}</div>
+             right — the content hugs the left with slack on the right.
+             `h-10 sm:h-11` matches the digit cell height so the `h-full`
+             chain inside ClueLabelContent can genuinely vertically
+             center the name + sub-label block against those cells. */}
+        <div className="min-w-[6rem] shrink-0 h-10 sm:h-11">{labelSlot}</div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {displayed.map((v, i) => {
             // Active (entering) rows make their non-certain cells

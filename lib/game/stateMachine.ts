@@ -1,6 +1,7 @@
 import type { Clue, ClueId, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
 import { pickTwoClues } from "./clueSelector";
+import { knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
 export const DEFAULT_MAX_GUESSES = 8;
@@ -144,7 +145,14 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const { guess, options, locks } = state.pendingGuess;
       const clue = options.find((c) => c.id === action.clueId);
       if (!clue) return state;
-      const result = clue.compute(guess, state.target);
+      // Oracle (and any future context-aware clue) gets the slots
+      // already known BEFORE this guess resolves. Prior-guess history
+      // is authoritative; the pending guess isn't yet committed.
+      const knownSlots = knownSlotsFromHistory(
+        state.guesses,
+        state.digits,
+      );
+      const result = clue.compute(guess, state.target, { knownSlots });
       const guesses = [
         ...state.guesses,
         {

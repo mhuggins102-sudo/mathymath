@@ -43,6 +43,16 @@ export type ClueResult =
 
 export type ClueId = ClueResult["kind"];
 
+/** Optional context passed to `compute` when the caller has more state
+ *  than just (guess, target). Today only Oracle uses it — to avoid
+ *  re-revealing a slot the player already knows from prior clues or a
+ *  correctly-landed lock. Callers that don't supply a context get the
+ *  original "any slot" behaviour, so tests and sims don't break. */
+export interface ClueComputeContext {
+  /** Indices of slots whose target digit is already known. */
+  knownSlots?: readonly number[];
+}
+
 export interface Clue<R extends ClueResult = ClueResult> {
   id: R["kind"];
   name: string;
@@ -52,7 +62,7 @@ export interface Clue<R extends ClueResult = ClueResult> {
   /** Optional color legend. Rendered below the description in Help/Chooser
    *  so color references don't need to live in the description text. */
   legend?: LegendEntry[];
-  compute(guess: string, target: string): R;
+  compute(guess: string, target: string, context?: ClueComputeContext): R;
   example(target: string): { guess: string; result: R };
   /** Plain-language explanation of the result for this specific guess.
    *  Rendered in the in-game popover when a player taps the clue name. */
