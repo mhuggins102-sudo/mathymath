@@ -135,6 +135,11 @@ function fromSaved(
 ): DailyGameState {
   // Defensive: saved.date must match; otherwise re-init.
   if (saved.date !== config.date) return initialState(config);
+  // Also re-init if the saved maxGuesses no longer matches config —
+  // happens after a budget change (e.g. the 8 → 7 drop). Continuing
+  // with the old budget would either extend the game past the server's
+  // limit or truncate mid-history; clean re-init is safer.
+  if (saved.maxGuesses !== config.maxGuesses) return initialState(config);
   let pendingGuess: DailyGameState["pendingGuess"] = null;
   if (saved.pendingGuess) {
     try {

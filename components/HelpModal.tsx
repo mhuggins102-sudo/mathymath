@@ -43,7 +43,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 
         <div className="space-y-3 text-sm text-muted leading-relaxed mb-6">
           <p>
-            Guess the secret 5-digit number in 8 tries. Digits can repeat
+            Guess the secret 5-digit number in 7 tries. Digits can repeat
             (e.g. <span className="font-mono text-foreground">74727</span>).
           </p>
           <p>

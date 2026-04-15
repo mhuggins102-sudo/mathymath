@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
+import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
@@ -91,7 +92,7 @@ function UnlimitedGame({
     target: session.target,
     seed: session.seed,
     digits: 5,
-    maxGuesses: 8,
+    maxGuesses: DEFAULT_MAX_GUESSES,
     trackStats: true,
   });
 

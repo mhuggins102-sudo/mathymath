@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { todayUtcISO } from "@/lib/game/targetGenerator";
+import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
 import { DailyGame } from "./DailyGame";
 
 function isValidISODate(s: string): boolean {
@@ -29,7 +30,7 @@ export default async function DailyPage({
       date={date}
       isToday={date === today}
       digits={5}
-      maxGuesses={8}
+      maxGuesses={DEFAULT_MAX_GUESSES}
     />
   );
 }

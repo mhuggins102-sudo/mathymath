@@ -5,6 +5,7 @@ import { POST as submitResults } from "@/app/api/results/route";
 import { generateDailyTarget, todayUtcISO } from "@/lib/game/targetGenerator";
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import { getClueById } from "@/lib/game/clues/registry";
+import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
 
 const DATE = "2026-04-01";
 const TARGET = generateDailyTarget(DATE, 5);
@@ -46,13 +47,21 @@ describe("POST /api/daily/[date]/submit-guess", () => {
   });
 
   it("returns lost + target on final wrong guess", async () => {
-    // Build an honest 7-guess history, then submit an 8th wrong one.
+    // Build MAX-1 honest guesses and submit the final wrong one. Size
+    // is derived from DEFAULT_MAX_GUESSES so the test rides whatever
+    // budget production is currently using.
+    const historyLen = DEFAULT_MAX_GUESSES - 1;
     const history: { guess: string; clueId?: string; result?: unknown }[] = [];
     let chosen: string[] = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < historyLen; i++) {
       const guess = String(i).padStart(5, "0");
       const pair = pickTwoClues(DATE, chosen as never);
-      const clue = pair[0];
+      // Skip Oracle: its compute depends on context.knownSlots, which
+      // the validator computes from prior history on replay. This
+      // test doesn't thread that, so pin to a context-free clue.
+      const clue =
+        pair.find((c) => c.id !== "oracle" && c.category !== "special") ??
+        pair[0];
       const result = clue.compute(guess, TARGET);
       history.push({ guess, clueId: clue.id, result });
       chosen = [...chosen, clue.id];
