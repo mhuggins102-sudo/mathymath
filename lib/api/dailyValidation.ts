@@ -1,6 +1,12 @@
 import type { ClueId, ClueResult } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
+import {
+  INITIAL_LOCKS,
+  MAX_LOCKS,
+  countExtraLocksGained,
+  type LockRecord,
+} from "@/lib/game/locks";
 
 /**
  * Stateless replay-validator for a daily-game history.
@@ -25,6 +31,11 @@ export interface IncomingGuess {
   guess: string;
   clueId?: string;
   result?: unknown;
+  locks?: Array<{
+    slot: number;
+    digit: string;
+    correct: boolean;
+  }>;
 }
 
 export type ValidationResult =
@@ -46,6 +57,35 @@ function resultsMatch(a: unknown, b: ClueResult): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** Per-guess lock validation: every claimed lock must match the real
+ *  target's digit at its slot, and the per-guess attempts must be
+ *  within the remaining lock budget at that point. */
+function validateLocksForGuess(
+  locks: NonNullable<IncomingGuess["locks"]>,
+  target: string,
+  digits: number,
+  guessIndex: number,
+  remainingLocks: number,
+): string | null {
+  if (locks.length === 0) return null;
+  // Rule: no locks on guess 1 (zero-indexed).
+  if (guessIndex === 0) return "locks_on_first_guess";
+  // Per-lock structural checks first (dedupe / range / digit) so tests
+  // and errors are deterministic regardless of budget state.
+  const seenSlots = new Set<number>();
+  for (const lock of locks) {
+    if (lock.slot < 0 || lock.slot >= digits) return "lock_slot_out_of_range";
+    if (!/^[0-9]$/.test(lock.digit)) return "lock_digit_invalid";
+    if (seenSlots.has(lock.slot)) return "lock_duplicate_slot";
+    seenSlots.add(lock.slot);
+    const actuallyCorrect = target[lock.slot] === lock.digit;
+    if (actuallyCorrect !== lock.correct) return "lock_correctness_mismatch";
+  }
+  // Rule: can't use more locks than the player has.
+  if (locks.length > remainingLocks) return "locks_budget_exceeded";
+  return null;
+}
+
 export function validateDailyHistory(
   params: ValidateParams,
 ): ValidationResult {
@@ -56,6 +96,9 @@ export function validateDailyHistory(
 
   const chosenClueIds: ClueId[] = [];
   let status: "playing" | "won" | "lost" = "playing";
+  // Track running lock budget — the cap grows as Extra Lock specials
+  // are chosen, and shrinks as the player burns incorrect locks.
+  let locksRemaining = INITIAL_LOCKS;
 
   for (let i = 0; i < history.length; i++) {
     if (status !== "playing") {
@@ -69,6 +112,21 @@ export function validateDailyHistory(
     const isExact = g.guess === target;
     const isFinalSlot = i + 1 >= maxGuesses;
 
+    // Validate any locks on this guess regardless of whether it's a win,
+    // loss, or non-final wrong guess. The per-guess rules are the same.
+    if (g.locks && g.locks.length > 0) {
+      const lockError = validateLocksForGuess(
+        g.locks,
+        target,
+        digits,
+        i,
+        locksRemaining,
+      );
+      if (lockError !== null) {
+        return { ok: false, error: `${lockError}_at_${i}` };
+      }
+    }
+
     if (isExact) {
       // Exact match → auto-bullseyes, win. clueId (if present) must be
       // "bullseyes". result (if present) must match the real compute.
@@ -79,6 +137,10 @@ export function validateDailyHistory(
       if (g.result !== undefined && !resultsMatch(g.result, expected)) {
         return { ok: false, error: `result_mismatch_at_${i}` };
       }
+      // Spend incorrect locks from the running budget.
+      for (const lock of g.locks ?? []) {
+        if (!lock.correct) locksRemaining -= 1;
+      }
       status = "won";
       continue;
     }
@@ -87,6 +149,9 @@ export function validateDailyHistory(
       // Final wrong guess: no clue allowed.
       if (g.clueId !== undefined) {
         return { ok: false, error: `final_wrong_guess_has_clue_at_${i}` };
+      }
+      for (const lock of g.locks ?? []) {
+        if (!lock.correct) locksRemaining -= 1;
       }
       status = "lost";
       continue;
@@ -108,7 +173,35 @@ export function validateDailyHistory(
       return { ok: false, error: `result_mismatch_at_${i}` };
     }
     chosenClueIds.push(g.clueId as ClueId);
+    // Update running budget: Extra Lock grants +1 (capped at MAX_LOCKS);
+    // incorrect locks used this turn spend the budget.
+    const extraSoFar = countExtraLocksGained(
+      history.slice(0, i + 1) as IncomingGuess[],
+    );
+    const cap = Math.min(MAX_LOCKS, INITIAL_LOCKS + extraSoFar);
+    // Recompute remaining from cap + spent so we absorb any Extra Lock
+    // just chosen.
+    let spent = 0;
+    for (let k = 0; k <= i; k++) {
+      for (const lock of history[k].locks ?? []) {
+        if (!lock.correct) spent += 1;
+      }
+    }
+    locksRemaining = Math.max(0, cap - spent);
   }
 
   return { ok: true, status, chosenClueIds };
+}
+
+/** Resolve a fresh list of lock attempts against the real target. Used
+ *  by the submit-guess endpoint to stamp correctness before returning. */
+export function resolveLockAttempts(
+  attempts: readonly { slot: number; digit: string }[],
+  target: string,
+): LockRecord[] {
+  return attempts.map((a) => ({
+    slot: a.slot,
+    digit: a.digit,
+    correct: target[a.slot] === a.digit,
+  }));
 }

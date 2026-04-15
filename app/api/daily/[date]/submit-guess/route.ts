@@ -4,10 +4,18 @@ import {
   generateDailyTarget,
   todayUtcISO,
 } from "@/lib/game/targetGenerator";
-import { validateDailyHistory } from "@/lib/api/dailyValidation";
+import {
+  resolveLockAttempts,
+  validateDailyHistory,
+} from "@/lib/api/dailyValidation";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+import {
+  canUseLockOnGuess,
+  INITIAL_LOCKS,
+  locksAvailable as computeLocksAvailable,
+} from "@/lib/game/locks";
 
 const DIGITS = 5;
 const MAX_GUESSES = DEFAULT_MAX_GUESSES;
@@ -16,11 +24,26 @@ const historyGuessSchema = z.object({
   guess: z.string(),
   clueId: z.string().optional(),
   result: z.unknown().optional(),
+  locks: z
+    .array(
+      z.object({
+        slot: z.number().int().min(0).max(DIGITS - 1),
+        digit: z.string().regex(/^[0-9]$/),
+        correct: z.boolean(),
+      }),
+    )
+    .optional(),
+});
+
+const lockAttemptSchema = z.object({
+  slot: z.number().int().min(0).max(DIGITS - 1),
+  digit: z.string().regex(/^[0-9]$/),
 });
 
 const bodySchema = z.object({
   history: z.array(historyGuessSchema).max(MAX_GUESSES),
   guess: z.string().length(DIGITS).regex(/^[0-9]+$/),
+  lockAttempts: z.array(lockAttemptSchema).max(2).optional(),
 });
 
 /**
@@ -79,19 +102,57 @@ export async function POST(
     return NextResponse.json({ error: "game_over" }, { status: 409 });
   }
 
-  const { guess } = parsed.data;
+  const { guess, lockAttempts } = parsed.data;
+  const guessIndex = parsed.data.history.length;
+
+  // Lock guard: not on guess 1, no duplicate slots, within budget.
+  if (lockAttempts && lockAttempts.length > 0) {
+    if (!canUseLockOnGuess(guessIndex)) {
+      return NextResponse.json(
+        { error: "locks_on_first_guess" },
+        { status: 409 },
+      );
+    }
+    const slots = new Set<number>();
+    for (const a of lockAttempts) {
+      if (slots.has(a.slot)) {
+        return NextResponse.json(
+          { error: "lock_duplicate_slot" },
+          { status: 409 },
+        );
+      }
+      slots.add(a.slot);
+    }
+    const budget = computeLocksAvailable(
+      parsed.data.history as Parameters<typeof computeLocksAvailable>[0],
+      INITIAL_LOCKS,
+    );
+    if (lockAttempts.length > budget) {
+      return NextResponse.json(
+        { error: "locks_budget_exceeded" },
+        { status: 409 },
+      );
+    }
+  }
+
+  // Resolve correctness now so the response can echo {slot, digit, correct}
+  // back to the client. The client stores these on the guess so the
+  // validator catches tampering on subsequent calls.
+  const resolvedLocks = resolveLockAttempts(lockAttempts ?? [], target);
+  const locksField =
+    resolvedLocks.length > 0 ? { locks: resolvedLocks } : {};
 
   // Exact match → auto-win with bullseyes. Game is over, so reveal the
   // target (it's the guess anyway, but we echo it for consistency).
   if (guess === target) {
     const result = getClueById("bullseyes").compute(guess, target);
-    return NextResponse.json({ kind: "won", result, target });
+    return NextResponse.json({ kind: "won", result, target, ...locksField });
   }
 
   // Final wrong guess → no clue, game ends.
   const isFinalSlot = parsed.data.history.length + 1 >= MAX_GUESSES;
   if (isFinalSlot) {
-    return NextResponse.json({ kind: "lost", target });
+    return NextResponse.json({ kind: "lost", target, ...locksField });
   }
 
   // Non-final wrong guess → offer a pair. Only the ids travel over the
@@ -100,5 +161,6 @@ export async function POST(
   return NextResponse.json({
     kind: "pending",
     options: [options[0].id, options[1].id],
+    ...locksField,
   });
 }

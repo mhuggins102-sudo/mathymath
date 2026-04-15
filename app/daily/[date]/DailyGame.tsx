@@ -67,12 +67,23 @@ export function DailyGame({
     loading,
     certainDigits,
     inputCapacity,
+    lockedSlots,
+    pendingLockSlot,
+    locksAvailable,
+    canCommitPendingLock,
+    tapCell,
+    commitLock,
   } = game;
 
   const keypadDisabled =
     state.status !== "playing" || !!state.pendingGuess || loading;
-  // Submit is ready when typed input has filled every non-certain slot.
-  const submitDisabled = input.length !== inputCapacity || keypadDisabled;
+  // Submit requires all non-certain non-locked slots to be typed AND no
+  // lock still pending (must be committed or cancelled first).
+  const submitDisabled =
+    input.length !== inputCapacity ||
+    pendingLockSlot !== null ||
+    keypadDisabled;
+  const lockMode = pendingLockSlot !== null;
 
   // Record this daily's result locally (first write wins per date). This
   // feeds the Lifetime Stats view on the home page — it's not shown on the
@@ -220,9 +231,21 @@ export function DailyGame({
           state={state}
           currentInput={input}
           certainDigits={certainDigits}
+          lockedSlots={lockedSlots}
+          pendingLockSlot={pendingLockSlot}
+          onTapCell={tapCell}
         />
         {error && (
           <p className="text-bad text-xs text-center mt-2 shake">{error}</p>
+        )}
+        {state.status === "playing" && !state.pendingGuess && (
+          <p className="text-[10px] text-muted text-center mt-2">
+            {lockMode
+              ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
+              : locksAvailable > 0
+              ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+              : ""}
+          </p>
         )}
         {state.status === "playing" && (
           <div className="mt-4">
@@ -238,6 +261,9 @@ export function DailyGame({
                 onSubmit={submit}
                 disabled={keypadDisabled}
                 submitDisabled={submitDisabled}
+                lockMode={lockMode}
+                onLockCommit={commitLock}
+                lockCommitDisabled={!canCommitPendingLock}
               />
             )}
           </div>

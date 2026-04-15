@@ -15,6 +15,15 @@ const historyGuessSchema = z.object({
   guess: z.string(),
   clueId: z.string().optional(),
   result: z.unknown().optional(),
+  locks: z
+    .array(
+      z.object({
+        slot: z.number().int().min(0).max(4),
+        digit: z.string().regex(/^[0-9]$/),
+        correct: z.boolean(),
+      }),
+    )
+    .optional(),
 });
 
 // The client now sends its full history so the server can verify that

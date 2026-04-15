@@ -16,6 +16,15 @@ const historyGuessSchema = z.object({
   guess: z.string(),
   clueId: z.string().optional(),
   result: z.unknown().optional(),
+  locks: z
+    .array(
+      z.object({
+        slot: z.number().int().min(0).max(DIGITS - 1),
+        digit: z.string().regex(/^[0-9]$/),
+        correct: z.boolean(),
+      }),
+    )
+    .optional(),
 });
 
 const bodySchema = z.object({

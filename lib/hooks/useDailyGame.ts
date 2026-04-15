@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { validateGuess } from "@/lib/game/validator";
@@ -15,6 +15,11 @@ import {
   deriveCertainDigits,
   inputCapacity,
 } from "@/lib/game/certain";
+import {
+  canUseLockOnGuess,
+  locksAvailable as computeLocksAvailable,
+  type LockRecord,
+} from "@/lib/game/locks";
 
 /**
  * Client-side shape for a daily game. This deliberately mirrors the
@@ -30,10 +35,20 @@ export interface DailyGameState {
     guess: string;
     clueId?: ClueId;
     result?: ClueResult;
+    locks?: LockRecord[];
   }>;
-  pendingGuess: { guess: string; options: [Clue, Clue] } | null;
+  pendingGuess: {
+    guess: string;
+    options: [Clue, Clue];
+    locks?: LockRecord[];
+  } | null;
   status: "playing" | "won" | "lost";
   revealedTarget: string | null;
+}
+
+export interface LockAttempt {
+  slot: number;
+  digit: string;
 }
 
 export interface UseDailyGameConfig {
@@ -54,12 +69,19 @@ export interface UseDailyGameResult {
   loading: boolean;
   /** Per-slot digits known-certain from prior clues (length = digits). */
   certainDigits: (string | null)[];
-  /** Max typed-input length = digits − certain-slot count. */
+  /** Max typed-input length = digits − certain − committed locks this turn. */
   inputCapacity: number;
+  lockedSlots: readonly LockAttempt[];
+  pendingLockSlot: number | null;
+  locksAvailable: number;
+  canStartLock: boolean;
+  canCommitPendingLock: boolean;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
   chooseClue: (id: ClueId) => void;
+  tapCell: (slot: number) => void;
+  commitLock: () => void;
 }
 
 function initialState(config: UseDailyGameConfig): DailyGameState {
@@ -84,6 +106,7 @@ function toSaved(state: DailyGameState): SavedDailyGame {
       guess: g.guess,
       clueId: g.clueId,
       result: g.result,
+      locks: g.locks,
     })),
     pendingGuess: state.pendingGuess
       ? {
@@ -92,6 +115,7 @@ function toSaved(state: DailyGameState): SavedDailyGame {
             state.pendingGuess.options[0].id,
             state.pendingGuess.options[1].id,
           ],
+          locks: state.pendingGuess.locks,
         }
       : null,
     status: state.status,
@@ -110,7 +134,11 @@ function fromSaved(
     try {
       const a = getClueById(saved.pendingGuess.optionIds[0] as ClueId);
       const b = getClueById(saved.pendingGuess.optionIds[1] as ClueId);
-      pendingGuess = { guess: saved.pendingGuess.guess, options: [a, b] };
+      pendingGuess = {
+        guess: saved.pendingGuess.guess,
+        options: [a, b],
+        locks: saved.pendingGuess.locks,
+      };
     } catch {
       // Unknown clue id (e.g. a retired clue in older saves). Drop
       // pending and let the player resubmit.
@@ -125,6 +153,7 @@ function fromSaved(
       guess: g.guess,
       clueId: g.clueId as ClueId | undefined,
       result: g.result as ClueResult | undefined,
+      locks: g.locks,
     })),
     pendingGuess,
     status: saved.status,
@@ -133,12 +162,14 @@ function fromSaved(
 }
 
 /** Strip Clue objects out of the history when sending to the server.
- *  Only { guess, clueId?, result? } travels over the wire. */
+ *  { guess, clueId?, result?, locks? } travels over the wire — the
+ *  server replays the history including locks for integrity. */
 function historyForServer(state: DailyGameState) {
   return state.guesses.map((g) => ({
     guess: g.guess,
     clueId: g.clueId,
     result: g.result,
+    locks: g.locks,
   }));
 }
 
@@ -148,6 +179,8 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lockedSlots, setLockedSlots] = useState<LockAttempt[]>([]);
+  const [pendingLockSlot, setPendingLockSlot] = useState<number | null>(null);
   // Prevents double-submits from racing with a pending network call.
   const inFlightRef = useRef(false);
 
@@ -166,28 +199,118 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     saveDailyGame(config.storageKey, toSaved(state));
   }, [state, config.storageKey, hydrated]);
 
-  // `input` holds only typed-into-non-certain-slots. Certain digits
-  // (revealed by prior clues) are auto-filled on submit.
+  // Reset the current-turn lock state whenever the committed state
+  // changes (submit landed, clue chosen, etc.).
+  const guessesLen = state.guesses.length;
+  const hasPending = !!state.pendingGuess;
+  useEffect(() => {
+    setLockedSlots([]);
+    setPendingLockSlot(null);
+  }, [guessesLen, hasPending]);
+
+  // `input` holds only typed-into-non-certain-non-locked-slots.
   const certain = deriveCertainDigits(state.guesses, state.digits);
-  const capacity = inputCapacity(certain);
+  const capacity = inputCapacity(certain) - lockedSlots.length;
+
+  const locksAvailableCount = computeLocksAvailable(state.guesses);
+  const canUseLocks = canUseLockOnGuess(state.guesses.length);
+  const canStartLock =
+    canUseLocks && lockedSlots.length < locksAvailableCount;
+  const pendingLockDigit = useMemo(() => {
+    if (pendingLockSlot === null) return null;
+    return (
+      lockedSlots.find((l) => l.slot === pendingLockSlot)?.digit ?? null
+    );
+  }, [pendingLockSlot, lockedSlots]);
+  const canCommitPendingLock =
+    pendingLockSlot !== null && pendingLockDigit !== null;
+
+  const typedIndexForSlot = useCallback(
+    (slot: number): number | null => {
+      let idx = 0;
+      for (let i = 0; i < state.digits; i++) {
+        if (certain[i] !== null) continue;
+        if (lockedSlots.some((l) => l.slot === i)) continue;
+        if (i === slot) return idx < input.length ? idx : null;
+        idx++;
+      }
+      return null;
+    },
+    [state.digits, certain, lockedSlots, input],
+  );
 
   const appendDigit = useCallback(
     (d: string) => {
       setError(null);
+      if (pendingLockSlot !== null) {
+        setLockedSlots((cur) => {
+          const others = cur.filter((l) => l.slot !== pendingLockSlot);
+          return [...others, { slot: pendingLockSlot, digit: d }];
+        });
+        return;
+      }
       setInput((cur) => (cur.length >= capacity ? cur : cur + d));
     },
-    [capacity],
+    [pendingLockSlot, capacity],
   );
 
   const backspace = useCallback(() => {
     setError(null);
+    if (pendingLockSlot !== null) {
+      setLockedSlots((cur) => cur.filter((l) => l.slot !== pendingLockSlot));
+      return;
+    }
     setInput((cur) => cur.slice(0, -1));
-  }, []);
+  }, [pendingLockSlot]);
+
+  const tapCell = useCallback(
+    (slot: number) => {
+      setError(null);
+      if (slot < 0 || slot >= state.digits) return;
+      if (certain[slot] !== null) return;
+      if (pendingLockSlot === slot) {
+        setLockedSlots((cur) => cur.filter((l) => l.slot !== slot));
+        setPendingLockSlot(null);
+        return;
+      }
+      if (pendingLockSlot !== null) return; // Q8: no switching.
+      const isAlreadyLocked = lockedSlots.some((l) => l.slot === slot);
+      if (!canUseLocks) return;
+      if (!isAlreadyLocked && lockedSlots.length >= locksAvailableCount)
+        return;
+      const idx = typedIndexForSlot(slot);
+      if (idx !== null) {
+        setInput((cur) => cur.slice(0, idx) + cur.slice(idx + 1));
+      }
+      setPendingLockSlot(slot);
+    },
+    [
+      state.digits,
+      certain,
+      pendingLockSlot,
+      lockedSlots,
+      canUseLocks,
+      locksAvailableCount,
+      typedIndexForSlot,
+    ],
+  );
+
+  const commitLock = useCallback(() => {
+    if (pendingLockSlot === null) return;
+    if (pendingLockDigit === null) return;
+    setPendingLockSlot(null);
+    buzz(18);
+  }, [pendingLockSlot, pendingLockDigit]);
 
   const submit = useCallback(async () => {
     if (inFlightRef.current) return;
     if (state.status !== "playing" || state.pendingGuess) return;
-    const fullGuess = buildGuessFromInput(certain, input);
+    // Refuse submit while a lock is still pending — same rule as
+    // unlimited: commit or cancel first.
+    if (pendingLockSlot !== null) return;
+    const overlay: (string | null)[] = certain.slice();
+    for (const l of lockedSlots) overlay[l.slot] = l.digit;
+    const fullGuess = buildGuessFromInput(overlay, input);
     const v = validateGuess(fullGuess, state.digits);
     if (!v.ok) {
       setError(v.error);
@@ -206,6 +329,8 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           body: JSON.stringify({
             history: historyForServer(state),
             guess: v.digits,
+            lockAttempts:
+              lockedSlots.length > 0 ? lockedSlots : undefined,
           }),
         },
       );
@@ -214,12 +339,20 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
         setError(body.error ?? "server_error");
         return;
       }
+      const resolvedLocks = (body.locks as LockRecord[] | undefined) ?? [];
+      const locksField =
+        resolvedLocks.length > 0 ? { locks: resolvedLocks } : {};
       if (body.kind === "won") {
         setState((s) => ({
           ...s,
           guesses: [
             ...s.guesses,
-            { guess: v.digits, clueId: "bullseyes", result: body.result },
+            {
+              guess: v.digits,
+              clueId: "bullseyes",
+              result: body.result,
+              ...locksField,
+            },
           ],
           pendingGuess: null,
           status: "won",
@@ -229,7 +362,10 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       } else if (body.kind === "lost") {
         setState((s) => ({
           ...s,
-          guesses: [...s.guesses, { guess: v.digits }],
+          guesses: [
+            ...s.guesses,
+            { guess: v.digits, ...locksField },
+          ],
           pendingGuess: null,
           status: "lost",
           revealedTarget: body.target,
@@ -243,7 +379,11 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
         ];
         setState((s) => ({
           ...s,
-          pendingGuess: { guess: v.digits, options: opts },
+          pendingGuess: {
+            guess: v.digits,
+            options: opts,
+            ...locksField,
+          },
         }));
         setInput("");
       } else {
@@ -255,7 +395,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       inFlightRef.current = false;
       setLoading(false);
     }
-  }, [input, state]);
+  }, [input, state, certain, lockedSlots, pendingLockSlot]);
 
   const chooseClue = useCallback(
     async (clueId: ClueId) => {
@@ -290,11 +430,19 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           return;
         }
         if (body.kind === "continue") {
+          const pendingLocks = pending.locks;
           setState((s) => ({
             ...s,
             guesses: [
               ...s.guesses,
-              { guess: pending.guess, clueId, result: body.result },
+              {
+                guess: pending.guess,
+                clueId,
+                result: body.result,
+                ...(pendingLocks && pendingLocks.length > 0
+                  ? { locks: pendingLocks }
+                  : {}),
+              },
             ],
             pendingGuess: null,
           }));
@@ -319,9 +467,16 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     loading,
     certainDigits: certain,
     inputCapacity: capacity,
+    lockedSlots,
+    pendingLockSlot,
+    locksAvailable: locksAvailableCount,
+    canStartLock,
+    canCommitPendingLock,
     appendDigit,
     backspace,
     submit,
     chooseClue,
+    tapCell,
+    commitLock,
   };
 }
