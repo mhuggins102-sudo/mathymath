@@ -9,6 +9,7 @@ import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
+import { SlotPicker, DigitPicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
@@ -86,6 +87,9 @@ function UnlimitedGame({
     pendingLockSlot,
     locksAvailable,
     canCommitPendingLock,
+    pendingClueParam,
+    confirmClueParam,
+    cancelClueParam,
     tapCell,
     commitLock,
   } = useGame({
@@ -161,7 +165,26 @@ function UnlimitedGame({
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
 
         <div className="mt-4">
-          {state.pendingGuess ? (
+          {/* Clue-param pickers: shown after the player picks a clue
+              that requires a slot (Oracle) or digit (Contains Digit)
+              selection before it resolves. */}
+          {pendingClueParam?.paramKind === "slot" ? (
+            <SlotPicker
+              digits={5}
+              certainDigits={certainDigits}
+              onSelect={(slot) =>
+                confirmClueParam({ selectedSlot: slot })
+              }
+              onCancel={cancelClueParam}
+            />
+          ) : pendingClueParam?.paramKind === "digit" ? (
+            <DigitPicker
+              onSelect={(digit) =>
+                confirmClueParam({ selectedDigit: digit })
+              }
+              onCancel={cancelClueParam}
+            />
+          ) : state.pendingGuess ? (
             <ClueChooser
               options={state.pendingGuess.options}
               onChoose={chooseClue}

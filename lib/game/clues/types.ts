@@ -48,13 +48,23 @@ export type ClueResult =
 export type ClueId = ClueResult["kind"];
 
 /** Optional context passed to `compute` when the caller has more state
- *  than just (guess, target). Today only Oracle uses it — to avoid
- *  re-revealing a slot the player already knows from prior clues or a
- *  correctly-landed lock. Callers that don't supply a context get the
- *  original "any slot" behaviour, so tests and sims don't break. */
+ *  than just (guess, target). */
 export interface ClueComputeContext {
   /** Indices of slots whose target digit is already known. */
   knownSlots?: readonly number[];
+  /** Player-chosen slot for clues with paramKind "slot" (Oracle). */
+  selectedSlot?: number;
+  /** Player-chosen digit for clues with paramKind "digit"
+   *  (Contains Digit). */
+  selectedDigit?: number;
+}
+
+/** The parameter the player chose when a clue requires paramKind.
+ *  Serialized into the choose-clue server request and the CHOOSE_CLUE
+ *  state-machine action. */
+export interface ClueParam {
+  selectedSlot?: number;
+  selectedDigit?: number;
 }
 
 export interface Clue<R extends ClueResult = ClueResult> {
@@ -66,6 +76,11 @@ export interface Clue<R extends ClueResult = ClueResult> {
   /** Optional color legend. Rendered below the description in Help/Chooser
    *  so color references don't need to live in the description text. */
   legend?: LegendEntry[];
+  /** If set, the player must provide a parameter after choosing this
+   *  clue — "slot" shows a 5-cell position picker (Oracle), "digit"
+   *  shows a 0-9 numpad (Contains Digit). Clues without this resolve
+   *  immediately when chosen. */
+  paramKind?: "slot" | "digit";
   compute(guess: string, target: string, context?: ClueComputeContext): R;
   example(target: string): { guess: string; result: R };
   /** Plain-language explanation of the result for this specific guess.

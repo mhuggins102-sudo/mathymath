@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
+import type { Clue, ClueId, ClueParam, ClueResult } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { validateGuess } from "@/lib/game/validator";
 import {
@@ -82,10 +82,13 @@ export interface UseDailyGameResult {
   locksAvailable: number;
   canStartLock: boolean;
   canCommitPendingLock: boolean;
+  pendingClueParam: { clueId: string; paramKind: "slot" | "digit" } | null;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
   chooseClue: (id: ClueId) => void;
+  confirmClueParam: (param: ClueParam) => void;
+  cancelClueParam: () => void;
   tapCell: (slot: number) => void;
   commitLock: () => void;
 }
@@ -421,16 +424,19 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     }
   }, [input, state, certain, lockedSlots, pendingLockSlot]);
 
-  const chooseClue = useCallback(
-    async (clueId: ClueId) => {
+  // --- Clue-parameter selection (Oracle slot / Contains Digit digit) ---
+  const [pendingClueParam, setPendingClueParam] = useState<{
+    clueId: string;
+    paramKind: "slot" | "digit";
+  } | null>(null);
+
+  /** Internal: actually fires the choose-clue server call once we
+   *  have both the clueId and (optionally) the player's param. */
+  const doChooseClue = useCallback(
+    async (clueId: ClueId, clueParam?: ClueParam) => {
       if (inFlightRef.current) return;
       if (!state.pendingGuess || state.status !== "playing") return;
       const pending = state.pendingGuess;
-      // Sanity: the picked id must actually be in the offered pair.
-      if (!pending.options.some((c) => c.id === clueId)) {
-        setError("invalid_clue");
-        return;
-      }
       inFlightRef.current = true;
       setError(null);
       setLoading(true);
@@ -445,6 +451,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
               history: historyForServer(state),
               pendingGuess: pending.guess,
               clueId,
+              ...(clueParam ? { clueParam } : {}),
             }),
           },
         );
@@ -483,6 +490,33 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     [state],
   );
 
+  const chooseClue = useCallback(
+    (clueId: ClueId) => {
+      if (!state.pendingGuess) return;
+      const clue = state.pendingGuess.options.find((c) => c.id === clueId);
+      if (!clue) return;
+      if (clue.paramKind) {
+        setPendingClueParam({ clueId, paramKind: clue.paramKind });
+        return;
+      }
+      doChooseClue(clueId);
+    },
+    [state.pendingGuess, doChooseClue],
+  );
+
+  const confirmClueParam = useCallback(
+    (param: ClueParam) => {
+      if (!pendingClueParam) return;
+      doChooseClue(pendingClueParam.clueId as ClueId, param);
+      setPendingClueParam(null);
+    },
+    [pendingClueParam, doChooseClue],
+  );
+
+  const cancelClueParam = useCallback(() => {
+    setPendingClueParam(null);
+  }, []);
+
   return {
     state,
     input,
@@ -496,10 +530,13 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     locksAvailable: locksAvailableCount,
     canStartLock,
     canCommitPendingLock,
+    pendingClueParam,
     appendDigit,
     backspace,
     submit,
     chooseClue,
+    confirmClueParam,
+    cancelClueParam,
     tapCell,
     commitLock,
   };

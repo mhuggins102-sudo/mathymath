@@ -52,7 +52,7 @@ export interface GameState {
 
 export type GameAction =
   | { type: "SUBMIT_GUESS"; guess: string; locks?: readonly LockAttempt[] }
-  | { type: "CHOOSE_CLUE"; clueId: ClueId }
+  | { type: "CHOOSE_CLUE"; clueId: ClueId; param?: { selectedSlot?: number; selectedDigit?: number } }
   | { type: "RESET"; target: string; seed: string; digits?: number; maxGuesses?: number };
 
 export function initGameState(params: {
@@ -152,7 +152,10 @@ export function reduce(state: GameState, action: GameAction): GameState {
         state.guesses,
         state.digits,
       );
-      const result = clue.compute(guess, state.target, { knownSlots });
+      const result = clue.compute(guess, state.target, {
+        knownSlots,
+        ...action.param,
+      });
       const guesses = [
         ...state.guesses,
         {
