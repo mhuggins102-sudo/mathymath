@@ -20,11 +20,19 @@ export const containsDigitClue: Clue<{
   // the chooser regularly (it's often the finisher late-game), but pulled
   // back from the top after simulations showed it dominating picks.
   weight: 1.2,
+  paramKind: "digit",
   legend: [
     { state: "match", label: "digit present" },
     { state: "cold", label: "digit absent" },
   ],
-  compute(guess, target) {
+  compute(guess, target, context) {
+    // Player-selected: use the chosen digit directly.
+    if (context?.selectedDigit !== undefined) {
+      const digit = context.selectedDigit;
+      const present = target.includes(String(digit));
+      return { kind: "containsDigit", digit, present };
+    }
+    // Fallback (sim / tests / backward compat): random digit.
     const rng = seededRng(`contains:${guess}:${target}`);
     const digit = Math.floor(rng() * 10);
     const present = target.includes(String(digit));

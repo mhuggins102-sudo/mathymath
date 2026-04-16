@@ -9,6 +9,7 @@ import {
   initGameState,
   reduce,
 } from "@/lib/game/stateMachine";
+import type { ClueParam } from "@/lib/game/clues/types";
 import { validateGuess } from "@/lib/game/validator";
 import {
   buildGuessFromInput,
@@ -63,10 +64,27 @@ export interface UseGameResult {
   canStartLock: boolean;
   /** True iff the pending lock has a digit and can be committed. */
   canCommitPendingLock: boolean;
+  /** When a clue with `paramKind` is chosen, this holds the clue id
+   *  and the required parameter kind until the player makes their
+   *  selection. null when no parameter is pending. */
+  pendingClueParam: {
+    clueId: string;
+    paramKind: "slot" | "digit";
+  } | null;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
+  /** Picks a clue. If the clue has `paramKind`, the hook enters
+   *  parameter-selection mode instead of resolving immediately —
+   *  call `confirmClueParam` once the player has selected. */
   chooseClue: (id: string) => void;
+  /** Resolves a pending paramKind clue with the player's selection.
+   *  For Oracle: `{ selectedSlot: N }`. For Contains Digit:
+   *  `{ selectedDigit: N }`. No-op if no param is pending. */
+  confirmClueParam: (param: ClueParam) => void;
+  /** Cancels the pending clue param selection, returning to the
+   *  chooser so the player can pick a different clue. */
+  cancelClueParam: () => void;
   /** Player tapped cell `slot`. Enters lock-selection on an empty or
    *  typed non-certain cell; cancels lock-selection (and drops any
    *  pending digit) when the same cell is tapped again. Tapping a
@@ -307,9 +325,50 @@ export function useGame(config: UseGameConfig): UseGameResult {
     buzz(12);
   }, [pendingLockSlot, input, state.digits, certain, lockedSlots]);
 
-  const chooseClue = useCallback((id: string) => {
-    dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
-    buzz(18);
+  // --- Clue-parameter selection state ---
+  //
+  // Clues with `paramKind` (Oracle, Contains Digit) need an extra step
+  // between the player tapping the clue in the chooser and the actual
+  // CHOOSE_CLUE dispatch. The player picks the clue → hook enters
+  // parameter-selection mode → UI shows a slot/digit picker → player
+  // confirms → hook dispatches CHOOSE_CLUE with the param attached.
+  const [pendingClueParam, setPendingClueParam] = useState<{
+    clueId: string;
+    paramKind: "slot" | "digit";
+  } | null>(null);
+
+  const chooseClue = useCallback(
+    (id: string) => {
+      if (!state.pendingGuess) return;
+      const clue = state.pendingGuess.options.find((c) => c.id === id);
+      if (!clue) return;
+      if (clue.paramKind) {
+        // Park in parameter-selection mode; the UI will render a picker.
+        setPendingClueParam({ clueId: id, paramKind: clue.paramKind });
+        return;
+      }
+      dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
+      buzz(18);
+    },
+    [state.pendingGuess],
+  );
+
+  const confirmClueParam = useCallback(
+    (param: ClueParam) => {
+      if (!pendingClueParam) return;
+      dispatch({
+        type: "CHOOSE_CLUE",
+        clueId: pendingClueParam.clueId as never,
+        param,
+      });
+      setPendingClueParam(null);
+      buzz(18);
+    },
+    [pendingClueParam],
+  );
+
+  const cancelClueParam = useCallback(() => {
+    setPendingClueParam(null);
   }, []);
 
   const reset = useCallback(
@@ -342,10 +401,13 @@ export function useGame(config: UseGameConfig): UseGameResult {
     locksAvailable: locksAvailableCount,
     canStartLock,
     canCommitPendingLock,
+    pendingClueParam,
     appendDigit,
     backspace,
     submit,
     chooseClue,
+    confirmClueParam,
+    cancelClueParam,
     tapCell,
     commitLock,
     reset,

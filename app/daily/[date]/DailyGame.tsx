@@ -7,6 +7,7 @@ import { useClientId } from "@/lib/hooks/useClientId";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
+import { SlotPicker, DigitPicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
@@ -81,6 +82,9 @@ export function DailyGame({
     pendingLockSlot,
     locksAvailable,
     canCommitPendingLock,
+    pendingClueParam,
+    confirmClueParam,
+    cancelClueParam,
     tapCell,
     commitLock,
   } = game;
@@ -268,7 +272,23 @@ export function DailyGame({
         )}
         {hydrated && state.status === "playing" && (
           <div className="mt-4">
-            {state.pendingGuess ? (
+            {pendingClueParam?.paramKind === "slot" ? (
+              <SlotPicker
+                digits={5}
+                certainDigits={certainDigits}
+                onSelect={(slot) =>
+                  confirmClueParam({ selectedSlot: slot })
+                }
+                onCancel={cancelClueParam}
+              />
+            ) : pendingClueParam?.paramKind === "digit" ? (
+              <DigitPicker
+                onSelect={(digit) =>
+                  confirmClueParam({ selectedDigit: digit })
+                }
+                onCancel={cancelClueParam}
+              />
+            ) : state.pendingGuess ? (
               <ClueChooser
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}

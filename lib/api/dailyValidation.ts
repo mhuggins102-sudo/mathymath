@@ -176,8 +176,23 @@ export function validateDailyHistory(
       history.slice(0, i) as Parameters<typeof knownSlotsFromHistory>[0],
       digits,
     );
+    // For clues with paramKind (Oracle, Contains Digit): the player's
+    // selection is encoded in the result itself. Oracle stores slot,
+    // Contains Digit stores digit. Extract and pass so compute
+    // reproduces the same result as the client claimed.
+    const clueParam: Record<string, unknown> = {};
+    if (g.result && typeof g.result === "object") {
+      const r = g.result as Record<string, unknown>;
+      if (r.kind === "oracle" && typeof r.slot === "number") {
+        clueParam.selectedSlot = r.slot;
+      }
+      if (r.kind === "containsDigit" && typeof r.digit === "number") {
+        clueParam.selectedDigit = r.digit;
+      }
+    }
     const expected = clue.compute(g.guess, target, {
       knownSlots: priorKnownSlots,
+      ...clueParam,
     });
     if (!resultsMatch(g.result, expected)) {
       return { ok: false, error: `result_mismatch_at_${i}` };

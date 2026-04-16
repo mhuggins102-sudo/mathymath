@@ -28,10 +28,18 @@ const historyGuessSchema = z.object({
     .optional(),
 });
 
+const clueParamSchema = z
+  .object({
+    selectedSlot: z.number().int().min(0).max(DIGITS - 1).optional(),
+    selectedDigit: z.number().int().min(0).max(9).optional(),
+  })
+  .optional();
+
 const bodySchema = z.object({
   history: z.array(historyGuessSchema).max(MAX_GUESSES),
   pendingGuess: z.string().length(DIGITS).regex(/^[0-9]+$/),
   clueId: z.string().min(1),
+  clueParam: clueParamSchema,
 });
 
 /**
@@ -114,7 +122,14 @@ export async function POST(
     parsed.data.history as Parameters<typeof knownSlotsFromHistory>[0],
     DIGITS,
   );
-  const result = clue.compute(pendingGuess, target, { knownSlots });
+  // Player-selected params (Oracle → selectedSlot; Contains Digit →
+  // selectedDigit) are forwarded into the compute context alongside
+  // knownSlots. Clues without a paramKind simply ignore them.
+  const { clueParam } = parsed.data;
+  const result = clue.compute(pendingGuess, target, {
+    knownSlots,
+    ...clueParam,
+  });
 
   return NextResponse.json({ kind: "continue", result });
 }
