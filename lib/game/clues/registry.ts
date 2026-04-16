@@ -15,6 +15,7 @@ import { distinctDigitsClue } from "./distinctDigits";
 import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
 import { totalDeviationClue } from "./totalDeviation";
+import { diceCountClue } from "./diceCount";
 import { extraLockClue } from "./extraLock";
 
 // Retired 2026-04-15 (see full-review doc):
@@ -42,6 +43,7 @@ export const CLUES: readonly Clue[] = [
   medianClue,
   divisibleByClue,
   totalDeviationClue,
+  diceCountClue,
   extraLockClue,
 ] as const;
 

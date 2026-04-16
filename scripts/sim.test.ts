@@ -167,6 +167,8 @@ function resultKey(r: ClueResult): string {
       return `DB:${r.divisor ?? "n"}:${r.present ? 1 : 0}`;
     case "totalDeviation":
       return `TD:${r.value}`;
+    case "diceCount":
+      return `DC:${r.cmp}`;
   }
 }
 

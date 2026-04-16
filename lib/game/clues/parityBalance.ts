@@ -8,7 +8,7 @@ function evenCount(s: string): number {
 
 export const parityBalanceClue: Clue<{ kind: "parityBalance"; cmp: Cmp }> = {
   id: "parityBalance",
-  name: "Parity Balance",
+  name: "Even Count",
   category: "compositional",
   description:
     "Compares the number of even digits in the target to your guess.",

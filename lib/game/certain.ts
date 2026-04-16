@@ -45,7 +45,15 @@ export function deriveCertainDigits(
             if (r.cmp[i] === "eq") out[i] = g.guess[i] ?? null;
           }
           break;
-        case "thermometer":
+        case "within2":
+        // `exact` was added later; old saved-game data may omit it.
+        if (r.exact) {
+          for (let i = 0; i < digits; i++) {
+            if (r.exact[i]) out[i] = g.guess[i] ?? null;
+          }
+        }
+        break;
+      case "thermometer":
           for (let i = 0; i < digits; i++) {
             if (r.tier[i] === 0) out[i] = g.guess[i] ?? null;
           }

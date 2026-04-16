@@ -2,7 +2,7 @@ import type { Clue } from "./types";
 
 export const bullseyesClue: Clue<{ kind: "bullseyes"; hits: boolean[] }> = {
   id: "bullseyes",
-  name: "Bullseyes",
+  name: "Bullseye",
   category: "positional",
   description:
     "Marks each slot where your digit exactly matches the target digit in that position.",

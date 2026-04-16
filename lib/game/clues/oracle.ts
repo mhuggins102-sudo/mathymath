@@ -6,7 +6,7 @@ export const oracleClue: Clue<{ kind: "oracle"; slot: number; digit: number }> =
   name: "Oracle",
   category: "positional",
   description:
-    "Reveals the exact target digit at one slot. The slot is picked pseudo-randomly from your guess and the target, so it's a bit of a gamble — but the same guess on the same puzzle will always reveal the same slot.",
+    "You pick a slot — the target's exact digit there is revealed.",
   weight: 0.9,
   legend: [{ state: "match", label: "revealed digit" }],
   compute(guess, target, context) {

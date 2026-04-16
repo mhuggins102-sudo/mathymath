@@ -1,18 +1,29 @@
 import type { Clue } from "./types";
 
-export const within2Clue: Clue<{ kind: "within2"; mask: boolean[] }> = {
+export const within2Clue: Clue<{
+  kind: "within2";
+  mask: boolean[];
+  exact: boolean[];
+}> = {
   id: "within2",
   name: "Within 2",
   category: "positional",
   description:
-    "Marks each slot where your digit is within 2 of the target digit (direction unknown).",
+    "Marks each slot where your digit is within 2 of the target digit (direction unknown). Exact matches are highlighted.",
   weight: 0.8,
-  legend: [{ state: "match", label: "within ±2" }],
+  legend: [
+    { state: "match", label: "exact" },
+    { state: "warm", label: "within ±2" },
+  ],
   compute(guess, target) {
-    const mask = [...guess].map(
-      (ch, i) => Math.abs(Number(ch) - Number(target[i])) <= 2,
-    );
-    return { kind: "within2", mask };
+    const mask: boolean[] = [];
+    const exact: boolean[] = [];
+    for (let i = 0; i < guess.length; i++) {
+      const diff = Math.abs(Number(guess[i]) - Number(target[i]));
+      mask.push(diff <= 2);
+      exact.push(diff === 0);
+    }
+    return { kind: "within2", mask, exact };
   },
   example(target) {
     const guess = "5".repeat(target.length);

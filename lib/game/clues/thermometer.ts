@@ -22,10 +22,10 @@ export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
   weight: 0.4,
   legend: [
     { state: "match", label: "exact" },
-    { state: "close", label: "within 1" },
-    { state: "warm", label: "within 3" },
-    { state: "cool", label: "within 5" },
-    { state: "cold", label: "further off" },
+    { state: "close", label: "1 off" },
+    { state: "warm", label: "2-3 off" },
+    { state: "cool", label: "4-5 off" },
+    { state: "cold", label: "6+ off" },
   ],
   compute(guess, target) {
     const tiers = [...guess].map((ch, i) => tier(Number(ch) - Number(target[i])));

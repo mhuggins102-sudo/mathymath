@@ -18,6 +18,7 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   median: "🎚️",
   divisibleBy: "➗",
   totalDeviation: "📐",
+  diceCount: "🎲",
   extraLock: "🔒",
 };
 
@@ -31,7 +32,9 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
         .map((c) => (c === "eq" ? "🟩" : c === "gt" ? "🔼" : "🔽"))
         .join("");
     case "within2":
-      return result.mask.map((m) => (m ? "🟨" : "⬛")).join("");
+      return result.mask
+        .map((m, i) => (result.exact[i] ? "🟩" : m ? "🟨" : "⬛"))
+        .join("");
     case "parityMask":
       return result.matches.map((m) => (m ? "🟨" : "⬛")).join("");
     case "oracle": {
