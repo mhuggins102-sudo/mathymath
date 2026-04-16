@@ -4,7 +4,7 @@ import { pickTwoClues } from "./clueSelector";
 import { knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
-export const DEFAULT_MAX_GUESSES = 8;
+export const DEFAULT_MAX_GUESSES = 7;
 
 export type GameStatus = "playing" | "won" | "lost";
 

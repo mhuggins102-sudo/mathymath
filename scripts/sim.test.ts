@@ -19,13 +19,108 @@
 import { describe, it, expect } from "vitest";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
+import { seededRng } from "@/lib/game/seededRng";
 import {
   generateDailyTarget,
   isDegenerateTarget,
 } from "@/lib/game/targetGenerator";
-import type { ClueId, ClueResult } from "@/lib/game/clues/types";
+import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
 
 const DIGITS = 5;
+
+/** "deck" scheme: strict P+P on top, rest shuffled, poof-discard
+ *  (both cards in a pair are removed from the pool each round, so
+ *  offered-but-unpicked cards never come back).
+ *
+ *  Seeds are derived from the game seed so two players on the same
+ *  puzzle see the same deck — daily fairness is preserved. */
+function buildDeck(seed: string): ClueId[] {
+  const positional = CLUES.filter((c) => c.category === "positional");
+  const other = CLUES.filter((c) => c.category !== "positional");
+
+  const rngP = seededRng(`deckP:${seed}`);
+  const shuffledP = fisherYates(
+    positional.map((c) => c.id),
+    rngP,
+  );
+  // Top two cards of the final deck are positional (strict pair-1
+  // guarantee). The rest of the positional deck merges with the
+  // "other" deck and gets its own shuffle.
+  const topPP = shuffledP.slice(0, 2);
+  const remainingP = shuffledP.slice(2);
+
+  const rngRest = seededRng(`deckRest:${seed}`);
+  const rest = fisherYates(
+    [...remainingP, ...other.map((c) => c.id)],
+    rngRest,
+  );
+
+  return [...topPP, ...rest];
+}
+
+function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+type Scheme = "current" | "deck" | "deck_1p1c";
+
+/** Build the deck for a scheme variant that guarantees the first pair
+ *  is exactly 1 positional + 1 compositional/special, shuffled within
+ *  the pair. The rest of the deck is 5 remaining positional + 10
+ *  remaining compositional/special, shuffled together. */
+function buildDeck1P1C(seed: string): ClueId[] {
+  const positional = CLUES.filter((c) => c.category === "positional");
+  const other = CLUES.filter((c) => c.category !== "positional");
+
+  const rngP = seededRng(`deck1p1cP:${seed}`);
+  const shuffledP = fisherYates(
+    positional.map((c) => c.id),
+    rngP,
+  );
+  const rngC = seededRng(`deck1p1cC:${seed}`);
+  const shuffledC = fisherYates(
+    other.map((c) => c.id),
+    rngC,
+  );
+
+  // Pair 1 = the two top cards (one from each deck) shuffled within
+  // the pair so the order is random even though composition is fixed.
+  const rngPair = seededRng(`deck1p1cPair:${seed}`);
+  const pair1 = fisherYates([shuffledP[0], shuffledC[0]], rngPair);
+
+  const rngRest = seededRng(`deck1p1cRest:${seed}`);
+  const rest = fisherYates(
+    [...shuffledP.slice(1), ...shuffledC.slice(1)],
+    rngRest,
+  );
+
+  return [...pair1, ...rest];
+}
+
+function pairFor(
+  scheme: Scheme,
+  seed: string,
+  chosenClueIds: readonly ClueId[],
+  roundIndex: number,
+  deck: ClueId[] | null,
+): [Clue, Clue] {
+  if (scheme === "current") {
+    return pickTwoClues(seed, chosenClueIds);
+  }
+  // deck* schemes: read positions (roundIndex*2, roundIndex*2+1) of
+  // the pre-built deck. Fall back to the last two ids if we ran off
+  // the end (shouldn't happen — deck has 17, budget ≤ 8 → max 14 draws).
+  const base = roundIndex * 2;
+  const d = deck!;
+  const aId = d[base] ?? d[d.length - 2];
+  const bId = d[base + 1] ?? d[d.length - 1];
+  return [getClueById(aId), getClueById(bId)];
+}
 
 function allCandidates(): string[] {
   const out: string[] = [];
@@ -112,6 +207,18 @@ interface SimStats {
   guessCount: number;
   cluePicks: ClueId[];
   reductionsByClue: Map<ClueId, number[]>;
+  /** Set of clue ids that were OFFERED (shown in a pair) this game,
+   *  regardless of whether they were picked. */
+  cluesOffered: Set<ClueId>;
+  /** Categories of the two clues offered on pair 1, in order. */
+  pair1Categories: [
+    "positional" | "compositional" | "special",
+    "positional" | "compositional" | "special",
+  ] | null;
+  /** Category of the clue the solver picked on pair 1 (null if game
+   *  ended before pair 1 was offered — rare). Used to answer "is the
+   *  P card always picked when pair 1 is mixed?". */
+  pair1Picked: "positional" | "compositional" | "special" | null;
   /** For each chooser decision in this game: details about the two
    *  offered clues vs. which one the greedy solver picked. */
   decisions: Array<{
@@ -129,16 +236,31 @@ function playOne(
   seed: string,
   budget: number,
   strategy: "greedy" | "weight",
+  scheme: Scheme,
 ): SimStats {
   let candidates = ALL.slice();
   const chosen: ClueId[] = [];
+  const deck =
+    scheme === "deck"
+      ? buildDeck(seed)
+      : scheme === "deck_1p1c"
+        ? buildDeck1P1C(seed)
+        : null;
   const stats: SimStats = {
     won: false,
     guessCount: 0,
     cluePicks: [],
     reductionsByClue: new Map(),
+    cluesOffered: new Set(),
+    pair1Categories: null,
+    pair1Picked: null,
     decisions: [],
   };
+
+  // Track how many chooser decisions we've made so far — drives which
+  // slice of the deck we draw from in the "deck" scheme. (Not the same
+  // as guessIndex because an exact-match win skips the chooser.)
+  let roundIndex = 0;
 
   for (let g = 0; g < budget; g++) {
     const guess = candidates[0] ?? ALL[0];
@@ -150,7 +272,13 @@ function playOne(
     }
     if (g + 1 >= budget) return stats;
 
-    const options = pickTwoClues(seed, chosen);
+    const options = pairFor(scheme, seed, chosen, roundIndex, deck);
+    roundIndex++;
+    stats.cluesOffered.add(options[0].id);
+    stats.cluesOffered.add(options[1].id);
+    if (stats.pair1Categories === null) {
+      stats.pair1Categories = [options[0].category, options[1].category];
+    }
     const e0 = expectedRemaining(candidates, guess, options[0].id);
     const e1 = expectedRemaining(candidates, guess, options[1].id);
 
@@ -173,6 +301,9 @@ function playOne(
     const otherExp = pickedIdx === 0 ? e1 : e0;
     chosen.push(pick.id);
     stats.cluePicks.push(pick.id);
+    if (stats.pair1Picked === null && stats.pair1Categories !== null) {
+      stats.pair1Picked = pick.category;
+    }
     stats.decisions.push({
       pickedWeight: pick.weight,
       otherWeight: other.weight,
@@ -210,8 +341,19 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
         );
       }
       const strategy = strategyEnv as "greedy" | "weight";
+      const schemeEnv = (process.env.SIM_SCHEME ?? "current").toLowerCase();
+      if (
+        schemeEnv !== "current" &&
+        schemeEnv !== "deck" &&
+        schemeEnv !== "deck_1p1c"
+      ) {
+        throw new Error(
+          `SIM_SCHEME must be "current" | "deck" | "deck_1p1c"; got ${schemeEnv}`,
+        );
+      }
+      const scheme = schemeEnv as Scheme;
       console.log(
-        `\nSimulating ${N} daily puzzles  budget=${BUDGET}  strategy=${strategy}`,
+        `\nSimulating ${N} daily puzzles  budget=${BUDGET}  strategy=${strategy}  scheme=${scheme}`,
       );
       if (strategy === "weight") {
         console.log(
@@ -222,6 +364,19 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
           "  (greedy: picks whichever option most reduces the candidate set)",
         );
       }
+      if (scheme === "deck") {
+        console.log(
+          "  (deck: strict P+P on top, rest shuffled; offered-but-unpicked cards are discarded permanently)",
+        );
+      } else if (scheme === "deck_1p1c") {
+        console.log(
+          "  (deck_1p1c: top pair = exactly 1P+1CS shuffled; rest shuffled; poof)",
+        );
+      } else {
+        console.log(
+          "  (current: weighted random pair from not-yet-chosen pool; unpicked cards can reappear)",
+        );
+      }
       console.log(
         `Candidate pool after degenerate filter: ${ALL.length} / 100000`,
       );
@@ -229,14 +384,18 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
       const runStats: SimStats[] = [];
       const globalReductions = new Map<ClueId, number[]>();
       const pickCount = new Map<ClueId, number>();
+      const offeredCount = new Map<ClueId, number>();
 
       for (let i = 0; i < N; i++) {
         const date = `sim-${i}`;
         const target = generateDailyTarget(date, DIGITS);
-        const r = playOne(target, date, BUDGET, strategy);
+        const r = playOne(target, date, BUDGET, strategy, scheme);
         runStats.push(r);
         for (const id of r.cluePicks) {
           pickCount.set(id, (pickCount.get(id) ?? 0) + 1);
+        }
+        for (const id of r.cluesOffered) {
+          offeredCount.set(id, (offeredCount.get(id) ?? 0) + 1);
         }
         for (const [id, ratios] of r.reductionsByClue) {
           const cur = globalReductions.get(id) ?? [];
@@ -265,11 +424,58 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
         `  ✕: ${String(losses).padStart(5)} ${"█".repeat(Math.round((losses / N) * 40))}`,
       );
 
+      // Pair-1 composition — diagnostic for the "positional always on
+      // turn 1" property. Pair 1 can be 2P (two positional), 1P+1CS,
+      // or 0P (two compositional/special). The deck scheme should hit
+      // 2P on 100% of games; the current scheme hits it randomly.
+      let p1_2P = 0,
+        p1_1P = 0,
+        p1_0P = 0;
+      for (const r of runStats) {
+        if (!r.pair1Categories) continue;
+        const positionals = r.pair1Categories.filter(
+          (c) => c === "positional",
+        ).length;
+        if (positionals === 2) p1_2P++;
+        else if (positionals === 1) p1_1P++;
+        else p1_0P++;
+      }
+      console.log("\n--- pair-1 composition ---");
       console.log(
-        "\n--- per-clue (picks, avg remaining after pick as % of before) ---",
+        `  2 positional: ${p1_2P} / ${N} (${((p1_2P / N) * 100).toFixed(1)}%)`,
+      );
+      console.log(
+        `  1 positional: ${p1_1P} / ${N} (${((p1_1P / N) * 100).toFixed(1)}%)`,
+      );
+      console.log(
+        `  0 positional: ${p1_0P} / ${N} (${((p1_0P / N) * 100).toFixed(1)}%)`,
+      );
+
+      // Pair-1 picked breakdown, restricted to mixed (1P+1CS) pairs —
+      // the interesting case. In deck_1p1c this is 100% of games, so
+      // the denominator matches N. In the current scheme it answers
+      // "when pair 1 was mixed, how often did the solver take the P?".
+      let mixedGames = 0;
+      let mixedPickedP = 0;
+      for (const r of runStats) {
+        if (!r.pair1Categories) continue;
+        const ps = r.pair1Categories.filter((c) => c === "positional").length;
+        if (ps !== 1) continue;
+        mixedGames += 1;
+        if (r.pair1Picked === "positional") mixedPickedP += 1;
+      }
+      if (mixedGames > 0) {
+        console.log(
+          `  mixed pair 1 (1P+1CS): solver picked P in ${mixedPickedP}/${mixedGames} (${((mixedPickedP / mixedGames) * 100).toFixed(1)}%)`,
+        );
+      }
+
+      console.log(
+        "\n--- per-clue (offered rate, picks, avg remaining after pick) ---",
       );
       const clueLines = CLUES.map((c) => {
         const picks = pickCount.get(c.id) ?? 0;
+        const offered = offeredCount.get(c.id) ?? 0;
         const rs = globalReductions.get(c.id) ?? [];
         const avgRatio =
           rs.length === 0 ? null : rs.reduce((s, x) => s + x, 0) / rs.length;
@@ -279,6 +485,7 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
           weight: c.weight,
           category: c.category,
           picks,
+          offered,
           avgRatio,
         };
       });
@@ -288,9 +495,17 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
           row.avgRatio === null
             ? "    —"
             : `${(row.avgRatio * 100).toFixed(1)}%`.padStart(6);
-        const cat = row.category === "positional" ? "P" : "C";
+        const cat =
+          row.category === "positional"
+            ? "P"
+            : row.category === "compositional"
+              ? "C"
+              : "S";
+        const offeredPct = `${((row.offered / N) * 100).toFixed(0)}%`.padStart(
+          4,
+        );
         console.log(
-          `  [${cat}] ${row.name.padEnd(16)} w=${row.weight.toFixed(1)}  picks=${String(row.picks).padStart(5)}  remaining=${ratioStr}`,
+          `  [${cat}] ${row.name.padEnd(16)} w=${row.weight.toFixed(1)}  offered=${offeredPct}  picks=${String(row.picks).padStart(5)}  remaining=${ratioStr}`,
         );
       }
 

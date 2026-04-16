@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateDailyTarget, todayUtcISO } from "@/lib/game/targetGenerator";
+import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
 import { getDailyStore } from "@/lib/api/dailyStore";
 
 function isValidISODate(s: string): boolean {
@@ -27,7 +28,7 @@ export async function GET(
   return NextResponse.json({
     date,
     digits: 5,
-    maxGuesses: 8,
+    maxGuesses: DEFAULT_MAX_GUESSES,
     aggregate,
     issuedAt: Date.now(),
   });
