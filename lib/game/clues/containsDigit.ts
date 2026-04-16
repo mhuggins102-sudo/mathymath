@@ -15,7 +15,7 @@ export const containsDigitClue: Clue<{
   name: "Contains Digit",
   category: "compositional",
   description:
-    "Picks one specific digit (shown in the clue) and tells you yes or no: is it anywhere in the target?",
+    "You pick a digit (0-9) — is it anywhere in the target? Yes or no.",
   // Single-bit yes/no clue. Weight kept above neutral so it shows up in
   // the chooser regularly (it's often the finisher late-game), but pulled
   // back from the top after simulations showed it dominating picks.

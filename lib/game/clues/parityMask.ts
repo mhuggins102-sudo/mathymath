@@ -2,10 +2,10 @@ import type { Clue } from "./types";
 
 export const parityMaskClue: Clue<{ kind: "parityMask"; matches: boolean[] }> = {
   id: "parityMask",
-  name: "Parity Mask",
+  name: "Odd or Even",
   category: "positional",
   description:
-    "For each slot, shows whether your digit's parity (even/odd) matches the target's parity at that slot.",
+    "For each slot, does your digit's parity (odd/even) match the target's?",
   weight: 0.8,
   legend: [{ state: "match", label: "parity matches" }],
   compute(guess, target) {

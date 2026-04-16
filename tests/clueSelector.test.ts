@@ -97,6 +97,7 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       "median",
       "divisibleBy",
       "totalDeviation",
+      "diceCount",
       "extraLock",
     ] as ClueId[]) {
       // getClueById sanity + seen

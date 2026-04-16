@@ -48,7 +48,9 @@ function cellStates(
         c === "eq" ? "match" : c === "gt" ? "warm" : "cold",
       );
     case "within2":
-      return result.mask.map((m) => (m ? "match" : "idle"));
+      return result.mask.map((m, i) =>
+        result.exact[i] ? "match" : m ? "warm" : "idle",
+      );
     case "parityMask":
       return result.matches.map((m) => (m ? "match" : "idle"));
     case "oracle":
@@ -153,6 +155,15 @@ function computeMedian(s: string): number {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
+function computeDiceCount(s: string): number {
+  let n = 0;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d >= 1 && d <= 6) n++;
+  }
+  return n;
+}
+
 function computeDigitSum(s: string): number {
   let sum = 0;
   for (const ch of s) sum += Number(ch);
@@ -175,7 +186,8 @@ export function subLabelFor(
     case "rangeCompare":
     case "parityBalance":
     case "primeCount":
-    case "median": {
+    case "median":
+    case "diceCount": {
       const own =
         result.kind === "rangeCompare"
           ? computeRange(guess)
@@ -183,6 +195,8 @@ export function subLabelFor(
           ? computeEvenCount(guess)
           : result.kind === "primeCount"
           ? computePrimeCount(guess)
+          : result.kind === "diceCount"
+          ? computeDiceCount(guess)
           : computeMedian(guess);
       const symbol =
         result.cmp === "eq" ? "=" : result.cmp === "gt" ? "↑" : "↓";

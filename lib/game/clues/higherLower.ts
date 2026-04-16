@@ -10,7 +10,7 @@ export const higherLowerClue: Clue<{ kind: "higherLower"; cmp: Cmp[] }> = {
   name: "Higher or Lower",
   category: "positional",
   description:
-    "For each slot, shows whether your digit matches the target's, or whether the target's digit at that slot is higher or lower than yours.",
+    "For each slot: does your digit match, or is the target's higher or lower?",
   // Highest-info clue in the roster (~8 bits per pick). Weight held low so
   // it doesn't dominate the chooser pool.
   weight: 0.4,

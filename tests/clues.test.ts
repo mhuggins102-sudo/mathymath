@@ -15,6 +15,7 @@ import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
 import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
 import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
+import { diceCountClue } from "@/lib/game/clues/diceCount";
 import { extraLockClue } from "@/lib/game/clues/extraLock";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
@@ -42,9 +43,22 @@ describe("Higher or Lower", () => {
 
 describe("Within 2", () => {
   it("marks slots within ±2", () => {
-    expect(within2Clue.compute("13579", "15670").mask).toEqual([
-      true, true, true, true, false,
-    ]);
+    const r = within2Clue.compute("13579", "15670");
+    expect(r.mask).toEqual([true, true, true, true, false]);
+  });
+  it("flags exact matches separately from close-but-not-exact", () => {
+    // guess=15370 vs target=15670: slot 0 exact, slot 1 exact, slot 2
+    // off by 3 (not within 2), slot 3 exact, slot 4 exact.
+    const r = within2Clue.compute("15370", "15670");
+    expect(r.exact).toEqual([true, true, false, true, true]);
+    expect(r.mask).toEqual([true, true, false, true, true]);
+  });
+  it("exact is false when diff is 1 or 2 (close but not exact)", () => {
+    // guess=12345 vs target=13355 diffs: |1-1|=0, |2-3|=1, |3-3|=0,
+    //   |4-5|=1, |5-5|=0 → exact at slots 0,2,4.
+    const r = within2Clue.compute("12345", "13355");
+    expect(r.exact).toEqual([true, false, true, false, true]);
+    expect(r.mask).toEqual([true, true, true, true, true]);
   });
 });
 
@@ -257,6 +271,20 @@ describe("Total Deviation", () => {
   });
 });
 
+describe("Dice Count", () => {
+  it("counts digits that are standard die values (1-6)", () => {
+    // cmp convention: target vs guess. target 47628 has 4,6,2 = 3 die
+    // values; guess 12345 has 1,2,3,4,5 = 5. 3 < 5 → lt.
+    expect(diceCountClue.compute("12345", "47628").cmp).toBe("lt");
+    // target 00009: 0 die values. guess 11111: 5 die values. 0 < 5 → lt
+    expect(diceCountClue.compute("11111", "00009").cmp).toBe("lt");
+    // target 12300: 1,2,3 = 3 die values. guess 45600: 4,5,6 = 3. eq.
+    expect(diceCountClue.compute("45600", "12300").cmp).toBe("eq");
+    // target 11111: 5 die values. guess 00000: 0 → gt
+    expect(diceCountClue.compute("00000", "11111").cmp).toBe("gt");
+  });
+});
+
 describe("Extra Lock (special)", () => {
   it("is in the special category with a flat result", () => {
     expect(extraLockClue.category).toBe("special");
@@ -273,10 +301,10 @@ describe("Extra Lock (special)", () => {
 });
 
 describe("Registry", () => {
-  it("has 17 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(17);
+  it("has 18 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(18);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(17);
+    expect(ids.size).toBe(18);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

@@ -25,7 +25,7 @@ export type ClueResult =
   // Positional
   | { kind: "bullseyes"; hits: boolean[] }
   | { kind: "higherLower"; cmp: Cmp[] }
-  | { kind: "within2"; mask: boolean[] }
+  | { kind: "within2"; mask: boolean[]; exact: boolean[] }
   | { kind: "parityMask"; matches: boolean[] }
   | { kind: "oracle"; slot: number; digit: number }
   | { kind: "thermometer"; tier: number[] } // 0=exact..4=far
@@ -40,6 +40,7 @@ export type ClueResult =
   | { kind: "median"; cmp: Cmp }
   | { kind: "divisibleBy"; divisor: number | null; present: boolean }
   | { kind: "totalDeviation"; value: number }
+  | { kind: "diceCount"; cmp: Cmp }
   // Special — meta-action cards that don't reveal target info but
   // change game resources. extraLock grants +1 lock (see locks.ts).
   | { kind: "extraLock" };
