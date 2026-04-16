@@ -30,7 +30,7 @@ export function SlotPicker({
           return (
             <Digit
               key={i}
-              value={known ? certainDigits[i] : String(i + 1)}
+              value={known ? certainDigits[i] : null}
               size="lg"
               state={state}
               onClick={known ? undefined : () => onSelect(i)}
