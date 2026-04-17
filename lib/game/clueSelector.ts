@@ -23,7 +23,13 @@ import { seededRng } from "./seededRng";
  */
 function buildDeck(seed: string): ClueId[] {
   const positional = CLUES.filter((c) => c.category === "positional");
-  const other = CLUES.filter((c) => c.category !== "positional");
+  // Clue Reuse is excluded from the top pair (pair 1) because there
+  // are no previously-used clues to reuse on round 1. It's pushed
+  // into the "rest" section so it can appear from round 2 onward.
+  const otherForPair1 = CLUES.filter(
+    (c) => c.category !== "positional" && c.id !== "clueReuse",
+  );
+  const clueReuseId = CLUES.find((c) => c.id === "clueReuse")?.id;
 
   const rngP = seededRng(`deck1p1cP:${seed}`);
   const shuffledP = fisherYates(
@@ -32,7 +38,7 @@ function buildDeck(seed: string): ClueId[] {
   );
   const rngC = seededRng(`deck1p1cC:${seed}`);
   const shuffledC = fisherYates(
-    other.map((c) => c.id),
+    otherForPair1.map((c) => c.id),
     rngC,
   );
 
@@ -41,7 +47,11 @@ function buildDeck(seed: string): ClueId[] {
 
   const rngRest = seededRng(`deck1p1cRest:${seed}`);
   const rest = fisherYates(
-    [...shuffledP.slice(1), ...shuffledC.slice(1)],
+    [
+      ...shuffledP.slice(1),
+      ...shuffledC.slice(1),
+      ...(clueReuseId ? [clueReuseId] : []),
+    ],
     rngRest,
   );
 
