@@ -88,6 +88,7 @@ function UnlimitedGame({
     pendingLockSlot,
     locksAvailable,
     canCommitPendingLock,
+    unlockMode,
     pendingClueParam,
     confirmClueParam,
     cancelClueParam,
@@ -218,13 +219,16 @@ function UnlimitedGame({
                 submitDisabled={submitDisabled}
                 lockMode={lockMode}
                 onLockCommit={commitLock}
-                lockCommitDisabled={!canCommitPendingLock}
+                lockCommitDisabled={!canCommitPendingLock && !unlockMode}
+                unlockMode={unlockMode}
               />
               {/* Lock hint sits below the keypad so it doesn't shift
                   the keypad around as it appears/disappears. */}
               <p className="text-[10px] text-muted text-center mt-2 min-h-4">
                 {lockMode
-                  ? canCommitPendingLock
+                  ? unlockMode
+                    ? "Press Unlock to remove the lock — or tap a different slot."
+                    : canCommitPendingLock
                     ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
                     : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
                   : hintLocks > 0

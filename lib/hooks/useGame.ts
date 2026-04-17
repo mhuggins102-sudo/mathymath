@@ -65,6 +65,9 @@ export interface UseGameResult {
   canStartLock: boolean;
   /** True iff the pending lock has a digit and can be committed. */
   canCommitPendingLock: boolean;
+  /** True when the pending lock is on an already-committed lock —
+   *  the Keypad label shows "Unlock" instead of "Lock". */
+  unlockMode: boolean;
   /** When a clue with `paramKind` is chosen, this holds the clue id
    *  and the required parameter kind until the player makes their
    *  selection. null when no parameter is pending. */
@@ -184,6 +187,9 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const certain = deriveCertainDigits(state.guesses, state.digits);
   const [lockedSlots, setLockedSlots] = useState<LockAttempt[]>([]);
   const [pendingLockSlot, setPendingLockSlot] = useState<number | null>(null);
+  // True when the pending slot is an already-committed lock being
+  // re-selected for unlock. Drives the Keypad's "Unlock" label.
+  const [unlockMode, setUnlockMode] = useState(false);
 
   // Lock state is cleared INLINE in submit() — see the dispatches
   // there. This avoids an extra render cycle that used to run after
@@ -254,53 +260,112 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setInput((cur) => cur.slice(0, -1));
   }, [pendingLockSlot]);
 
+  /** Helper: given a locally-computed locked array, find the input
+   *  index where a digit at `slot` would be inserted. */
+  const inputInsertIdx = useCallback(
+    (slot: number, locked: readonly LockAttempt[]): number => {
+      let idx = 0;
+      for (let i = 0; i < slot; i++) {
+        if (certain[i] !== null) continue;
+        if (locked.some((l) => l.slot === i)) continue;
+        idx++;
+      }
+      return idx;
+    },
+    [certain],
+  );
+
+  /** Helper: cancel the current pending lock selection. Returns the
+   *  new { locked, input } after restoring the digit if needed. Does
+   *  NOT call setState — the caller applies the returned values. */
+  const cancelPendingLock = useCallback((): {
+    locked: LockAttempt[];
+    inp: string;
+  } => {
+    if (pendingLockSlot === null) return { locked: [...lockedSlots], inp: input };
+    if (unlockMode) {
+      // Was re-selecting a committed lock → keep the lock as-is.
+      return { locked: [...lockedSlots], inp: input };
+    }
+    // Was creating a new lock → remove it, restore digit.
+    const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
+    const locked = lockedSlots.filter((l) => l.slot !== pendingLockSlot);
+    let inp = input;
+    if (removed) {
+      const idx = inputInsertIdx(pendingLockSlot, locked);
+      inp = inp.slice(0, idx) + removed.digit + inp.slice(idx);
+    }
+    return { locked, inp };
+  }, [pendingLockSlot, unlockMode, lockedSlots, input, inputInsertIdx]);
+
   const tapCell = useCallback(
     (slot: number) => {
       setError(null);
       if (slot < 0 || slot >= state.digits) return;
-      if (certain[slot] !== null) return; // immutable
-      // Cancel: same cell tapped again → remove the lock but KEEP the
-      // digit as a regular typed character so nothing slides around.
+      if (certain[slot] !== null) return;
+
+      // Same cell: cancel / toggle.
       if (pendingLockSlot === slot) {
-        const removedLock = lockedSlots.find((l) => l.slot === slot);
-        const newLocked = lockedSlots.filter((l) => l.slot !== slot);
-        setLockedSlots(newLocked);
+        const { locked, inp } = cancelPendingLock();
+        setLockedSlots(locked);
+        setInput(inp);
         setPendingLockSlot(null);
-        if (removedLock) {
-          // Re-insert the digit into `input` at the position that
-          // maps to this slot (given the updated lockedSlots).
-          let insertIdx = 0;
-          for (let i = 0; i < slot; i++) {
-            if (certain[i] !== null) continue;
-            if (newLocked.some((l) => l.slot === i)) continue;
-            insertIdx++;
-          }
-          setInput((cur) =>
-            cur.slice(0, insertIdx) + removedLock.digit + cur.slice(insertIdx),
-          );
-        }
+        setUnlockMode(false);
         return;
       }
-      // Different cell while one is already pending → ignore.
-      if (pendingLockSlot !== null) return;
-      // Cannot start a new lock without budget or on guess 1.
-      const isAlreadyLocked = lockedSlots.some((l) => l.slot === slot);
+
+      // Different cell while pending → cancel old, start new.
+      let effectiveLocked = [...lockedSlots];
+      let effectiveInput = input;
+      if (pendingLockSlot !== null) {
+        const cancelled = cancelPendingLock();
+        effectiveLocked = cancelled.locked;
+        effectiveInput = cancelled.inp;
+      }
+
       if (!canUseLocks) return;
-      if (!isAlreadyLocked && lockedSlots.length >= locksAvailableCount)
+      const isAlreadyLocked = effectiveLocked.some((l) => l.slot === slot);
+      if (!isAlreadyLocked && effectiveLocked.length >= locksAvailableCount)
         return;
-      // If the slot has a typed char, pre-fill the lock with that
-      // digit (the char moves from `input` to `lockedSlots` but stays
-      // visible in the same cell — no sliding).
-      const idx = typedIndexForSlot(slot);
-      if (idx !== null) {
-        const digit = input[idx];
-        setInput((cur) => cur.slice(0, idx) + cur.slice(idx + 1));
-        setLockedSlots((cur) => [
-          ...cur.filter((l) => l.slot !== slot),
-          { slot, digit },
-        ]);
+
+      if (isAlreadyLocked) {
+        // Tapping a committed lock → unlock mode.
+        setLockedSlots(effectiveLocked);
+        setInput(effectiveInput);
+        setPendingLockSlot(slot);
+        setUnlockMode(true);
+        return;
       }
+
+      // Tapping a typed or empty cell → new lock with pre-fill.
+      // Find typed digit at this slot in the effective state.
+      let typedIdx: number | null = null;
+      {
+        let idx = 0;
+        for (let i = 0; i < state.digits; i++) {
+          if (certain[i] !== null) continue;
+          if (effectiveLocked.some((l) => l.slot === i)) continue;
+          if (i === slot) {
+            typedIdx = idx < effectiveInput.length ? idx : null;
+            break;
+          }
+          idx++;
+        }
+      }
+      if (typedIdx !== null) {
+        const digit = effectiveInput[typedIdx];
+        effectiveInput =
+          effectiveInput.slice(0, typedIdx) +
+          effectiveInput.slice(typedIdx + 1);
+        effectiveLocked = [
+          ...effectiveLocked.filter((l) => l.slot !== slot),
+          { slot, digit },
+        ];
+      }
+      setLockedSlots(effectiveLocked);
+      setInput(effectiveInput);
       setPendingLockSlot(slot);
+      setUnlockMode(false);
     },
     [
       state.digits,
@@ -308,20 +373,37 @@ export function useGame(config: UseGameConfig): UseGameResult {
       input,
       pendingLockSlot,
       lockedSlots,
+      unlockMode,
       canUseLocks,
       locksAvailableCount,
-      typedIndexForSlot,
+      cancelPendingLock,
     ],
   );
 
   const commitLock = useCallback(() => {
     if (pendingLockSlot === null) return;
+    if (unlockMode) {
+      // Unlock: remove lock, restore digit as typed.
+      const { locked, inp } = cancelPendingLock();
+      const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
+      const newLocked = locked.filter((l) => l.slot !== pendingLockSlot);
+      let newInput = inp;
+      if (removed) {
+        const idx = inputInsertIdx(pendingLockSlot, newLocked);
+        newInput = newInput.slice(0, idx) + removed.digit + newInput.slice(idx);
+      }
+      setLockedSlots(newLocked);
+      setInput(newInput);
+      setPendingLockSlot(null);
+      setUnlockMode(false);
+      buzz(18);
+      return;
+    }
     if (pendingLockDigit === null) return;
-    // The lock stays in lockedSlots; we just exit lock-entry mode so
-    // number keys resume typing and the Enter label reverts.
     setPendingLockSlot(null);
+    setUnlockMode(false);
     buzz(18);
-  }, [pendingLockSlot, pendingLockDigit]);
+  }, [pendingLockSlot, pendingLockDigit, unlockMode, cancelPendingLock, lockedSlots, inputInsertIdx]);
 
   const submit = useCallback(() => {
     // Refuse to submit from inside lock-entry mode (user should commit
@@ -472,6 +554,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
     locksAvailable: locksAvailableCount,
     canStartLock,
     canCommitPendingLock,
+    unlockMode,
     pendingClueParam,
     appendDigit,
     backspace,
