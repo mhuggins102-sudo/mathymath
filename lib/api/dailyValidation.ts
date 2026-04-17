@@ -192,6 +192,7 @@ export function validateDailyHistory(
     // selection is encoded in the result itself. Oracle stores slot,
     // Contains Digit stores digit. Extract and pass so compute
     // reproduces the same result as the client claimed.
+    // For Clue Reuse: result.kind IS the reused clue's id.
     const clueParam: Record<string, unknown> = {};
     if (g.result && typeof g.result === "object") {
       const r = g.result as Record<string, unknown>;
@@ -200,6 +201,11 @@ export function validateDailyHistory(
       }
       if (r.kind === "containsDigit" && typeof r.digit === "number") {
         clueParam.selectedDigit = r.digit;
+      }
+      // Clue Reuse: the result carries the re-used clue's kind, which
+      // we pass back as reusedClueId so compute delegates correctly.
+      if (g.clueId === "clueReuse" && typeof r.kind === "string") {
+        clueParam.reusedClueId = r.kind;
       }
     }
     const expected = clue.compute(g.guess, target, {

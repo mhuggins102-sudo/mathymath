@@ -33,6 +33,7 @@ const clueParamSchema = z
   .object({
     selectedSlot: z.number().int().min(0).max(DIGITS - 1).optional(),
     selectedDigit: z.number().int().min(0).max(9).optional(),
+    reusedClueId: z.string().min(1).optional(),
   })
   .optional();
 
