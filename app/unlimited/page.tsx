@@ -90,6 +90,8 @@ function UnlimitedGame({
     pendingClueParam,
     confirmClueParam,
     cancelClueParam,
+    redraw,
+    canRedraw,
     tapCell,
     commitLock,
   } = useGame({
@@ -188,6 +190,8 @@ function UnlimitedGame({
             <ClueChooser
               options={state.pendingGuess.options}
               onChoose={chooseClue}
+              onRedraw={redraw}
+              canRedraw={canRedraw}
             />
           ) : state.status === "playing" ? (
             <>

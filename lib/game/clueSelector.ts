@@ -61,23 +61,17 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * Picks two clue options for the current chooser round.
  *
  * The round index is `chosenClueIds.length` — each chosen clue advances
- * the round. In the deck model the pair is simply `deck[round*2]` and
- * `deck[round*2+1]`. `chosenClueIds` is otherwise unused; it's kept in
- * the signature for the rare fallback below and so downstream code
- * doesn't need to change shape.
- *
- * Fallback: with 17 clues and a 7-guess budget we consume at most 12
- * cards (6 chooser rounds × 2), so running off the end shouldn't
- * happen in practice. If somehow it does (e.g. stale client state
- * replay), we return the last two ids rather than crash — the history
- * validator will reject an inconsistent state anyway.
+ * the round. `deckOffset` adds extra positions consumed by redraws
+ * (the burn-lock-to-redraw mechanic). In the deck model the pair is
+ * simply `deck[(round + offset) * 2]` and `deck[(round + offset) * 2 + 1]`.
  */
 export function pickTwoClues(
   seed: string,
   chosenClueIds: readonly ClueId[],
+  deckOffset: number = 0,
 ): [Clue, Clue] {
   const deck = buildDeck(seed);
-  const base = chosenClueIds.length * 2;
+  const base = (chosenClueIds.length + deckOffset) * 2;
   const aId = deck[base] ?? deck[deck.length - 2];
   const bId = deck[base + 1] ?? deck[deck.length - 1];
   return [getClueById(aId), getClueById(bId)];

@@ -15,6 +15,7 @@ import {
   deriveCertainDigits,
   inputCapacity,
 } from "@/lib/game/certain";
+import { pickTwoClues } from "@/lib/game/clueSelector";
 import {
   canUseLockOnGuess,
   locksAvailable as computeLocksAvailable,
@@ -36,11 +37,15 @@ export interface DailyGameState {
     clueId?: ClueId;
     result?: ClueResult;
     locks?: LockRecord[];
+    redraws?: number;
   }>;
+  /** Cumulative deck-position offset caused by redraws. */
+  deckOffset: number;
   pendingGuess: {
     guess: string;
     options: [Clue, Clue];
     locks?: LockRecord[];
+    redraws: number;
   } | null;
   status: "playing" | "won" | "lost";
   revealedTarget: string | null;
@@ -83,6 +88,8 @@ export interface UseDailyGameResult {
   canStartLock: boolean;
   canCommitPendingLock: boolean;
   pendingClueParam: { clueId: string; paramKind: "slot" | "digit" } | null;
+  redraw: () => void;
+  canRedraw: boolean;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
@@ -99,6 +106,7 @@ function initialState(config: UseDailyGameConfig): DailyGameState {
     digits: config.digits,
     maxGuesses: config.maxGuesses,
     guesses: [],
+    deckOffset: 0,
     pendingGuess: null,
     status: "playing",
     revealedTarget: null,
@@ -152,6 +160,7 @@ function fromSaved(
         guess: saved.pendingGuess.guess,
         options: [a, b],
         locks: saved.pendingGuess.locks,
+        redraws: 0,
       };
     } catch {
       // Unknown clue id (e.g. a retired clue in older saves). Drop
@@ -159,16 +168,24 @@ function fromSaved(
       pendingGuess = null;
     }
   }
+  // Derive deckOffset from stored redraws history so the deck pointer
+  // picks up where it left off after a page refresh.
+  const restoredGuesses = saved.guesses.map((g) => ({
+    guess: g.guess,
+    clueId: g.clueId as ClueId | undefined,
+    result: g.result as ClueResult | undefined,
+    locks: g.locks,
+    redraws: g.redraws as number | undefined,
+  }));
+  let deckOffset = 0;
+  for (const g of restoredGuesses) deckOffset += g.redraws ?? 0;
+
   return {
     date: saved.date,
     digits: saved.digits,
     maxGuesses: saved.maxGuesses,
-    guesses: saved.guesses.map((g) => ({
-      guess: g.guess,
-      clueId: g.clueId as ClueId | undefined,
-      result: g.result as ClueResult | undefined,
-      locks: g.locks,
-    })),
+    guesses: restoredGuesses,
+    deckOffset,
     pendingGuess,
     status: saved.status,
     revealedTarget: saved.revealedTarget,
@@ -184,6 +201,7 @@ function historyForServer(state: DailyGameState) {
     clueId: g.clueId,
     result: g.result,
     locks: g.locks,
+    redraws: g.redraws,
   }));
 }
 
@@ -403,6 +421,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           pendingGuess: {
             guess: v.digits,
             options: opts,
+            redraws: 0,
             ...locksField,
           },
         }));
@@ -452,6 +471,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
               pendingGuess: pending.guess,
               clueId,
               ...(clueParam ? { clueParam } : {}),
+              redraws: pending.redraws ?? 0,
             }),
           },
         );
@@ -462,6 +482,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
         }
         if (body.kind === "continue") {
           const pendingLocks = pending.locks;
+          const pendingRedrawCount = pending.redraws ?? 0;
           setState((s) => ({
             ...s,
             guesses: [
@@ -472,6 +493,9 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
                 result: body.result,
                 ...(pendingLocks && pendingLocks.length > 0
                   ? { locks: pendingLocks }
+                  : {}),
+                ...(pendingRedrawCount > 0
+                  ? { redraws: pendingRedrawCount }
                   : {}),
               },
             ],
@@ -517,6 +541,37 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     setPendingClueParam(null);
   }, []);
 
+  // Redraw: burn a lock to discard the current pair and advance the
+  // deck. Computed locally (pickTwoClues is shared lib, seed = date).
+  // The server validates the final choice via the redraws count sent
+  // in the choose-clue request.
+  const pendingRedraws = state.pendingGuess?.redraws ?? 0;
+  const canRedraw =
+    !!state.pendingGuess &&
+    !pendingClueParam &&
+    locksAvailableCount - pendingRedraws > 0;
+
+  const redraw = useCallback(() => {
+    if (!canRedraw || !state.pendingGuess) return;
+    const newOffset = state.deckOffset + 1;
+    const usedClueIds = state.guesses
+      .map((g) => g.clueId)
+      .filter((id): id is ClueId => id !== undefined);
+    const newPair = pickTwoClues(state.date, usedClueIds, newOffset);
+    setState((s) => ({
+      ...s,
+      deckOffset: newOffset,
+      pendingGuess: s.pendingGuess
+        ? {
+            ...s.pendingGuess,
+            options: newPair,
+            redraws: (s.pendingGuess.redraws ?? 0) + 1,
+          }
+        : null,
+    }));
+    buzz(12);
+  }, [canRedraw, state.pendingGuess, state.deckOffset, state.guesses, state.date]);
+
   return {
     state,
     input,
@@ -531,6 +586,8 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     canStartLock,
     canCommitPendingLock,
     pendingClueParam,
+    redraw,
+    canRedraw,
     appendDigit,
     backspace,
     submit,

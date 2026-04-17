@@ -6,6 +6,9 @@ import { ClueLegend } from "./ClueLegend";
 interface ClueChooserProps {
   options: [Clue, Clue];
   onChoose: (id: ClueId) => void;
+  /** When provided, a "Redraw" button appears below the cards. */
+  onRedraw?: () => void;
+  canRedraw?: boolean;
 }
 
 /**
@@ -13,7 +16,12 @@ interface ClueChooserProps {
  * submitted. Stacked vertically (full width) so each clue's description
  * can render on multiple lines without truncation.
  */
-export function ClueChooser({ options, onChoose }: ClueChooserProps) {
+export function ClueChooser({
+  options,
+  onChoose,
+  onRedraw,
+  canRedraw,
+}: ClueChooserProps) {
   return (
     <div className="w-full max-w-md mx-auto select-none">
       <p className="text-center text-[10px] uppercase tracking-wider text-muted mb-2">
@@ -48,6 +56,16 @@ export function ClueChooser({ options, onChoose }: ClueChooserProps) {
           </button>
         ))}
       </div>
+      {onRedraw && (
+        <button
+          type="button"
+          onClick={onRedraw}
+          disabled={!canRedraw}
+          className="w-full mt-3 text-xs text-muted hover:text-foreground disabled:opacity-30 disabled:hover:text-muted underline underline-offset-4 py-1"
+        >
+          Redraw (costs 🔒×1)
+        </button>
+      )}
     </div>
   );
 }

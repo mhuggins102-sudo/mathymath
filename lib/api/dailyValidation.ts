@@ -37,6 +37,7 @@ export interface IncomingGuess {
     digit: string;
     correct: boolean;
   }>;
+  redraws?: number;
 }
 
 export type ValidationResult =
@@ -115,13 +116,19 @@ export function validateDailyHistory(
 
     // Validate any locks on this guess regardless of whether it's a win,
     // loss, or non-final wrong guess. The per-guess rules are the same.
+    // Validate redraws: each costs one lock.
+    const roundRedraws = g.redraws ?? 0;
+    if (roundRedraws > 0 && roundRedraws > locksRemaining) {
+      return { ok: false, error: `redraw_budget_exceeded_at_${i}` };
+    }
+
     if (g.locks && g.locks.length > 0) {
       const lockError = validateLocksForGuess(
         g.locks,
         target,
         digits,
         i,
-        locksRemaining,
+        locksRemaining - roundRedraws,
       );
       if (lockError !== null) {
         return { ok: false, error: `${lockError}_at_${i}` };
@@ -163,7 +170,12 @@ export function validateDailyHistory(
     if (!g.clueId || g.result === undefined) {
       return { ok: false, error: `missing_clue_or_result_at_${i}` };
     }
-    const offered = pickTwoClues(seed, chosenClueIds);
+    // Cumulative deck offset = sum of prior rounds' redraws + this
+    // round's redraws. Each redraw advances the deck by one pair.
+    let cumulativeRedraws = 0;
+    for (let k = 0; k < i; k++) cumulativeRedraws += history[k].redraws ?? 0;
+    cumulativeRedraws += g.redraws ?? 0;
+    const offered = pickTwoClues(seed, chosenClueIds, cumulativeRedraws);
     const offeredIds = offered.map((c) => c.id);
     if (!offeredIds.includes(g.clueId as ClueId)) {
       return { ok: false, error: `clue_not_offered_at_${i}` };
@@ -211,6 +223,7 @@ export function validateDailyHistory(
       for (const lock of history[k].locks ?? []) {
         if (!lock.correct) spent += 1;
       }
+      spent += history[k].redraws ?? 0;
     }
     locksRemaining = Math.max(0, cap - spent);
   }

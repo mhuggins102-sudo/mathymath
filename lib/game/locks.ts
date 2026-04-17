@@ -26,6 +26,7 @@ export const EXTRA_LOCK_CLUE_ID = "extraLock";
 export interface LockAccountingGuess {
   clueId?: string;
   locks?: readonly LockRecord[];
+  redraws?: number;
 }
 
 /** Total extra locks granted so far by Extra Lock clue picks. */
@@ -57,6 +58,8 @@ export function locksAvailable(
     for (const lock of g.locks ?? []) {
       if (!lock.correct) spent += 1;
     }
+    // Each redraw (burn-lock-to-redraw) costs one lock.
+    spent += g.redraws ?? 0;
   }
   return Math.max(0, cap - spent);
 }

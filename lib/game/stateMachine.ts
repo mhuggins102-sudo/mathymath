@@ -23,6 +23,9 @@ export interface ResolvedGuess {
   clueId?: ClueId;
   result?: ClueResult;
   locks?: LockRecord[];
+  /** How many times the player burned a lock to redraw the offered pair
+   *  on this round (0 = no redraws). Affects deck pointer + lock budget. */
+  redraws?: number;
 }
 
 /** A lock the player committed before submit, sans correctness — the
@@ -39,6 +42,10 @@ export interface GameState {
   maxGuesses: number;
   seed: string;
   guesses: ResolvedGuess[];
+  /** Cumulative deck-position offset caused by redraws across all
+   *  prior rounds. Used by pickTwoClues to advance past consumed
+   *  pairs. Starts at 0; each REDRAW bumps by 1. */
+  deckOffset: number;
   /** Current pending guess waiting for the player to choose a clue.
    *  `locks` travels with the pending guess so the chosen clue handler
    *  can append them to the resolved history alongside the clue result. */
@@ -46,6 +53,7 @@ export interface GameState {
     guess: string;
     options: [Clue, Clue];
     locks?: LockRecord[];
+    redraws: number;
   } | null;
   status: GameStatus;
 }
@@ -53,6 +61,7 @@ export interface GameState {
 export type GameAction =
   | { type: "SUBMIT_GUESS"; guess: string; locks?: readonly LockAttempt[] }
   | { type: "CHOOSE_CLUE"; clueId: ClueId; param?: { selectedSlot?: number; selectedDigit?: number } }
+  | { type: "REDRAW" }
   | { type: "RESET"; target: string; seed: string; digits?: number; maxGuesses?: number };
 
 export function initGameState(params: {
@@ -67,6 +76,7 @@ export function initGameState(params: {
     digits: params.digits ?? params.target.length,
     maxGuesses: params.maxGuesses ?? DEFAULT_MAX_GUESSES,
     guesses: [],
+    deckOffset: 0,
     pendingGuess: null,
     status: "playing",
   };
@@ -129,13 +139,34 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const usedClueIds = state.guesses
         .map((g) => g.clueId)
         .filter((id): id is ClueId => id !== undefined);
-      const options = pickTwoClues(state.seed, usedClueIds);
+      const options = pickTwoClues(state.seed, usedClueIds, state.deckOffset);
       return {
         ...state,
         pendingGuess: {
           guess: action.guess,
           options,
+          redraws: 0,
           ...(resolvedLocks.length > 0 ? { locks: resolvedLocks } : {}),
+        },
+      };
+    }
+
+    case "REDRAW": {
+      if (!state.pendingGuess) return state;
+      // Lock budget check is the caller's responsibility (the hook
+      // gates the redraw button). The reducer just advances the deck.
+      const newOffset = state.deckOffset + 1;
+      const usedClueIds = state.guesses
+        .map((g) => g.clueId)
+        .filter((id): id is ClueId => id !== undefined);
+      const newOptions = pickTwoClues(state.seed, usedClueIds, newOffset);
+      return {
+        ...state,
+        deckOffset: newOffset,
+        pendingGuess: {
+          ...state.pendingGuess,
+          options: newOptions,
+          redraws: state.pendingGuess.redraws + 1,
         },
       };
     }
@@ -156,6 +187,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
         knownSlots,
         ...action.param,
       });
+      const { redraws } = state.pendingGuess;
       const guesses = [
         ...state.guesses,
         {
@@ -163,6 +195,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
           clueId: clue.id,
           result,
           ...(locks && locks.length > 0 ? { locks } : {}),
+          ...(redraws > 0 ? { redraws } : {}),
         },
       ];
       const won = guess === state.target;

@@ -85,6 +85,11 @@ export interface UseGameResult {
   /** Cancels the pending clue param selection, returning to the
    *  chooser so the player can pick a different clue. */
   cancelClueParam: () => void;
+  /** Burns one lock to discard the current clue pair and draw the
+   *  next from the deck. Only available when pendingGuess is set
+   *  and the player has at least one lock remaining. */
+  redraw: () => void;
+  canRedraw: boolean;
   /** Player tapped cell `slot`. Enters lock-selection on an empty or
    *  typed non-certain cell; cancels lock-selection (and drops any
    *  pending digit) when the same cell is tapped again. Tapping a
@@ -371,6 +376,24 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setPendingClueParam(null);
   }, []);
 
+  // Redraw: burn a lock to discard the current pair and advance the
+  // deck. Lock cost is borne by the reducer's deckOffset + the
+  // resolved guess's `redraws` field (counted as spent in
+  // locksAvailable). Guard: must have a pending guess AND remaining
+  // locks (accounting for locks already pending on this turn's locks +
+  // this turn's prior redraws).
+  const pendingRedraws = state.pendingGuess?.redraws ?? 0;
+  const canRedraw =
+    !!state.pendingGuess &&
+    !pendingClueParam &&
+    locksAvailableCount - pendingRedraws > 0;
+
+  const redraw = useCallback(() => {
+    if (!canRedraw) return;
+    dispatch({ type: "REDRAW" });
+    buzz(12);
+  }, [canRedraw]);
+
   const reset = useCallback(
     (params: { target: string; seed: string }) => {
       if (config.storageKey) clearGame(config.storageKey);
@@ -408,6 +431,8 @@ export function useGame(config: UseGameConfig): UseGameResult {
     chooseClue,
     confirmClueParam,
     cancelClueParam,
+    redraw,
+    canRedraw,
     tapCell,
     commitLock,
     reset,
