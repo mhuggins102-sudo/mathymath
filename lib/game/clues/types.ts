@@ -43,7 +43,12 @@ export type ClueResult =
   | { kind: "diceCount"; cmp: Cmp }
   // Special — meta-action cards that don't reveal target info but
   // change game resources. extraLock grants +1 lock (see locks.ts).
-  | { kind: "extraLock" };
+  | { kind: "extraLock" }
+  // clueReuse: the Clue Reuse special's nominal result kind. In
+  // practice the resolved result carries the RE-USED clue's kind
+  // (e.g. "thermometer") — this variant exists only to satisfy the
+  // Clue<R> constraint where id must equal R["kind"].
+  | { kind: "clueReuse" };
 
 export type ClueId = ClueResult["kind"];
 
@@ -57,6 +62,8 @@ export interface ClueComputeContext {
   /** Player-chosen digit for clues with paramKind "digit"
    *  (Contains Digit). */
   selectedDigit?: number;
+  /** Player-chosen previously-used clue to reuse (Clue Reuse special). */
+  reusedClueId?: string;
 }
 
 /** The parameter the player chose when a clue requires paramKind.
@@ -65,6 +72,7 @@ export interface ClueComputeContext {
 export interface ClueParam {
   selectedSlot?: number;
   selectedDigit?: number;
+  reusedClueId?: string;
 }
 
 export interface Clue<R extends ClueResult = ClueResult> {
@@ -80,7 +88,7 @@ export interface Clue<R extends ClueResult = ClueResult> {
    *  clue — "slot" shows a 5-cell position picker (Oracle), "digit"
    *  shows a 0-9 numpad (Contains Digit). Clues without this resolve
    *  immediately when chosen. */
-  paramKind?: "slot" | "digit";
+  paramKind?: "slot" | "digit" | "reuse";
   compute(guess: string, target: string, context?: ClueComputeContext): R;
   example(target: string): { guess: string; result: R };
   /** Plain-language explanation of the result for this specific guess.

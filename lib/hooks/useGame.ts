@@ -69,7 +69,7 @@ export interface UseGameResult {
    *  selection. null when no parameter is pending. */
   pendingClueParam: {
     clueId: string;
-    paramKind: "slot" | "digit";
+    paramKind: "slot" | "digit" | "reuse";
   } | null;
   appendDigit: (d: string) => void;
   backspace: () => void;
@@ -339,7 +339,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // confirms → hook dispatches CHOOSE_CLUE with the param attached.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit";
+    paramKind: "slot" | "digit" | "reuse";
   } | null>(null);
 
   const chooseClue = useCallback(

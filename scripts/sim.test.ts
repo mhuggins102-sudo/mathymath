@@ -169,6 +169,8 @@ function resultKey(r: ClueResult): string {
       return `TD:${r.value}`;
     case "diceCount":
       return `DC:${r.cmp}`;
+    case "clueReuse":
+      return "REUSE";
   }
 }
 

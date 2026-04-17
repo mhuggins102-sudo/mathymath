@@ -87,7 +87,7 @@ export interface UseDailyGameResult {
   locksAvailable: number;
   canStartLock: boolean;
   canCommitPendingLock: boolean;
-  pendingClueParam: { clueId: string; paramKind: "slot" | "digit" } | null;
+  pendingClueParam: { clueId: string; paramKind: "slot" | "digit" | "reuse" } | null;
   redraw: () => void;
   canRedraw: boolean;
   appendDigit: (d: string) => void;
@@ -446,7 +446,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // --- Clue-parameter selection (Oracle slot / Contains Digit digit) ---
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit";
+    paramKind: "slot" | "digit" | "reuse";
   } | null>(null);
 
   /** Internal: actually fires the choose-clue server call once we

@@ -301,10 +301,10 @@ describe("Extra Lock (special)", () => {
 });
 
 describe("Registry", () => {
-  it("has 18 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(18);
+  it("has 19 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(19);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(18);
+    expect(ids.size).toBe(19);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

@@ -1,5 +1,7 @@
 "use client";
 
+import type { ClueId } from "@/lib/game/clues/types";
+import { getClueById } from "@/lib/game/clues/registry";
 import { Digit, type DigitState } from "./Digit";
 
 /**
@@ -100,6 +102,76 @@ export function DigitPicker({
         type="button"
         onClick={onCancel}
         className="text-xs text-muted hover:text-foreground underline underline-offset-4"
+      >
+        cancel — pick a different clue
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Reuse picker — appears after the player chooses the Clue Reuse
+ * special. Shows a list of previously-used non-special clues. Tapping
+ * one applies that clue again to the current guess.
+ */
+export function ReusePicker({
+  usedClueIds,
+  onSelect,
+  onCancel,
+}: {
+  usedClueIds: readonly ClueId[];
+  onSelect: (clueId: ClueId) => void;
+  onCancel: () => void;
+}) {
+  const reusable = usedClueIds.filter((id) => {
+    try {
+      return getClueById(id).category !== "special";
+    } catch {
+      return false;
+    }
+  });
+  const btn =
+    "w-full text-left bg-surface-2 hover:bg-surface-2/80 active:scale-[0.99] transition rounded-lg px-4 py-3 border border-border";
+  return (
+    <div className="w-full max-w-md mx-auto select-none text-center">
+      <p className="text-[10px] uppercase tracking-wider text-muted mb-2">
+        Pick a clue to re-use
+      </p>
+      <div className="flex flex-col gap-2 max-h-[40vh] overflow-y-auto">
+        {reusable.length === 0 && (
+          <p className="text-xs text-muted py-4">
+            No reusable clues yet — play another round first.
+          </p>
+        )}
+        {reusable.map((id) => {
+          const clue = getClueById(id);
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              className={btn}
+            >
+              <span className="font-semibold text-foreground">
+                {clue.name}
+              </span>
+              <span
+                className={`ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+                  clue.category === "positional"
+                    ? "bg-accent/20 text-accent"
+                    : "bg-warn/20 text-warn"
+                }`}
+              >
+                {clue.category}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="mt-3 text-xs text-muted hover:text-foreground underline underline-offset-4"
       >
         cancel — pick a different clue
       </button>

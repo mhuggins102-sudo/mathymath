@@ -17,6 +17,7 @@ import { divisibleByClue } from "./divisibleBy";
 import { totalDeviationClue } from "./totalDeviation";
 import { diceCountClue } from "./diceCount";
 import { extraLockClue } from "./extraLock";
+import { clueReuseClue } from "./clueReuse";
 
 // Retired 2026-04-15 (see full-review doc):
 //   - sumDirectionClue — strictly dominated by sumDeltaClue (direction-only
@@ -45,6 +46,7 @@ export const CLUES: readonly Clue[] = [
   totalDeviationClue,
   diceCountClue,
   extraLockClue,
+  clueReuseClue,
 ] as const;
 
 const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));

@@ -7,7 +7,7 @@ import { useClientId } from "@/lib/hooks/useClientId";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
-import { SlotPicker, DigitPicker } from "@/components/CluePickers";
+import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
@@ -17,6 +17,7 @@ import {
 } from "@/components/DailyResultPanel";
 import { Modal } from "@/components/Modal";
 import { buildShareText } from "@/lib/game/share";
+import type { ClueId } from "@/lib/game/clues/types";
 import { computeDailyNumber } from "@/lib/game/targetGenerator";
 import { recordDailyResult } from "@/lib/persistence/localStore";
 
@@ -280,6 +281,16 @@ export function DailyGame({
                 certainDigits={certainDigits}
                 onSelect={(slot) =>
                   confirmClueParam({ selectedSlot: slot })
+                }
+                onCancel={cancelClueParam}
+              />
+            ) : pendingClueParam?.paramKind === "reuse" ? (
+              <ReusePicker
+                usedClueIds={state.guesses
+                  .map((g) => g.clueId)
+                  .filter(Boolean) as ClueId[]}
+                onSelect={(clueId) =>
+                  confirmClueParam({ reusedClueId: clueId })
                 }
                 onCancel={cancelClueParam}
               />

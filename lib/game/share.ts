@@ -20,6 +20,7 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   totalDeviation: "📐",
   diceCount: "🎲",
   extraLock: "🔒",
+  clueReuse: "🔄",
 };
 
 function perSlotLine(result: ClueResult | undefined, digits: number): string {
