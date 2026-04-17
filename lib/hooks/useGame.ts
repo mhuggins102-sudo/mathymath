@@ -287,13 +287,19 @@ export function useGame(config: UseGameConfig): UseGameResult {
       // Was re-selecting a committed lock → keep the lock as-is.
       return { locked: [...lockedSlots], inp: input };
     }
-    // Was creating a new lock → remove it, restore digit.
+    // Was creating a new lock → remove it. Restore the digit ONLY if
+    // the input string is long enough that the digit would land back
+    // at its original slot position. If the player backspaced in the
+    // meantime, there are gaps and the digit would misplace — in that
+    // case, drop it (cell goes blank, player can retype).
     const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
     const locked = lockedSlots.filter((l) => l.slot !== pendingLockSlot);
     let inp = input;
     if (removed) {
       const idx = inputInsertIdx(pendingLockSlot, locked);
-      inp = inp.slice(0, idx) + removed.digit + inp.slice(idx);
+      if (idx <= inp.length) {
+        inp = inp.slice(0, idx) + removed.digit + inp.slice(idx);
+      }
     }
     return { locked, inp };
   }, [pendingLockSlot, unlockMode, lockedSlots, input, inputInsertIdx]);
@@ -383,17 +389,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const commitLock = useCallback(() => {
     if (pendingLockSlot === null) return;
     if (unlockMode) {
-      // Unlock: remove lock, restore digit as typed.
-      const { locked, inp } = cancelPendingLock();
-      const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
-      const newLocked = locked.filter((l) => l.slot !== pendingLockSlot);
-      let newInput = inp;
-      if (removed) {
-        const idx = inputInsertIdx(pendingLockSlot, newLocked);
-        newInput = newInput.slice(0, idx) + removed.digit + newInput.slice(idx);
-      }
+      // Unlock: remove lock. Digit goes blank (not restored to input)
+      // because the input string may have changed since the lock was
+      // committed — re-inserting at the computed index could place the
+      // digit in the wrong slot if earlier slots were backspaced.
+      const newLocked = lockedSlots.filter((l) => l.slot !== pendingLockSlot);
       setLockedSlots(newLocked);
-      setInput(newInput);
       setPendingLockSlot(null);
       setUnlockMode(false);
       buzz(18);

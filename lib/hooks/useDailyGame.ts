@@ -328,7 +328,9 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     let inp = input;
     if (removed) {
       const idx = inputInsertIdx(pendingLockSlot, locked);
-      inp = inp.slice(0, idx) + removed.digit + inp.slice(idx);
+      if (idx <= inp.length) {
+        inp = inp.slice(0, idx) + removed.digit + inp.slice(idx);
+      }
     }
     return { locked, inp };
   }, [pendingLockSlot, unlockMode, lockedSlots, input, inputInsertIdx]);
@@ -413,15 +415,9 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const commitLock = useCallback(() => {
     if (pendingLockSlot === null) return;
     if (unlockMode) {
-      const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
+      // Unlock: remove lock. Cell goes blank (digit not restored).
       const newLocked = lockedSlots.filter((l) => l.slot !== pendingLockSlot);
-      let newInput = input;
-      if (removed) {
-        const idx = inputInsertIdx(pendingLockSlot, newLocked);
-        newInput = newInput.slice(0, idx) + removed.digit + newInput.slice(idx);
-      }
       setLockedSlots(newLocked);
-      setInput(newInput);
       setPendingLockSlot(null);
       setUnlockMode(false);
       buzz(18);
@@ -431,7 +427,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     setPendingLockSlot(null);
     setUnlockMode(false);
     buzz(18);
-  }, [pendingLockSlot, pendingLockDigit, unlockMode, lockedSlots, input, inputInsertIdx]);
+  }, [pendingLockSlot, pendingLockDigit, unlockMode, lockedSlots]);
 
   const submit = useCallback(async () => {
     if (inFlightRef.current) return;
