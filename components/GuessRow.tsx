@@ -424,7 +424,7 @@ export function GuessRow({
   return (
     <div ref={containerRef} className="w-full">
       <div
-        className={`w-full flex items-center justify-between px-1 py-1.5 rounded-lg ${
+        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg ${
           active ? "bg-surface/40" : ""
         }`}
       >
