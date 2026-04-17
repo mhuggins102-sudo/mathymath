@@ -56,12 +56,11 @@ export function ClueChooser({
           </button>
         ))}
       </div>
-      {onRedraw && (
+      {onRedraw && canRedraw && (
         <button
           type="button"
           onClick={onRedraw}
-          disabled={!canRedraw}
-          className="w-full mt-3 text-xs text-muted hover:text-foreground disabled:opacity-30 disabled:hover:text-muted underline underline-offset-4 py-1"
+          className="w-full mt-3 text-xs text-muted hover:text-foreground py-1"
         >
           Redraw (costs 🔒×1)
         </button>

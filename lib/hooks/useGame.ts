@@ -10,6 +10,7 @@ import {
   reduce,
 } from "@/lib/game/stateMachine";
 import type { ClueParam } from "@/lib/game/clues/types";
+import { getClueById } from "@/lib/game/clues/registry";
 import { validateGuess } from "@/lib/game/validator";
 import {
   buildGuessFromInput,
@@ -69,7 +70,7 @@ export interface UseGameResult {
    *  selection. null when no parameter is pending. */
   pendingClueParam: {
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
   } | null;
   appendDigit: (d: string) => void;
   backspace: () => void;
@@ -339,7 +340,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // confirms → hook dispatches CHOOSE_CLUE with the param attached.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
   } | null>(null);
 
   const chooseClue = useCallback(
@@ -361,10 +362,32 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const confirmClueParam = useCallback(
     (param: ClueParam) => {
       if (!pendingClueParam) return;
+      // Chained flow for Clue Reuse → Oracle / Contains Digit:
+      // When the reuse picker yields a clue that itself has a paramKind,
+      // we enter that clue's sub-picker before dispatching.
+      if (pendingClueParam.paramKind === "reuse" && param.reusedClueId) {
+        try {
+          const reusedClue = getClueById(param.reusedClueId as never);
+          if (reusedClue.paramKind && (reusedClue.paramKind === "slot" || reusedClue.paramKind === "digit")) {
+            setPendingClueParam({
+              clueId: pendingClueParam.clueId,
+              paramKind: reusedClue.paramKind,
+              reusedClueId: param.reusedClueId,
+            });
+            return;
+          }
+        } catch {
+          // Unknown clue; fall through to dispatch.
+        }
+      }
+      // Merge any stashed reusedClueId from the chained flow.
+      const mergedParam = pendingClueParam.reusedClueId
+        ? { ...param, reusedClueId: pendingClueParam.reusedClueId }
+        : param;
       dispatch({
         type: "CHOOSE_CLUE",
         clueId: pendingClueParam.clueId as never,
-        param,
+        param: mergedParam,
       });
       setPendingClueParam(null);
       buzz(18);
@@ -383,10 +406,13 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // locks (accounting for locks already pending on this turn's locks +
   // this turn's prior redraws).
   const pendingRedraws = state.pendingGuess?.redraws ?? 0;
+  const pendingWrongLocks = (state.pendingGuess?.locks ?? []).filter(
+    (l) => !l.correct,
+  ).length;
   const canRedraw =
     !!state.pendingGuess &&
     !pendingClueParam &&
-    locksAvailableCount - pendingRedraws > 0;
+    locksAvailableCount - pendingWrongLocks - pendingRedraws > 0;
 
   const redraw = useCallback(() => {
     if (!canRedraw) return;

@@ -48,7 +48,7 @@ export function SlotPicker({
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-muted hover:text-foreground underline underline-offset-4"
+        className="text-xs text-muted hover:text-foreground "
       >
         cancel — pick a different clue
       </button>
@@ -101,7 +101,7 @@ export function DigitPicker({
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-muted hover:text-foreground underline underline-offset-4"
+        className="text-xs text-muted hover:text-foreground "
       >
         cancel — pick a different clue
       </button>
@@ -123,13 +123,10 @@ export function ReusePicker({
   onSelect: (clueId: ClueId) => void;
   onCancel: () => void;
 }) {
-  const reusable = usedClueIds.filter((id) => {
-    try {
-      return getClueById(id).category !== "special";
-    } catch {
-      return false;
-    }
-  });
+  // All previously-used clues are reusable EXCEPT Clue Reuse itself
+  // (re-using a re-use is circular). Extra Lock IS reusable — picking
+  // it again grants another lock.
+  const reusable = usedClueIds.filter((id) => id !== "clueReuse");
   const btn =
     "w-full text-left bg-surface-2 hover:bg-surface-2/80 active:scale-[0.99] transition rounded-lg px-4 py-3 border border-border";
   return (
@@ -159,7 +156,9 @@ export function ReusePicker({
                 className={`ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
                   clue.category === "positional"
                     ? "bg-accent/20 text-accent"
-                    : "bg-warn/20 text-warn"
+                    : clue.category === "compositional"
+                    ? "bg-warn/20 text-warn"
+                    : "bg-good/20 text-good"
                 }`}
               >
                 {clue.category}
@@ -171,7 +170,7 @@ export function ReusePicker({
       <button
         type="button"
         onClick={onCancel}
-        className="mt-3 text-xs text-muted hover:text-foreground underline underline-offset-4"
+        className="mt-3 text-xs text-muted hover:text-foreground "
       >
         cancel — pick a different clue
       </button>

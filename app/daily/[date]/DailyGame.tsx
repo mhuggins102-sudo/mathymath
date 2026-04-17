@@ -101,6 +101,7 @@ export function DailyGame({
     pendingLockSlot !== null ||
     keypadDisabled;
   const lockMode = pendingLockSlot !== null;
+  const hintLocks = locksAvailable - lockedSlots.length;
 
   // Record this daily's result locally (first write wins per date). This
   // feeds the Lifetime Stats view on the home page — it's not shown on the
@@ -326,8 +327,8 @@ export function DailyGame({
                 <p className="text-[10px] text-muted text-center mt-2 min-h-4">
                   {lockMode
                     ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-                    : locksAvailable > 0
-                    ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+                    : hintLocks > 0
+                    ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
                     : ""}
                 </p>
               </>
