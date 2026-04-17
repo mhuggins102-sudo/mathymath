@@ -337,7 +337,7 @@ describe.skipIf(!runSim)("greedy-info simulation", () => {
     { timeout: 600_000 },
     () => {
       const N = Number(process.env.SIM_N ?? 2000);
-      const BUDGET = Number(process.env.SIM_BUDGET ?? 8);
+      const BUDGET = Number(process.env.SIM_BUDGET ?? 7);
       const strategyEnv = (process.env.SIM_STRATEGY ?? "greedy").toLowerCase();
       if (strategyEnv !== "greedy" && strategyEnv !== "weight") {
         throw new Error(

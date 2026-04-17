@@ -259,31 +259,53 @@ export function useGame(config: UseGameConfig): UseGameResult {
       setError(null);
       if (slot < 0 || slot >= state.digits) return;
       if (certain[slot] !== null) return; // immutable
-      // Cancel: same cell tapped again → drop pending and any digit.
+      // Cancel: same cell tapped again → remove the lock but KEEP the
+      // digit as a regular typed character so nothing slides around.
       if (pendingLockSlot === slot) {
-        setLockedSlots((cur) => cur.filter((l) => l.slot !== slot));
+        const removedLock = lockedSlots.find((l) => l.slot === slot);
+        const newLocked = lockedSlots.filter((l) => l.slot !== slot);
+        setLockedSlots(newLocked);
         setPendingLockSlot(null);
+        if (removedLock) {
+          // Re-insert the digit into `input` at the position that
+          // maps to this slot (given the updated lockedSlots).
+          let insertIdx = 0;
+          for (let i = 0; i < slot; i++) {
+            if (certain[i] !== null) continue;
+            if (newLocked.some((l) => l.slot === i)) continue;
+            insertIdx++;
+          }
+          setInput((cur) =>
+            cur.slice(0, insertIdx) + removedLock.digit + cur.slice(insertIdx),
+          );
+        }
         return;
       }
-      // Different cell while one is already pending → ignore (Q8: no
-      // switching while a lock is in progress).
+      // Different cell while one is already pending → ignore.
       if (pendingLockSlot !== null) return;
       // Cannot start a new lock without budget or on guess 1.
       const isAlreadyLocked = lockedSlots.some((l) => l.slot === slot);
       if (!canUseLocks) return;
       if (!isAlreadyLocked && lockedSlots.length >= locksAvailableCount)
         return;
-      // If the slot currently shows a typed char, remove that index
-      // from input so it stops projecting to this slot.
+      // If the slot has a typed char, pre-fill the lock with that
+      // digit (the char moves from `input` to `lockedSlots` but stays
+      // visible in the same cell — no sliding).
       const idx = typedIndexForSlot(slot);
       if (idx !== null) {
+        const digit = input[idx];
         setInput((cur) => cur.slice(0, idx) + cur.slice(idx + 1));
+        setLockedSlots((cur) => [
+          ...cur.filter((l) => l.slot !== slot),
+          { slot, digit },
+        ]);
       }
       setPendingLockSlot(slot);
     },
     [
       state.digits,
       certain,
+      input,
       pendingLockSlot,
       lockedSlots,
       canUseLocks,

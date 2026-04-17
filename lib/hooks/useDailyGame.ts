@@ -307,25 +307,46 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       setError(null);
       if (slot < 0 || slot >= state.digits) return;
       if (certain[slot] !== null) return;
+      // Cancel: same cell → remove lock, restore digit as typed.
       if (pendingLockSlot === slot) {
-        setLockedSlots((cur) => cur.filter((l) => l.slot !== slot));
+        const removedLock = lockedSlots.find((l) => l.slot === slot);
+        const newLocked = lockedSlots.filter((l) => l.slot !== slot);
+        setLockedSlots(newLocked);
         setPendingLockSlot(null);
+        if (removedLock) {
+          let insertIdx = 0;
+          for (let i = 0; i < slot; i++) {
+            if (certain[i] !== null) continue;
+            if (newLocked.some((l) => l.slot === i)) continue;
+            insertIdx++;
+          }
+          setInput((cur) =>
+            cur.slice(0, insertIdx) + removedLock.digit + cur.slice(insertIdx),
+          );
+        }
         return;
       }
-      if (pendingLockSlot !== null) return; // Q8: no switching.
+      if (pendingLockSlot !== null) return;
       const isAlreadyLocked = lockedSlots.some((l) => l.slot === slot);
       if (!canUseLocks) return;
       if (!isAlreadyLocked && lockedSlots.length >= locksAvailableCount)
         return;
+      // Pre-fill lock with the typed digit (stays in same cell).
       const idx = typedIndexForSlot(slot);
       if (idx !== null) {
+        const digit = input[idx];
         setInput((cur) => cur.slice(0, idx) + cur.slice(idx + 1));
+        setLockedSlots((cur) => [
+          ...cur.filter((l) => l.slot !== slot),
+          { slot, digit },
+        ]);
       }
       setPendingLockSlot(slot);
     },
     [
       state.digits,
       certain,
+      input,
       pendingLockSlot,
       lockedSlots,
       canUseLocks,

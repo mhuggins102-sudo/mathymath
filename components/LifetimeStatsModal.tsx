@@ -105,7 +105,10 @@ export function LifetimeStatsModal({
   );
 }
 
-function meanFromDistribution(distribution: Record<string, number>): number | null {
+function meanFromDistribution(
+  distribution: Record<string, number>,
+  losses: number,
+): number | null {
   let sum = 0;
   let n = 0;
   for (const [k, count] of Object.entries(distribution)) {
@@ -114,6 +117,10 @@ function meanFromDistribution(distribution: Record<string, number>): number | nu
     sum += g * count;
     n += count;
   }
+  // Losses count as one more than the max budget (8 for a 7-guess game)
+  // so the mean reflects overall skill, not just winning speed.
+  sum += losses * (DEFAULT_MAX_GUESSES + 1);
+  n += losses;
   return n === 0 ? null : sum / n;
 }
 
@@ -135,7 +142,8 @@ function Block({
   distribution: Record<string, number>;
 }) {
   const winPct = played ? Math.round((wins / played) * 100) : 0;
-  const meanVal = meanFromDistribution(distribution);
+  const losses = Math.max(0, played - wins);
+  const meanVal = meanFromDistribution(distribution, losses);
   const meanLabel = meanVal === null ? "—" : meanVal.toFixed(1);
 
   return (
@@ -154,7 +162,7 @@ function Block({
           <div className="grid grid-cols-5 gap-1 mb-3">
             <Stat label="Played" value={played} />
             <Stat label="Win %" value={winPct} />
-            <Stat label="Mean" value={meanLabel} hint="wins only" />
+            <Stat label="Mean" value={meanLabel} />
             <Stat label="Streak" value={currentStreak} />
             <Stat label="Best" value={bestStreak} />
           </div>

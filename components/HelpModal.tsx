@@ -49,22 +49,39 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           <p>
             After each guess you&apos;ll be offered{" "}
             <strong className="text-foreground">two clue options</strong>.
-            Pick the one that will help you most.{" "}
-            <span className="text-accent">Positional</span> clues color the
-            cells; <span className="text-warn">compositional</span> clues
-            tell you something about the whole number;{" "}
-            <span className="text-good">special</span> cards change the
-            rules (e.g. grant an extra lock).
+            Pick the one that will help you most:
           </p>
+          <ul className="list-disc list-inside space-y-1 pl-1">
+            <li>
+              <span className="text-accent">Positional</span> — colors each
+              cell to show how close your digit is at that slot.
+            </li>
+            <li>
+              <span className="text-warn">Compositional</span> — tells you
+              something about the target number as a whole.
+            </li>
+            <li>
+              <span className="text-good">Special</span> — changes the rules
+              instead of giving info (e.g. grants an extra lock or lets you
+              re-use a previous clue).
+            </li>
+          </ul>
           <p>
             You also start each game with one{" "}
             <span className="text-foreground">🔒 lock</span> — from guess 2
             on, tap a cell to pin a digit you&apos;re sure of. Correct locks
-            stay; wrong locks are spent.
+            stay; wrong locks are spent. You can also spend a lock to{" "}
+            <strong className="text-foreground">redraw</strong> the offered
+            clue pair if neither option appeals.
           </p>
           <p>
             A clue type can only be chosen once per game — used types
             won&apos;t appear as future options.
+          </p>
+          <p className="text-foreground/80 italic">
+            Tip: your guess doesn&apos;t have to be your best estimate of the
+            target. A strategic guess — like all 5s — can extract more
+            information from the clue you&apos;re hoping to receive.
           </p>
         </div>
 
