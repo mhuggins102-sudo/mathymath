@@ -326,7 +326,9 @@ export function DailyGame({
                     visible next to the thumbs. */}
                 <p className="text-[10px] text-muted text-center mt-2 min-h-4">
                   {lockMode
-                    ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
+                    ? canCommitPendingLock
+                      ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
+                      : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
                     : hintLocks > 0
                     ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
                     : ""}
