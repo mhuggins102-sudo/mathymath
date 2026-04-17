@@ -111,6 +111,10 @@ function UnlimitedGame({
     pendingLockSlot !== null ||
     keypadDisabled;
   const lockMode = pendingLockSlot !== null;
+  // Lock hint shows how many are LEFT after accounting for locks the
+  // player has committed this turn (but not yet submitted). Updates
+  // immediately on commit and on cancel/undo.
+  const hintLocks = locksAvailable - lockedSlots.length;
 
   const statusMessage = useMemo(() => {
     if (state.status === "won")
@@ -221,8 +225,8 @@ function UnlimitedGame({
               <p className="text-[10px] text-muted text-center mt-2 min-h-4">
                 {lockMode
                   ? "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-                  : locksAvailable > 0
-                  ? `🔒 ${locksAvailable} lock${locksAvailable === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+                  : hintLocks > 0
+                  ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
                   : ""}
               </p>
             </>

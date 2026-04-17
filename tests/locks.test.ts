@@ -13,7 +13,7 @@ import {
 describe("locks constants", () => {
   it("starts each game with 1 lock and caps at 2", () => {
     expect(INITIAL_LOCKS).toBe(1);
-    expect(MAX_LOCKS).toBe(2);
+    expect(MAX_LOCKS).toBe(3);
   });
 });
 
@@ -52,13 +52,13 @@ describe("locksAvailable", () => {
   });
   it("Extra Lock grants +1 (cap 2)", () => {
     expect(locksAvailable([{ clueId: EXTRA_LOCK_CLUE_ID }])).toBe(2);
-    // Two extraLock clues still cap at 2, not 3.
+    // Two extraLock clues: initial 1 + 2 = 3, capped at MAX_LOCKS=3.
     expect(
       locksAvailable([
         { clueId: EXTRA_LOCK_CLUE_ID },
         { clueId: EXTRA_LOCK_CLUE_ID },
       ]),
-    ).toBe(2);
+    ).toBe(3);
   });
   it("EXTRA_LOCK_CLUE_ID matches the registered extraLock clue id", async () => {
     const { extraLockClue } = await import("@/lib/game/clues/extraLock");

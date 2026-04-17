@@ -13,9 +13,9 @@ export interface LockRecord {
 /** Each game begins with this many locks. */
 export const INITIAL_LOCKS = 1;
 
-/** Locks can never exceed this. Extra Lock specials can add +1 up to
- *  this cap (see Part 3). */
-export const MAX_LOCKS = 2;
+/** Locks can never exceed this. Extra Lock specials (including re-used
+ *  Extra Locks via Clue Reuse) can add up to this cap. */
+export const MAX_LOCKS = 3;
 
 /** Clue id for the Extra Lock Special card. Kept here (not in the
  *  clues/ registry yet) so that the locks accounting code can count
@@ -25,16 +25,30 @@ export const EXTRA_LOCK_CLUE_ID = "extraLock";
 
 export interface LockAccountingGuess {
   clueId?: string;
+  result?: unknown;
   locks?: readonly LockRecord[];
   redraws?: number;
 }
 
-/** Total extra locks granted so far by Extra Lock clue picks. */
+/** Total extra locks granted so far by Extra Lock clue picks. Also
+ *  counts re-used Extra Locks via Clue Reuse (identified by
+ *  result.kind being "extraLock" even though clueId is "clueReuse"). */
 export function countExtraLocksGained(
   history: readonly LockAccountingGuess[],
 ): number {
   let n = 0;
-  for (const g of history) if (g.clueId === EXTRA_LOCK_CLUE_ID) n++;
+  for (const g of history) {
+    if (g.clueId === EXTRA_LOCK_CLUE_ID) {
+      n++;
+    } else if (
+      g.clueId === "clueReuse" &&
+      g.result &&
+      typeof g.result === "object" &&
+      (g.result as Record<string, unknown>).kind === EXTRA_LOCK_CLUE_ID
+    ) {
+      n++;
+    }
+  }
   return n;
 }
 

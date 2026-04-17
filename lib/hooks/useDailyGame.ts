@@ -446,7 +446,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // --- Clue-parameter selection (Oracle slot / Contains Digit digit) ---
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
   } | null>(null);
 
   /** Internal: actually fires the choose-clue server call once we
@@ -531,7 +531,26 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const confirmClueParam = useCallback(
     (param: ClueParam) => {
       if (!pendingClueParam) return;
-      doChooseClue(pendingClueParam.clueId as ClueId, param);
+      // Chained flow for Clue Reuse → Oracle / Contains Digit:
+      if (pendingClueParam.paramKind === "reuse" && param.reusedClueId) {
+        try {
+          const reusedClue = getClueById(param.reusedClueId as never);
+          if (reusedClue.paramKind && (reusedClue.paramKind === "slot" || reusedClue.paramKind === "digit")) {
+            setPendingClueParam({
+              clueId: pendingClueParam.clueId,
+              paramKind: reusedClue.paramKind,
+              reusedClueId: param.reusedClueId,
+            });
+            return;
+          }
+        } catch {
+          // Fall through.
+        }
+      }
+      const mergedParam = pendingClueParam.reusedClueId
+        ? { ...param, reusedClueId: pendingClueParam.reusedClueId }
+        : param;
+      doChooseClue(pendingClueParam.clueId as ClueId, mergedParam);
       setPendingClueParam(null);
     },
     [pendingClueParam, doChooseClue],
@@ -546,10 +565,13 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // The server validates the final choice via the redraws count sent
   // in the choose-clue request.
   const pendingRedraws = state.pendingGuess?.redraws ?? 0;
+  const pendingWrongLocks = (state.pendingGuess?.locks ?? []).filter(
+    (l) => !l.correct,
+  ).length;
   const canRedraw =
     !!state.pendingGuess &&
     !pendingClueParam &&
-    locksAvailableCount - pendingRedraws > 0;
+    locksAvailableCount - pendingWrongLocks - pendingRedraws > 0;
 
   const redraw = useCallback(() => {
     if (!canRedraw || !state.pendingGuess) return;
