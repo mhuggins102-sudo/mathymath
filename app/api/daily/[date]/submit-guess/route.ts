@@ -33,6 +33,7 @@ const historyGuessSchema = z.object({
       }),
     )
     .optional(),
+  redraws: z.number().int().min(0).optional(),
 });
 
 const lockAttemptSchema = z.object({

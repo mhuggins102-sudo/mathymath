@@ -79,6 +79,7 @@ const savedDailyGuessSchema = z.object({
   clueId: z.string().optional(),
   result: z.unknown().optional(),
   locks: z.array(savedLockSchema).optional(),
+  redraws: z.number().int().min(0).optional(),
 });
 
 const savedDailyPendingSchema = z.object({

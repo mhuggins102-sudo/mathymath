@@ -24,6 +24,7 @@ const historyGuessSchema = z.object({
       }),
     )
     .optional(),
+  redraws: z.number().int().min(0).optional(),
 });
 
 // The client now sends its full history so the server can verify that

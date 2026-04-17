@@ -26,6 +26,7 @@ const historyGuessSchema = z.object({
       }),
     )
     .optional(),
+  redraws: z.number().int().min(0).optional(),
 });
 
 const clueParamSchema = z
@@ -40,6 +41,10 @@ const bodySchema = z.object({
   pendingGuess: z.string().length(DIGITS).regex(/^[0-9]+$/),
   clueId: z.string().min(1),
   clueParam: clueParamSchema,
+  /** Number of redraws on the current round (how many times the player
+   *  burned a lock to advance the deck). The server uses this to derive
+   *  which pair the clue was drawn from. */
+  redraws: z.number().int().min(0).max(5).default(0),
 });
 
 /**
@@ -100,9 +105,15 @@ export async function POST(
     return NextResponse.json({ error: "exact_match_in_choose" }, { status: 409 });
   }
 
+  // Compute the cumulative deck offset from prior rounds' redraws so
+  // the pair validation matches what the client drew after redraws.
+  const priorRedraws = (parsed.data.history as Array<{ redraws?: number }>)
+    .reduce((sum, g) => sum + (g.redraws ?? 0), 0);
+  const totalOffset = priorRedraws + parsed.data.redraws;
+
   // Ensure the claimed clueId was actually one of the two offered at
   // this point — the same pickTwoClues invocation the client saw.
-  const offered = pickTwoClues(date, validation.chosenClueIds);
+  const offered = pickTwoClues(date, validation.chosenClueIds, totalOffset);
   const offeredIds = offered.map((c) => c.id);
   if (!offeredIds.includes(clueId as (typeof offeredIds)[number])) {
     return NextResponse.json({ error: "clue_not_offered" }, { status: 409 });

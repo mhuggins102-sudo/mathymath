@@ -85,6 +85,8 @@ export function DailyGame({
     pendingClueParam,
     confirmClueParam,
     cancelClueParam,
+    redraw,
+    canRedraw,
     tapCell,
     commitLock,
   } = game;
@@ -292,6 +294,8 @@ export function DailyGame({
               <ClueChooser
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
+                onRedraw={redraw}
+                canRedraw={canRedraw}
               />
             ) : (
               <>
