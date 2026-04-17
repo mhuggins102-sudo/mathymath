@@ -5,11 +5,12 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+import type { ClueId } from "@/lib/game/clues/types";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
-import { SlotPicker, DigitPicker } from "@/components/CluePickers";
+import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
@@ -176,6 +177,16 @@ function UnlimitedGame({
               certainDigits={certainDigits}
               onSelect={(slot) =>
                 confirmClueParam({ selectedSlot: slot })
+              }
+              onCancel={cancelClueParam}
+            />
+          ) : pendingClueParam?.paramKind === "reuse" ? (
+            <ReusePicker
+              usedClueIds={state.guesses
+                .map((g) => g.clueId)
+                .filter(Boolean) as ClueId[]}
+              onSelect={(clueId) =>
+                confirmClueParam({ reusedClueId: clueId })
               }
               onCancel={cancelClueParam}
             />

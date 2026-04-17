@@ -99,6 +99,7 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       "totalDeviation",
       "diceCount",
       "extraLock",
+      "clueReuse",
     ] as ClueId[]) {
       // getClueById sanity + seen
       expect(getClueById(c).id).toBe(c);
