@@ -83,6 +83,7 @@ export function DailyGame({
     pendingLockSlot,
     locksAvailable,
     canCommitPendingLock,
+    unlockMode,
     pendingClueParam,
     confirmClueParam,
     cancelClueParam,
@@ -319,14 +320,17 @@ export function DailyGame({
                   submitDisabled={submitDisabled}
                   lockMode={lockMode}
                   onLockCommit={commitLock}
-                  lockCommitDisabled={!canCommitPendingLock}
+                  lockCommitDisabled={!canCommitPendingLock && !unlockMode}
+                  unlockMode={unlockMode}
                 />
                 {/* Lock hint sits BELOW the keypad so it doesn't push
                     the keypad down as messages appear/disappear and is
                     visible next to the thumbs. */}
                 <p className="text-[10px] text-muted text-center mt-2 min-h-4">
                   {lockMode
-                    ? canCommitPendingLock
+                    ? unlockMode
+                      ? "Press Unlock to remove the lock — or tap a different slot."
+                      : canCommitPendingLock
                       ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
                       : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
                     : hintLocks > 0

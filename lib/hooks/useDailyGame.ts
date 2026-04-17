@@ -87,6 +87,7 @@ export interface UseDailyGameResult {
   locksAvailable: number;
   canStartLock: boolean;
   canCommitPendingLock: boolean;
+  unlockMode: boolean;
   pendingClueParam: { clueId: string; paramKind: "slot" | "digit" | "reuse" } | null;
   redraw: () => void;
   canRedraw: boolean;
@@ -213,6 +214,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const [loading, setLoading] = useState(false);
   const [lockedSlots, setLockedSlots] = useState<LockAttempt[]>([]);
   const [pendingLockSlot, setPendingLockSlot] = useState<number | null>(null);
+  const [unlockMode, setUnlockMode] = useState(false);
   // Prevents double-submits from racing with a pending network call.
   const inFlightRef = useRef(false);
 
@@ -302,46 +304,98 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     setInput((cur) => cur.slice(0, -1));
   }, [pendingLockSlot]);
 
+  const inputInsertIdx = useCallback(
+    (slot: number, locked: readonly LockAttempt[]): number => {
+      let idx = 0;
+      for (let i = 0; i < slot; i++) {
+        if (certain[i] !== null) continue;
+        if (locked.some((l) => l.slot === i)) continue;
+        idx++;
+      }
+      return idx;
+    },
+    [certain],
+  );
+
+  const cancelPendingLock = useCallback((): {
+    locked: LockAttempt[];
+    inp: string;
+  } => {
+    if (pendingLockSlot === null) return { locked: [...lockedSlots], inp: input };
+    if (unlockMode) return { locked: [...lockedSlots], inp: input };
+    const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
+    const locked = lockedSlots.filter((l) => l.slot !== pendingLockSlot);
+    let inp = input;
+    if (removed) {
+      const idx = inputInsertIdx(pendingLockSlot, locked);
+      inp = inp.slice(0, idx) + removed.digit + inp.slice(idx);
+    }
+    return { locked, inp };
+  }, [pendingLockSlot, unlockMode, lockedSlots, input, inputInsertIdx]);
+
   const tapCell = useCallback(
     (slot: number) => {
       setError(null);
       if (slot < 0 || slot >= state.digits) return;
       if (certain[slot] !== null) return;
-      // Cancel: same cell → remove lock, restore digit as typed.
+
       if (pendingLockSlot === slot) {
-        const removedLock = lockedSlots.find((l) => l.slot === slot);
-        const newLocked = lockedSlots.filter((l) => l.slot !== slot);
-        setLockedSlots(newLocked);
+        const { locked, inp } = cancelPendingLock();
+        setLockedSlots(locked);
+        setInput(inp);
         setPendingLockSlot(null);
-        if (removedLock) {
-          let insertIdx = 0;
-          for (let i = 0; i < slot; i++) {
-            if (certain[i] !== null) continue;
-            if (newLocked.some((l) => l.slot === i)) continue;
-            insertIdx++;
-          }
-          setInput((cur) =>
-            cur.slice(0, insertIdx) + removedLock.digit + cur.slice(insertIdx),
-          );
-        }
+        setUnlockMode(false);
         return;
       }
-      if (pendingLockSlot !== null) return;
-      const isAlreadyLocked = lockedSlots.some((l) => l.slot === slot);
+
+      let effectiveLocked = [...lockedSlots];
+      let effectiveInput = input;
+      if (pendingLockSlot !== null) {
+        const cancelled = cancelPendingLock();
+        effectiveLocked = cancelled.locked;
+        effectiveInput = cancelled.inp;
+      }
+
       if (!canUseLocks) return;
-      if (!isAlreadyLocked && lockedSlots.length >= locksAvailableCount)
+      const isAlreadyLocked = effectiveLocked.some((l) => l.slot === slot);
+      if (!isAlreadyLocked && effectiveLocked.length >= locksAvailableCount)
         return;
-      // Pre-fill lock with the typed digit (stays in same cell).
-      const idx = typedIndexForSlot(slot);
-      if (idx !== null) {
-        const digit = input[idx];
-        setInput((cur) => cur.slice(0, idx) + cur.slice(idx + 1));
-        setLockedSlots((cur) => [
-          ...cur.filter((l) => l.slot !== slot),
-          { slot, digit },
-        ]);
+
+      if (isAlreadyLocked) {
+        setLockedSlots(effectiveLocked);
+        setInput(effectiveInput);
+        setPendingLockSlot(slot);
+        setUnlockMode(true);
+        return;
       }
+
+      let typedIdx: number | null = null;
+      {
+        let idx = 0;
+        for (let i = 0; i < state.digits; i++) {
+          if (certain[i] !== null) continue;
+          if (effectiveLocked.some((l) => l.slot === i)) continue;
+          if (i === slot) {
+            typedIdx = idx < effectiveInput.length ? idx : null;
+            break;
+          }
+          idx++;
+        }
+      }
+      if (typedIdx !== null) {
+        const digit = effectiveInput[typedIdx];
+        effectiveInput =
+          effectiveInput.slice(0, typedIdx) +
+          effectiveInput.slice(typedIdx + 1);
+        effectiveLocked = [
+          ...effectiveLocked.filter((l) => l.slot !== slot),
+          { slot, digit },
+        ];
+      }
+      setLockedSlots(effectiveLocked);
+      setInput(effectiveInput);
       setPendingLockSlot(slot);
+      setUnlockMode(false);
     },
     [
       state.digits,
@@ -349,18 +403,35 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       input,
       pendingLockSlot,
       lockedSlots,
+      unlockMode,
       canUseLocks,
       locksAvailableCount,
-      typedIndexForSlot,
+      cancelPendingLock,
     ],
   );
 
   const commitLock = useCallback(() => {
     if (pendingLockSlot === null) return;
+    if (unlockMode) {
+      const removed = lockedSlots.find((l) => l.slot === pendingLockSlot);
+      const newLocked = lockedSlots.filter((l) => l.slot !== pendingLockSlot);
+      let newInput = input;
+      if (removed) {
+        const idx = inputInsertIdx(pendingLockSlot, newLocked);
+        newInput = newInput.slice(0, idx) + removed.digit + newInput.slice(idx);
+      }
+      setLockedSlots(newLocked);
+      setInput(newInput);
+      setPendingLockSlot(null);
+      setUnlockMode(false);
+      buzz(18);
+      return;
+    }
     if (pendingLockDigit === null) return;
     setPendingLockSlot(null);
+    setUnlockMode(false);
     buzz(18);
-  }, [pendingLockSlot, pendingLockDigit]);
+  }, [pendingLockSlot, pendingLockDigit, unlockMode, lockedSlots, input, inputInsertIdx]);
 
   const submit = useCallback(async () => {
     if (inFlightRef.current) return;
@@ -628,6 +699,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     locksAvailable: locksAvailableCount,
     canStartLock,
     canCommitPendingLock,
+    unlockMode,
     pendingClueParam,
     redraw,
     canRedraw,

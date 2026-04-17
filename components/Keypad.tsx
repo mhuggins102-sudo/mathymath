@@ -11,8 +11,9 @@ interface KeypadProps {
    *  through `onDigit` (the hook routes them to the pending lock). */
   lockMode?: boolean;
   onLockCommit?: () => void;
-  /** Gated separately from `submitDisabled` — the Lock button is only
-   *  enabled when the pending lock has a digit set. */
+  /** When true AND lockMode is true, the button says "Unlock" instead
+   *  of "Lock" — for removing an already-committed lock. */
+  unlockMode?: boolean;
   lockCommitDisabled?: boolean;
 }
 
@@ -28,6 +29,7 @@ export function Keypad({
   lockMode = false,
   onLockCommit,
   lockCommitDisabled,
+  unlockMode = false,
 }: KeypadProps) {
   const btn =
     "h-12 select-none rounded-md bg-surface-2 text-foreground font-semibold active:scale-95 active:bg-surface transition disabled:opacity-40 disabled:active:scale-100";
@@ -74,9 +76,15 @@ export function Keypad({
           className={`${btn} col-span-3 bg-accent/70 text-background`}
           onClick={lockMode ? onLockCommit : onSubmit}
           disabled={disabled || (lockMode ? lockCommitDisabled : submitDisabled)}
-          aria-label={lockMode ? "Lock this digit" : "Submit guess"}
+          aria-label={
+            lockMode
+              ? unlockMode
+                ? "Unlock this slot"
+                : "Lock this digit"
+              : "Submit guess"
+          }
         >
-          {lockMode ? "Lock" : "Enter"}
+          {lockMode ? (unlockMode ? "Unlock" : "Lock") : "Enter"}
         </button>
       </div>
     </div>
