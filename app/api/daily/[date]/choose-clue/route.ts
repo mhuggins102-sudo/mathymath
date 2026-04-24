@@ -5,10 +5,11 @@ import {
   todayUtcISO,
 } from "@/lib/game/targetGenerator";
 import { validateDailyHistory } from "@/lib/api/dailyValidation";
+import type { ClueId } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
-import { knownSlotsFromHistory } from "@/lib/game/certain";
+import { deriveCertainDigits, knownSlotsFromHistory } from "@/lib/game/certain";
 
 const DIGITS = 5;
 const MAX_GUESSES = DEFAULT_MAX_GUESSES;
@@ -142,6 +143,27 @@ export async function POST(
     knownSlots,
     ...clueParam,
   });
+
+  // Oracle-induced win: if this Oracle reveal (possibly via Clue Reuse)
+  // completes the certain set, the player wins immediately. Reveal the
+  // target so the client can render the final state.
+  if (result.kind === "oracle") {
+    const historyAfter = [
+      ...parsed.data.history,
+      {
+        guess: pendingGuess,
+        clueId: clueId as ClueId,
+        result,
+      },
+    ];
+    const certain = deriveCertainDigits(
+      historyAfter as Parameters<typeof deriveCertainDigits>[0],
+      DIGITS,
+    );
+    if (certain.every((d) => d !== null)) {
+      return NextResponse.json({ kind: "won", result, target });
+    }
+  }
 
   return NextResponse.json({ kind: "continue", result });
 }

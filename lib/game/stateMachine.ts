@@ -1,10 +1,22 @@
 import type { Clue, ClueId, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
 import { pickTwoClues } from "./clueSelector";
-import { knownSlotsFromHistory } from "./certain";
+import { deriveCertainDigits, knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
 export const DEFAULT_MAX_GUESSES = 7;
+
+/** Per-digit-count guess budgets. 5-digit games get 7 tries; 6-digit
+ *  games (Unlimited mode only) get 8. Returns DEFAULT_MAX_GUESSES for
+ *  any unlisted digit count. */
+export const MAX_GUESSES_BY_DIGITS: Readonly<Record<number, number>> = {
+  5: 7,
+  6: 8,
+};
+
+export function maxGuessesForDigits(digits: number): number {
+  return MAX_GUESSES_BY_DIGITS[digits] ?? DEFAULT_MAX_GUESSES;
+}
 
 export type GameStatus = "playing" | "won" | "lost";
 
@@ -199,12 +211,24 @@ export function reduce(state: GameState, action: GameAction): GameState {
         },
       ];
       const won = guess === state.target;
-      const lost = !won && guesses.length >= state.maxGuesses;
+      // Oracle-induced win: when the chosen clue's result reveals the
+      // last unknown slot (combined with prior reveals + correct locks),
+      // the player has effectively solved the puzzle. They shouldn't be
+      // forced to type the now-known target on a subsequent guess.
+      // Triggered on result.kind === "oracle" so it also fires when
+      // Oracle is reached via Clue Reuse (clueId is "clueReuse" but
+      // result.kind is the reused clue's id).
+      let oracleWon = false;
+      if (!won && result.kind === "oracle") {
+        const certain = deriveCertainDigits(guesses, state.digits);
+        if (certain.every((d) => d !== null)) oracleWon = true;
+      }
+      const lost = !won && !oracleWon && guesses.length >= state.maxGuesses;
       return {
         ...state,
         guesses,
         pendingGuess: null,
-        status: won ? "won" : lost ? "lost" : "playing",
+        status: won || oracleWon ? "won" : lost ? "lost" : "playing",
       };
     }
   }

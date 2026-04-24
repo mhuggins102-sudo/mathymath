@@ -568,9 +568,10 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           setError(body.error ?? "server_error");
           return;
         }
-        if (body.kind === "continue") {
+        if (body.kind === "continue" || body.kind === "won") {
           const pendingLocks = pending.locks;
           const pendingRedrawCount = pending.redraws ?? 0;
+          const isOracleWin = body.kind === "won";
           setState((s) => ({
             ...s,
             guesses: [
@@ -588,6 +589,9 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
               },
             ],
             pendingGuess: null,
+            ...(isOracleWin
+              ? { status: "won" as const, revealedTarget: body.target }
+              : {}),
           }));
         } else {
           setError("unexpected_response");

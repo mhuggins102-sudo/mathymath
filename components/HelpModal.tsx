@@ -45,6 +45,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           <p>
             Guess the secret 5-digit number in 7 tries. Digits can repeat
             (e.g. <span className="font-mono text-foreground">74727</span>).
+            Unlimited mode also offers a 6-digit / 8-tries variant.
           </p>
           <p>
             After each guess you&apos;ll be offered{" "}

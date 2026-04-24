@@ -133,6 +133,35 @@ export function loadDailyGame(key: string): SavedDailyGame | null {
   }
 }
 
+// --- Unlimited mode preference ---
+//
+// The Unlimited page lets the player choose 5-digit, 6-digit, or "mix"
+// (weighted 3:1 between 5 and 6). The choice is saved so reloads keep
+// the preferred shape. Daily is unaffected — it's always 5-digit.
+
+export type UnlimitedMode = "5" | "6" | "mix";
+
+const UNLIMITED_MODE_KEY = "unlimitedMode";
+
+const unlimitedModeSchema = z.enum(["5", "6", "mix"]);
+
+export function loadUnlimitedMode(): UnlimitedMode {
+  if (typeof window === "undefined") return "5";
+  const raw = window.localStorage.getItem(STORAGE_PREFIX + UNLIMITED_MODE_KEY);
+  if (!raw) return "5";
+  const parsed = unlimitedModeSchema.safeParse(raw);
+  return parsed.success ? parsed.data : "5";
+}
+
+export function saveUnlimitedMode(mode: UnlimitedMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + UNLIMITED_MODE_KEY, mode);
+  } catch {
+    // ignore quota errors
+  }
+}
+
 // --- Personal stats (unlimited mode) ---
 
 const personalStatsSchema = z.object({
