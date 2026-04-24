@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
-import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+import { maxGuessesForDigits } from "@/lib/game/stateMachine";
 import type { ClueId } from "@/lib/game/clues/types";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
@@ -14,22 +14,56 @@ import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
+import {
+  loadUnlimitedMode,
+  saveUnlimitedMode,
+  type UnlimitedMode,
+} from "@/lib/persistence/localStore";
 
-function newSession() {
-  return { target: generateRandomTarget(5), seed: uuidv4() };
+interface Session {
+  target: string;
+  seed: string;
+  digits: number;
+}
+
+/** Resolves the chosen mode to a concrete digit count for the next
+ *  game. "mix" randomizes per game with 3:1 odds favoring 5-digit. */
+function resolveDigits(mode: UnlimitedMode): number {
+  if (mode === "5") return 5;
+  if (mode === "6") return 6;
+  return Math.random() < 0.75 ? 5 : 6;
+}
+
+function newSession(mode: UnlimitedMode): Session {
+  const digits = resolveDigits(mode);
+  return { target: generateRandomTarget(digits), seed: uuidv4(), digits };
 }
 
 export default function UnlimitedPage() {
-  const [session, setSession] = useState<{ target: string; seed: string } | null>(
-    null,
-  );
+  const [mode, setMode] = useState<UnlimitedMode>("5");
+  const [session, setSession] = useState<Session | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
 
+  // Hydrate the saved mode preference on first paint, then start the
+  // first session against it. Same effect so we don't kick off a 5-digit
+  // game and immediately replace it with the preferred shape on the
+  // next render.
   useEffect(() => {
-    setSession(newSession());
+    const saved = loadUnlimitedMode();
+    setMode(saved);
+    setSession(newSession(saved));
   }, []);
+
+  const handleModeChange = (next: UnlimitedMode) => {
+    setMode(next);
+    saveUnlimitedMode(next);
+    // Start a fresh session in the new mode immediately. This discards
+    // any in-progress game — acceptable for unlimited (no persisted
+    // state). The key on UnlimitedGame remounts the reducer.
+    setSession(newSession(next));
+  };
 
   if (!session) {
     return (
@@ -44,7 +78,9 @@ export default function UnlimitedPage() {
       // key forces a full remount (fresh reducer state, fresh effects) on "New puzzle"
       key={session.seed}
       session={session}
-      onNew={() => setSession(newSession())}
+      mode={mode}
+      onModeChange={handleModeChange}
+      onNew={() => setSession(newSession(mode))}
       helpOpen={helpOpen}
       setHelpOpen={setHelpOpen}
       settingsOpen={settingsOpen}
@@ -57,6 +93,8 @@ export default function UnlimitedPage() {
 
 function UnlimitedGame({
   session,
+  mode,
+  onModeChange,
   onNew,
   helpOpen,
   setHelpOpen,
@@ -65,7 +103,9 @@ function UnlimitedGame({
   statsOpen,
   setStatsOpen,
 }: {
-  session: { target: string; seed: string };
+  session: Session;
+  mode: UnlimitedMode;
+  onModeChange: (next: UnlimitedMode) => void;
   onNew: () => void;
   helpOpen: boolean;
   setHelpOpen: (v: boolean) => void;
@@ -74,6 +114,7 @@ function UnlimitedGame({
   statsOpen: boolean;
   setStatsOpen: (v: boolean) => void;
 }) {
+  const maxGuesses = maxGuessesForDigits(session.digits);
   const {
     state,
     input,
@@ -99,8 +140,8 @@ function UnlimitedGame({
   } = useGame({
     target: session.target,
     seed: session.seed,
-    digits: 5,
-    maxGuesses: DEFAULT_MAX_GUESSES,
+    digits: session.digits,
+    maxGuesses,
     trackStats: true,
   });
 
@@ -160,6 +201,12 @@ function UnlimitedGame({
         </div>
       </header>
 
+      <ModeSelector
+        mode={mode}
+        digits={session.digits}
+        onChange={onModeChange}
+      />
+
       <div className="flex-1 flex flex-col">
         <GuessGrid
           state={state}
@@ -178,7 +225,7 @@ function UnlimitedGame({
               selection before it resolves. */}
           {pendingClueParam?.paramKind === "slot" ? (
             <SlotPicker
-              digits={5}
+              digits={session.digits}
               certainDigits={certainDigits}
               onSelect={(slot) =>
                 confirmClueParam({ selectedSlot: slot })
@@ -268,5 +315,57 @@ function UnlimitedGame({
         mode="unlimited"
       />
     </main>
+  );
+}
+
+/** Three-way segmented control for picking the unlimited variant.
+ *  Mode "mix" rerolls between 5 and 6 each new puzzle (75% / 25%). */
+function ModeSelector({
+  mode,
+  digits,
+  onChange,
+}: {
+  mode: UnlimitedMode;
+  digits: number;
+  onChange: (next: UnlimitedMode) => void;
+}) {
+  const options: { value: UnlimitedMode; label: string }[] = [
+    { value: "5", label: "5-digit" },
+    { value: "6", label: "6-digit" },
+    { value: "mix", label: "Mix" },
+  ];
+  return (
+    <div className="mb-3">
+      <div
+        role="radiogroup"
+        aria-label="Game length"
+        className="grid grid-cols-3 gap-1 bg-surface-2 rounded-md p-1"
+      >
+        {options.map((opt) => {
+          const selected = mode === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(opt.value)}
+              className={`text-xs font-semibold py-1.5 rounded transition ${
+                selected
+                  ? "bg-accent/80 text-background"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      {mode === "mix" && (
+        <p className="text-[10px] text-muted text-center mt-1.5">
+          Currently playing {digits}-digit (mix randomizes 75% / 25%).
+        </p>
+      )}
+    </div>
   );
 }

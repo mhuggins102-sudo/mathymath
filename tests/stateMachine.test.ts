@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { initGameState, reduce } from "@/lib/game/stateMachine";
+import {
+  initGameState,
+  maxGuessesForDigits,
+  reduce,
+  type GameState,
+} from "@/lib/game/stateMachine";
+import { getClueById } from "@/lib/game/clues/registry";
 
 describe("stateMachine", () => {
   it("wins on exact match without showing clue options", () => {
@@ -115,5 +121,79 @@ describe("stateMachine", () => {
     const chosen = s.pendingGuess!.options[0];
     s = reduce(s, { type: "CHOOSE_CLUE", clueId: chosen.id });
     expect(s.guesses[0].locks).toBeUndefined();
+  });
+
+  it("Oracle wins immediately when it reveals the last unknown slot", () => {
+    // Pre-stage 4 correct locks across prior guesses so only slot 4 is
+    // unknown, then choose Oracle on slot 4. Game should transition to
+    // "won" without requiring the player to submit the matching guess.
+    const oracle = getClueById("oracle");
+    const sumDelta = getClueById("sumDelta");
+    const state: GameState = {
+      target: "12345",
+      digits: 5,
+      maxGuesses: 7,
+      seed: "t",
+      deckOffset: 0,
+      status: "playing",
+      guesses: [
+        { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 } },
+        { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 }, locks: [{ slot: 0, digit: "1", correct: true }] },
+        { guess: "10000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 14 }, locks: [{ slot: 1, digit: "2", correct: true }] },
+        { guess: "12000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 12 }, locks: [{ slot: 2, digit: "3", correct: true }] },
+        { guess: "12300", clueId: "sumDelta", result: { kind: "sumDelta", delta: 9 }, locks: [{ slot: 3, digit: "4", correct: true }] },
+      ],
+      pendingGuess: {
+        guess: "12340",
+        options: [oracle, sumDelta] as [typeof oracle, typeof sumDelta],
+        redraws: 0,
+      },
+    };
+    const next = reduce(state, {
+      type: "CHOOSE_CLUE",
+      clueId: "oracle",
+      param: { selectedSlot: 4 },
+    });
+    expect(next.status).toBe("won");
+    expect(next.pendingGuess).toBeNull();
+  });
+
+  it("Oracle does NOT win when it leaves slots still unknown", () => {
+    const oracle = getClueById("oracle");
+    const sumDelta = getClueById("sumDelta");
+    const state: GameState = {
+      target: "12345",
+      digits: 5,
+      maxGuesses: 7,
+      seed: "t",
+      deckOffset: 0,
+      status: "playing",
+      guesses: [
+        { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 } },
+      ],
+      pendingGuess: {
+        guess: "11111",
+        options: [oracle, sumDelta] as [typeof oracle, typeof sumDelta],
+        redraws: 0,
+      },
+    };
+    const next = reduce(state, {
+      type: "CHOOSE_CLUE",
+      clueId: "oracle",
+      param: { selectedSlot: 0 },
+    });
+    expect(next.status).toBe("playing");
+  });
+});
+
+describe("maxGuessesForDigits", () => {
+  it("returns 7 for the 5-digit puzzle", () => {
+    expect(maxGuessesForDigits(5)).toBe(7);
+  });
+  it("returns 8 for the 6-digit puzzle", () => {
+    expect(maxGuessesForDigits(6)).toBe(8);
+  });
+  it("falls back to the default for unlisted digit counts", () => {
+    expect(maxGuessesForDigits(4)).toBe(7);
   });
 });

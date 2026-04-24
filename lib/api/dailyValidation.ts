@@ -1,7 +1,7 @@
 import type { ClueId, ClueResult } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
-import { knownSlotsFromHistory } from "@/lib/game/certain";
+import { deriveCertainDigits, knownSlotsFromHistory } from "@/lib/game/certain";
 import {
   INITIAL_LOCKS,
   MAX_LOCKS,
@@ -232,6 +232,18 @@ export function validateDailyHistory(
       spent += history[k].redraws ?? 0;
     }
     locksRemaining = Math.max(0, cap - spent);
+    // Oracle-induced win: if this guess's clue (Oracle, possibly via
+    // Clue Reuse) revealed the last unknown slot, the player wins
+    // here without needing to submit the now-known target.
+    if (expected.kind === "oracle") {
+      const certain = deriveCertainDigits(
+        history.slice(0, i + 1) as Parameters<typeof deriveCertainDigits>[0],
+        digits,
+      );
+      if (certain.every((d) => d !== null)) {
+        status = "won";
+      }
+    }
   }
 
   return { ok: true, status, chosenClueIds };

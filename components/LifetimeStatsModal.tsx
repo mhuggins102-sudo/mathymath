@@ -8,8 +8,16 @@ import {
   type DailyHistoryStats,
   type PersonalStats,
 } from "@/lib/persistence/localStore";
-import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
+import { DEFAULT_MAX_GUESSES, MAX_GUESSES_BY_DIGITS } from "@/lib/game/stateMachine";
 import { Modal } from "./Modal";
+
+// Unlimited mode can include 6-digit games (8-guess budget). The
+// distribution chart renders rows up to whichever cap is in use; daily
+// stays at the 5-digit budget.
+const UNLIMITED_MAX_GUESSES = Math.max(
+  ...Object.values(MAX_GUESSES_BY_DIGITS),
+  DEFAULT_MAX_GUESSES,
+);
 
 export type StatsMode = "daily" | "unlimited" | "both";
 
@@ -68,6 +76,7 @@ export function LifetimeStatsModal({
             currentStreak={daily?.currentStreak ?? 0}
             bestStreak={daily?.bestStreak ?? 0}
             distribution={daily?.distribution ?? {}}
+            maxGuesses={DEFAULT_MAX_GUESSES}
           />
         )}
         {(mode === "unlimited" || mode === "both") && (
@@ -79,6 +88,7 @@ export function LifetimeStatsModal({
             currentStreak={unlimited?.currentStreak ?? 0}
             bestStreak={unlimited?.bestStreak ?? 0}
             distribution={unlimited?.distribution ?? {}}
+            maxGuesses={UNLIMITED_MAX_GUESSES}
           />
         )}
       </div>
@@ -108,6 +118,7 @@ export function LifetimeStatsModal({
 function meanFromDistribution(
   distribution: Record<string, number>,
   losses: number,
+  maxGuesses: number,
 ): number | null {
   let sum = 0;
   let n = 0;
@@ -117,9 +128,10 @@ function meanFromDistribution(
     sum += g * count;
     n += count;
   }
-  // Losses count as one more than the max budget (8 for a 7-guess game)
-  // so the mean reflects overall skill, not just winning speed.
-  sum += losses * (DEFAULT_MAX_GUESSES + 1);
+  // Losses count as one more than the max budget so the mean reflects
+  // overall skill, not just winning speed. Uses the larger budget when
+  // unlimited mixes 5- and 6-digit games.
+  sum += losses * (maxGuesses + 1);
   n += losses;
   return n === 0 ? null : sum / n;
 }
@@ -132,6 +144,7 @@ function Block({
   currentStreak,
   bestStreak,
   distribution,
+  maxGuesses,
 }: {
   title: string;
   showTitle: boolean;
@@ -140,10 +153,11 @@ function Block({
   currentStreak: number;
   bestStreak: number;
   distribution: Record<string, number>;
+  maxGuesses: number;
 }) {
   const winPct = played ? Math.round((wins / played) * 100) : 0;
   const losses = Math.max(0, played - wins);
-  const meanVal = meanFromDistribution(distribution, losses);
+  const meanVal = meanFromDistribution(distribution, losses, maxGuesses);
   const meanLabel = meanVal === null ? "—" : meanVal.toFixed(1);
 
   return (
@@ -168,7 +182,7 @@ function Block({
           </div>
           <DistributionBars
             distribution={distribution}
-            maxGuesses={DEFAULT_MAX_GUESSES}
+            maxGuesses={maxGuesses}
             losses={Math.max(0, played - wins)}
           />
         </>
