@@ -21,7 +21,7 @@ export type DigitBadge = "lock-pending" | "lock-correct" | "lock-wrong";
 
 interface DigitProps {
   value: string | null;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "lg-narrow";
   state?: DigitState;
   animate?: boolean;
   badge?: DigitBadge;
@@ -47,12 +47,16 @@ const STATE_CLASS: Record<DigitState, string> = {
   "locked-pending": "border-accent/80 bg-accent/15 text-foreground",
 };
 
-const SIZE_CLASS: Record<"sm" | "md" | "lg", string> = {
+const SIZE_CLASS: Record<"sm" | "md" | "lg" | "lg-narrow", string> = {
   sm: "h-9 w-8 text-lg",
   md: "h-10 w-9 text-lg",
   // "lg" is the in-game row size. Perfect-square cells so 8 rows + keypad
   // comfortably fit on a typical phone without vertical scrolling.
   lg: "h-10 w-10 text-xl sm:h-11 sm:w-11 sm:text-2xl",
+  // "lg-narrow" trims the cell width without dropping height — used by
+  // the 6-digit Unlimited variant so the row's clue label still fits to
+  // the left of the digit strip on phone-width viewports.
+  "lg-narrow": "h-10 w-8 text-lg sm:h-11 sm:w-9 sm:text-xl",
 };
 
 const BADGE_CLASS: Record<DigitBadge, string> = {

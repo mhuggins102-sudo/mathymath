@@ -14,18 +14,25 @@ export function SlotPicker({
   certainDigits,
   onSelect,
   onCancel,
+  compact,
 }: {
   digits: number;
   certainDigits: (string | null)[];
   onSelect: (slot: number) => void;
   onCancel: () => void;
+  /** Tightens cell sizing to match the 6-digit row layout in the grid. */
+  compact?: boolean;
 }) {
   return (
     <div className="w-full max-w-md mx-auto select-none text-center">
       <p className="text-[10px] uppercase tracking-wider text-muted mb-2">
         Pick a slot to reveal
       </p>
-      <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-3">
+      <div
+        className={`flex items-center justify-center mb-3 ${
+          compact ? "gap-1 sm:gap-1.5" : "gap-1.5 sm:gap-2"
+        }`}
+      >
         {Array.from({ length: digits }, (_, i) => {
           const known = certainDigits[i] !== null;
           const state: DigitState = known ? "match" : "idle";
@@ -33,7 +40,7 @@ export function SlotPicker({
             <Digit
               key={i}
               value={known ? certainDigits[i] : null}
-              size="lg"
+              size={compact ? "lg-narrow" : "lg"}
               state={state}
               onClick={known ? undefined : () => onSelect(i)}
               ariaLabel={

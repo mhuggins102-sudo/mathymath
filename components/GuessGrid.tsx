@@ -40,6 +40,9 @@ interface GuessGridProps {
   /** Tap handler for cells on the active row (initiates / cancels a
    *  lock selection). */
   onTapCell?: (slot: number) => void;
+  /** Tightens cell sizing so wider rows (6 digits) fit alongside the
+   *  clue label on phone-width viewports. */
+  compact?: boolean;
 }
 
 /**
@@ -57,6 +60,7 @@ export function GuessGrid({
   lockedSlots,
   pendingLockSlot,
   onTapCell,
+  compact,
 }: GuessGridProps) {
   const rows: React.ReactNode[] = [];
 
@@ -70,6 +74,7 @@ export function GuessGrid({
         result={g.result}
         locks={g.locks}
         interactive
+        compact={compact}
       />,
     );
   }
@@ -88,6 +93,7 @@ export function GuessGrid({
         active
         certainDigits={certainDigits}
         lockedSlots={state.pendingGuess.locks}
+        compact={compact}
       />,
     );
   } else if (state.status === "playing") {
@@ -103,6 +109,7 @@ export function GuessGrid({
         lockedSlots={lockedSlots}
         pendingLockSlot={pendingLockSlot}
         onTapCell={onTapCell}
+        compact={compact}
       />,
     );
   }
