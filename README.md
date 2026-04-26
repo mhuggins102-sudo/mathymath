@@ -29,6 +29,38 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Daily leaderboard backend
+
+The daily-puzzle leaderboard is backed by `lib/api/dailyStore.ts`. Without
+configuration it uses an in-memory store (resets on restart, not shared
+across server instances) — fine for development. For production, point it
+at a Cloudflare D1 database.
+
+1. Create the database (one-time):
+
+   ```bash
+   wrangler d1 create mathymath-daily
+   ```
+
+2. Apply the schema:
+
+   ```bash
+   wrangler d1 execute mathymath-daily --remote --file=scripts/d1-schema.sql
+   ```
+
+3. Set these env vars on the deployment (and locally in `.env.local` if
+   you want to test the real backend in dev):
+
+   ```
+   CF_ACCOUNT_ID=...
+   CF_D1_DATABASE_ID=...        # printed by `wrangler d1 create`
+   CF_D1_API_TOKEN=...           # API token with D1 read+write
+   ```
+
+When all three are present, `getDailyStore()` returns the D1 adapter
+(`lib/api/dailyStoreD1.ts`); otherwise it falls back to the in-memory
+store, so tests and local dev keep working with no setup.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

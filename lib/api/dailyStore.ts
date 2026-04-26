@@ -1,15 +1,19 @@
 /**
- * In-memory daily results aggregator. This is intentionally a module-scoped
- * Map so that a single Next.js server process can track submissions without
- * requiring a database.
+ * In-memory daily results aggregator. Used in development and tests; in
+ * production, getDailyStore() swaps in the Cloudflare D1 adapter when
+ * CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_D1_API_TOKEN are all set.
  *
- * For production, swap this for a real DB-backed implementation behind the
- * same interface (see `DailyStore` below). Expected DB shape:
+ * The in-memory store is module-scoped, so a single Next.js server
+ * process tracks submissions until restart. It is NOT shared across
+ * serverless instances — that's the D1 adapter's job.
  *
- *   daily_results(client_id UUID, puzzle_date DATE, guess_count SMALLINT,
- *                 won BOOLEAN, chosen_clues JSONB, created_at TIMESTAMPTZ,
- *                 UNIQUE(client_id, puzzle_date))
+ * D1 schema is in `scripts/d1-schema.sql`.
  */
+
+import {
+  createD1DailyStore,
+  readD1ConfigFromEnv,
+} from "./dailyStoreD1";
 
 export interface DailyResult {
   clientId: string;
@@ -93,8 +97,19 @@ export const inMemoryDailyStore: DailyStore = {
   },
 };
 
+/** Cached store instance. Selected once on first access so we don't
+ *  re-read env vars (or re-construct an HTTP client) on every request. */
+let cachedStore: DailyStore | null = null;
+
 export function getDailyStore(): DailyStore {
-  // When DATABASE_URL is set, a real implementation can be wired here.
-  // For now we always use in-memory.
-  return inMemoryDailyStore;
+  if (cachedStore) return cachedStore;
+  const cfg = readD1ConfigFromEnv();
+  cachedStore = cfg ? createD1DailyStore(cfg) : inMemoryDailyStore;
+  return cachedStore;
+}
+
+/** Test-only escape hatch: drop the cached store so the next call to
+ *  getDailyStore re-reads env. Not exported from the package barrel. */
+export function _resetDailyStoreCacheForTests(): void {
+  cachedStore = null;
 }
