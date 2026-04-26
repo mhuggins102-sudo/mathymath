@@ -110,7 +110,8 @@ export async function POST(req: Request) {
     .map((g, i) => ({ guessIdx: i, clueId: g.clueId }))
     .filter((c): c is { guessIdx: number; clueId: string } => !!c.clueId);
 
-  const res = await getDailyStore().submit({
+  const store = getDailyStore();
+  const res = await store.submit({
     clientId: data.clientId,
     puzzleDate: data.puzzleDate,
     guessCount,
@@ -119,5 +120,11 @@ export async function POST(req: Request) {
     durationMs: data.durationMs,
     createdAt: Date.now(),
   });
-  return NextResponse.json(res, { headers: NO_STORE_HEADERS });
+  // Annotate which backend served this response. Useful while debugging
+  // a "leaderboard isn't updating" report — if storeKind says "memory"
+  // in prod, the D1 env vars aren't reaching this function instance.
+  return NextResponse.json(
+    { ...res, storeKind: store.kind },
+    { headers: NO_STORE_HEADERS },
+  );
 }

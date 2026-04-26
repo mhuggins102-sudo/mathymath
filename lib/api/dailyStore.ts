@@ -33,6 +33,10 @@ export interface DailyAggregate {
 }
 
 export interface DailyStore {
+  /** Identifies the backend so a debug endpoint can surface whether
+   *  D1 is actually being used. "memory" means the in-process fallback
+   *  (per-instance state, NOT shared across serverless instances). */
+  readonly kind: "d1" | "memory";
   submit(result: DailyResult): Promise<{ percentile: number; aggregate: DailyAggregate; duplicate: boolean }>;
   aggregate(puzzleDate: string): Promise<DailyAggregate>;
 }
@@ -77,6 +81,7 @@ function percentileOf(arr: DailyResult[], me: DailyResult): number {
 }
 
 export const inMemoryDailyStore: DailyStore = {
+  kind: "memory",
   async submit(result) {
     const key = `${result.clientId}|${result.puzzleDate}`;
     const arr = ensureDate(result.puzzleDate);

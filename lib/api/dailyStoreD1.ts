@@ -110,6 +110,7 @@ function percentileOf(
 
 export function createD1DailyStore(config: D1Config): DailyStore {
   return {
+    kind: "d1",
     async submit(result: DailyResult) {
       // INSERT OR IGNORE = first write wins, matching the in-memory
       // store's de-dupe semantics. A second submit for the same
