@@ -18,10 +18,8 @@ describe("locks constants", () => {
 });
 
 describe("canUseLockOnGuess", () => {
-  it("disabled on guess 1 (index 0), enabled from guess 2+", () => {
-    expect(canUseLockOnGuess(0)).toBe(false);
-    expect(canUseLockOnGuess(1)).toBe(true);
-    expect(canUseLockOnGuess(7)).toBe(true);
+  it("allows locks on every guess (no per-turn restriction)", () => {
+    expect(canUseLockOnGuess()).toBe(true);
   });
 });
 

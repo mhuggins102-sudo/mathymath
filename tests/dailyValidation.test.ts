@@ -240,11 +240,11 @@ describe("validateDailyHistory", () => {
     if (!r.ok) expect(r.error).toMatch(/lock_correctness_mismatch/);
   });
 
-  it("rejects any lock on guess 1", () => {
+  it("accepts a correctly-claimed lock on guess 1 (no per-turn restriction)", () => {
     const g1 = honestGuess([], "11111");
     const withLock = {
       ...g1,
-      locks: [{ slot: 0, digit: "4", correct: true }],
+      locks: [{ slot: 0, digit: TARGET[0], correct: true }],
     };
     const r = validateDailyHistory({
       target: TARGET,
@@ -253,8 +253,7 @@ describe("validateDailyHistory", () => {
       seed: SEED,
       history: [withLock],
     });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/locks_on_first_guess/);
+    expect(r.ok).toBe(true);
   });
 
   it("rejects exceeding the lock budget", () => {

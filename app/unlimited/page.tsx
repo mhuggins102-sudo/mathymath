@@ -27,11 +27,11 @@ interface Session {
 }
 
 /** Resolves the chosen mode to a concrete digit count for the next
- *  game. "mix" randomizes per game with 3:1 odds favoring 5-digit. */
+ *  game. "mix" randomizes per game with even odds between 5 and 6. */
 function resolveDigits(mode: UnlimitedMode): number {
   if (mode === "5") return 5;
   if (mode === "6") return 6;
-  return Math.random() < 0.75 ? 5 : 6;
+  return Math.random() < 0.5 ? 5 : 6;
 }
 
 function newSession(mode: UnlimitedMode): Session {
@@ -201,11 +201,7 @@ function UnlimitedGame({
         </div>
       </header>
 
-      <ModeSelector
-        mode={mode}
-        digits={session.digits}
-        onChange={onModeChange}
-      />
+      <ModeSelector mode={mode} onChange={onModeChange} />
 
       <div className="flex-1 flex flex-col">
         <GuessGrid
@@ -281,7 +277,7 @@ function UnlimitedGame({
                     ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
                     : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
                   : hintLocks > 0
-                  ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+                  ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available — tap a cell to use`
                   : ""}
               </p>
             </>
@@ -321,14 +317,12 @@ function UnlimitedGame({
 }
 
 /** Three-way segmented control for picking the unlimited variant.
- *  Mode "mix" rerolls between 5 and 6 each new puzzle (75% / 25%). */
+ *  Mode "mix" rerolls between 5 and 6 each new puzzle (50% / 50%). */
 function ModeSelector({
   mode,
-  digits,
   onChange,
 }: {
   mode: UnlimitedMode;
-  digits: number;
   onChange: (next: UnlimitedMode) => void;
 }) {
   const options: { value: UnlimitedMode; label: string }[] = [
@@ -363,11 +357,6 @@ function ModeSelector({
           );
         })}
       </div>
-      {mode === "mix" && (
-        <p className="text-[10px] text-muted text-center mt-1.5">
-          Currently playing {digits}-digit (mix randomizes 75% / 25%).
-        </p>
-      )}
     </div>
   );
 }

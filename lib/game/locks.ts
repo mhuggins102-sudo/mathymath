@@ -78,10 +78,11 @@ export function locksAvailable(
   return Math.max(0, cap - spent);
 }
 
-/** Locks cannot be used on guess 1 (no clue info yet — pure guessing).
- *  `guessIndex` is zero-based; returns true for guessIndex >= 1. */
-export function canUseLockOnGuess(guessIndex: number): boolean {
-  return guessIndex >= 1;
+/** Locks may be used on any guess. Kept as a function so call sites
+ *  don't need to be touched if a per-turn restriction is reintroduced
+ *  later. */
+export function canUseLockOnGuess(): boolean {
+  return true;
 }
 
 /** Derives the revealed target digits from past locks alone. Used by

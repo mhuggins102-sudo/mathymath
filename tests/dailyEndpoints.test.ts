@@ -109,18 +109,21 @@ describe("POST /api/daily/[date]/submit-guess", () => {
     expect(body.target).toBeUndefined();
   });
 
-  it("rejects lock attempts on guess 1", async () => {
+  it("accepts lock attempts on guess 1 (no per-turn restriction)", async () => {
     const res = await submitGuess(
       mockRequest({
         history: [],
         guess: "11111",
-        lockAttempts: [{ slot: 0, digit: "1" }],
+        lockAttempts: [{ slot: 0, digit: TARGET[0] }],
       }),
       { params: paramsP(DATE) },
     );
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toBe("locks_on_first_guess");
+    expect(body.kind).toBe("pending");
+    expect(body.locks).toEqual([
+      { slot: 0, digit: TARGET[0], correct: true },
+    ]);
   });
 
   it("returns resolved locks with the pending response", async () => {

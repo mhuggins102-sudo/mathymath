@@ -12,7 +12,6 @@ import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
 import {
-  canUseLockOnGuess,
   INITIAL_LOCKS,
   locksAvailable as computeLocksAvailable,
 } from "@/lib/game/locks";
@@ -104,16 +103,9 @@ export async function POST(
   }
 
   const { guess, lockAttempts } = parsed.data;
-  const guessIndex = parsed.data.history.length;
 
-  // Lock guard: not on guess 1, no duplicate slots, within budget.
+  // Lock guard: no duplicate slots, within budget.
   if (lockAttempts && lockAttempts.length > 0) {
-    if (!canUseLockOnGuess(guessIndex)) {
-      return NextResponse.json(
-        { error: "locks_on_first_guess" },
-        { status: 409 },
-      );
-    }
     const slots = new Set<number>();
     for (const a of lockAttempts) {
       if (slots.has(a.slot)) {

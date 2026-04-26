@@ -168,10 +168,11 @@ export function useGame(config: UseGameConfig): UseGameResult {
     const updated = recordUnlimitedResult(
       state.status === "won",
       state.guesses.length,
+      state.digits,
     );
     statsRecordedRef.current = true;
     setUnlimitedStats(updated);
-  }, [state.status, state.guesses.length, config.trackStats]);
+  }, [state.status, state.guesses.length, state.digits, config.trackStats]);
 
   // ----- Input + lock state ------------------------------------------------
   //
@@ -202,7 +203,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const capacity = inputCapacity(certain) - lockedSlots.length;
 
   const locksAvailableCount = computeLocksAvailable(state.guesses);
-  const canUseLocks = canUseLockOnGuess(state.guesses.length);
+  const canUseLocks = canUseLockOnGuess();
   const canStartLock =
     canUseLocks && lockedSlots.length < locksAvailableCount;
   const pendingLockDigit = useMemo(() => {
