@@ -6,12 +6,12 @@ import type { LockRecord } from "./locks";
 
 export const DEFAULT_MAX_GUESSES = 7;
 
-/** Per-digit-count guess budgets. 5-digit games get 7 tries; 6-digit
- *  games (Unlimited mode only) get 8. Returns DEFAULT_MAX_GUESSES for
- *  any unlisted digit count. */
+/** Per-digit-count guess budgets. Both 5- and 6-digit games get 7
+ *  tries — the 6-digit puzzle is harder by design without an extended
+ *  budget. Returns DEFAULT_MAX_GUESSES for any unlisted digit count. */
 export const MAX_GUESSES_BY_DIGITS: Readonly<Record<number, number>> = {
   5: 7,
-  6: 8,
+  6: 7,
 };
 
 export function maxGuessesForDigits(digits: number): number {
