@@ -23,6 +23,14 @@ export const MAX_LOCKS = 3;
  *  the clue. */
 export const EXTRA_LOCK_CLUE_ID = "extraLock";
 
+/** Clue id for the Clue Reuse Special card. Picking it costs one lock
+ *  (reflected in the locksAvailable budget below) so it can't be used
+ *  as a free repeat-info button. */
+export const CLUE_REUSE_CLUE_ID = "clueReuse";
+
+/** Lock cost paid by picking Clue Reuse. */
+export const CLUE_REUSE_COST = 1;
+
 export interface LockAccountingGuess {
   clueId?: string;
   result?: unknown;
@@ -57,6 +65,8 @@ export function countExtraLocksGained(
  *
  *    remaining = min(MAX_LOCKS, initialLocks + extraLocksGained)
  *                − (incorrect locks ever used)
+ *                − (redraws spent)
+ *                − (clueReuse picks × CLUE_REUSE_COST)
  *
  *  Correct locks don't count as spent — the player keeps them. */
 export function locksAvailable(
@@ -74,6 +84,10 @@ export function locksAvailable(
     }
     // Each redraw (burn-lock-to-redraw) costs one lock.
     spent += g.redraws ?? 0;
+    // Each Clue Reuse pick costs one lock. Counted whether or not the
+    // re-used clue was a freebie like Extra Lock — the cost is for the
+    // reuse action itself.
+    if (g.clueId === CLUE_REUSE_CLUE_ID) spent += CLUE_REUSE_COST;
   }
   return Math.max(0, cap - spent);
 }

@@ -55,6 +55,24 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
       className: "text-warn",
     });
   });
+
+  it("Ups and Downs", () => {
+    // 24651 has 2 direction changes (up then down).
+    expect(subLabelFor("24651", { kind: "upsAndDowns", cmp: "eq" })).toEqual({
+      text: "= 2",
+      className: "text-good",
+    });
+    // 12345 has 1 direction; "↑" means target has more than 1.
+    expect(subLabelFor("12345", { kind: "upsAndDowns", cmp: "gt" })).toEqual({
+      text: "↑ 1",
+      className: "text-warn",
+    });
+    // 11111 has 0 direction changes.
+    expect(subLabelFor("11111", { kind: "upsAndDowns", cmp: "lt" })).toEqual({
+      text: "↓ 0",
+      className: "text-bad",
+    });
+  });
 });
 
 describe("subLabelFor — Sum Delta uses exact delta (Option B)", () => {

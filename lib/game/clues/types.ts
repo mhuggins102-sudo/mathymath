@@ -11,7 +11,6 @@ export type DigitStateName =
   | "match"
   | "close"
   | "warm"
-  | "cool"
   | "cold"
   | "hint"
   | "entering";
@@ -41,6 +40,7 @@ export type ClueResult =
   | { kind: "divisibleBy"; divisor: number | null; present: boolean }
   | { kind: "totalDeviation"; value: number }
   | { kind: "diceCount"; cmp: Cmp }
+  | { kind: "upsAndDowns"; cmp: Cmp }
   // Special — meta-action cards that don't reveal target info but
   // change game resources. extraLock grants +1 lock (see locks.ts).
   | { kind: "extraLock" }

@@ -61,11 +61,13 @@ function cellStates(
         i === result.slot ? "match" : "idle",
       );
     case "thermometer":
+      // 4 tiers (was 5): exact / 1-2 / 3-4 / 5+. Skips the orange "cool"
+      // band — the two-state heat ramp now goes match → close → warm →
+      // cold so the gradient still reads as cooling off.
       return result.tier.map((t) => {
         if (t === 0) return "match";
         if (t === 1) return "close";
         if (t === 2) return "warm";
-        if (t === 3) return "cool";
         return "cold";
       });
     default:
@@ -170,6 +172,22 @@ function computeDiceCount(s: string): number {
   return n;
 }
 
+function computeDirectionRuns(s: string): number {
+  let count = 0;
+  let lastDir: "up" | "down" | null = null;
+  for (let i = 0; i < s.length - 1; i++) {
+    const a = Number(s[i]);
+    const b = Number(s[i + 1]);
+    if (a === b) continue;
+    const dir: "up" | "down" = b > a ? "up" : "down";
+    if (dir !== lastDir) {
+      count++;
+      lastDir = dir;
+    }
+  }
+  return count;
+}
+
 function computeDigitSum(s: string): number {
   let sum = 0;
   for (const ch of s) sum += Number(ch);
@@ -193,7 +211,8 @@ export function subLabelFor(
     case "parityBalance":
     case "primeCount":
     case "median":
-    case "diceCount": {
+    case "diceCount":
+    case "upsAndDowns": {
       const own =
         result.kind === "rangeCompare"
           ? computeRange(guess)
@@ -203,6 +222,8 @@ export function subLabelFor(
           ? computePrimeCount(guess)
           : result.kind === "diceCount"
           ? computeDiceCount(guess)
+          : result.kind === "upsAndDowns"
+          ? computeDirectionRuns(guess)
           : computeMedian(guess);
       const symbol =
         result.cmp === "eq" ? "=" : result.cmp === "gt" ? "↑" : "↓";

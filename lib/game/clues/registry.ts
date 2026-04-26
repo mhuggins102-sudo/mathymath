@@ -16,6 +16,7 @@ import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
 import { totalDeviationClue } from "./totalDeviation";
 import { diceCountClue } from "./diceCount";
+import { upsAndDownsClue } from "./upsAndDowns";
 import { extraLockClue } from "./extraLock";
 import { clueReuseClue } from "./clueReuse";
 
@@ -45,6 +46,7 @@ export const CLUES: readonly Clue[] = [
   divisibleByClue,
   totalDeviationClue,
   diceCountClue,
+  upsAndDownsClue,
   extraLockClue,
   clueReuseClue,
 ] as const;

@@ -16,6 +16,10 @@ import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
 import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
 import { diceCountClue } from "@/lib/game/clues/diceCount";
+import {
+  directionRuns,
+  upsAndDownsClue,
+} from "@/lib/game/clues/upsAndDowns";
 import { extraLockClue } from "@/lib/game/clues/extraLock";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
@@ -126,14 +130,20 @@ describe("Oracle", () => {
 });
 
 describe("Thermometer", () => {
-  it("tiers distances", () => {
-    // |1-1|=0 -> 0
-    // |3-6|=3 -> 2 (within 3)
-    // |5-8|=3 -> 2 (within 3)
-    // |7-2|=5 -> 3 (within 5)
-    // |9-0|=9 -> 4 (far)
+  it("tiers distances into 4 buckets (exact / 1-2 / 3-4 / 5+)", () => {
+    // |1-1|=0 -> 0 (exact)
+    // |3-6|=3 -> 2 (3-4 off)
+    // |5-8|=3 -> 2 (3-4 off)
+    // |7-2|=5 -> 3 (5+ off)
+    // |9-0|=9 -> 3 (5+ off)
     expect(thermometerClue.compute("13579", "16820").tier).toEqual([
-      0, 2, 2, 3, 4,
+      0, 2, 2, 3, 3,
+    ]);
+  });
+  it("groups 1 and 2 into the close tier (1)", () => {
+    // |1-2|=1 -> 1; |2-4|=2 -> 1; |3-3|=0 -> 0
+    expect(thermometerClue.compute("12300", "24300").tier).toEqual([
+      1, 1, 0, 0, 0,
     ]);
   });
 });
@@ -282,6 +292,28 @@ describe("Total Deviation", () => {
   });
 });
 
+describe("Ups and Downs", () => {
+  it("counts monotonic runs", () => {
+    expect(directionRuns("11111")).toBe(0); // all equal — no direction
+    expect(directionRuns("12345")).toBe(1); // all up
+    expect(directionRuns("54321")).toBe(1); // all down
+    expect(directionRuns("24651")).toBe(2); // up, down
+    expect(directionRuns("20054")).toBe(3); // down, up, down (00 doesn't count)
+    expect(directionRuns("12121")).toBe(4); // up, down, up, down
+    // 6-digit examples
+    expect(directionRuns("123456")).toBe(1);
+    expect(directionRuns("121212")).toBe(5);
+  });
+  it("compares target's run count to guess", () => {
+    // 12345 → 1, 24651 → 2 → target ↑
+    expect(upsAndDownsClue.compute("12345", "24651").cmp).toBe("gt");
+    // 20054 → 3, 24651 → 2 → target ↓
+    expect(upsAndDownsClue.compute("20054", "24651").cmp).toBe("lt");
+    // 12321 → 2, 24651 → 2 → eq
+    expect(upsAndDownsClue.compute("12321", "24651").cmp).toBe("eq");
+  });
+});
+
 describe("Dice Count", () => {
   it("counts digits that are standard die values (1-6)", () => {
     // cmp convention: target vs guess. target 47628 has 4,6,2 = 3 die
@@ -391,10 +423,10 @@ describe("6-digit length sanity", () => {
 });
 
 describe("Registry", () => {
-  it("has 19 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(19);
+  it("has 20 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(20);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(19);
+    expect(ids.size).toBe(20);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }
