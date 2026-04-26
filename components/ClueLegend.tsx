@@ -10,7 +10,6 @@ const SWATCH_CLASS: Record<LegendEntry["state"], string> = {
   match: "bg-good",
   close: "bg-close",
   warm: "bg-warn",
-  cool: "bg-cool",
   cold: "bg-bad",
   hint: "bg-warn/50",
 };

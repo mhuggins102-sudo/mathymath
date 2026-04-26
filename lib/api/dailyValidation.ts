@@ -3,6 +3,8 @@ import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import { deriveCertainDigits, knownSlotsFromHistory } from "@/lib/game/certain";
 import {
+  CLUE_REUSE_CLUE_ID,
+  CLUE_REUSE_COST,
   INITIAL_LOCKS,
   MAX_LOCKS,
   countExtraLocksGained,
@@ -211,9 +213,22 @@ export function validateDailyHistory(
     if (!resultsMatch(g.result, expected)) {
       return { ok: false, error: `result_mismatch_at_${i}` };
     }
+    // Clue Reuse costs locks; reject the pick if the player couldn't
+    // afford it at the moment of choice. "At pick" budget = locks the
+    // player still has after this turn's wrong locks and redraws are
+    // accounted for, but before the cost of the pick itself.
+    if (g.clueId === CLUE_REUSE_CLUE_ID) {
+      const wrongLocksThisTurn =
+        (g.locks ?? []).filter((l) => !l.correct).length;
+      const budgetAtPick =
+        locksRemaining - wrongLocksThisTurn - roundRedraws;
+      if (budgetAtPick < CLUE_REUSE_COST) {
+        return { ok: false, error: `clue_reuse_no_budget_at_${i}` };
+      }
+    }
     chosenClueIds.push(g.clueId as ClueId);
     // Update running budget: Extra Lock grants +1 (capped at MAX_LOCKS);
-    // incorrect locks used this turn spend the budget.
+    // incorrect locks + redraws + Clue Reuse picks all spend the budget.
     const extraSoFar = countExtraLocksGained(
       history.slice(0, i + 1) as IncomingGuess[],
     );
@@ -226,6 +241,7 @@ export function validateDailyHistory(
         if (!lock.correct) spent += 1;
       }
       spent += history[k].redraws ?? 0;
+      if (history[k].clueId === CLUE_REUSE_CLUE_ID) spent += CLUE_REUSE_COST;
     }
     locksRemaining = Math.max(0, cap - spent);
     // Oracle-induced win: if this guess's clue (Oracle, possibly via

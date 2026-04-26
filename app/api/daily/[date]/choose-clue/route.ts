@@ -4,6 +4,12 @@ import {
   generateDailyTarget,
   todayUtcISO,
 } from "@/lib/game/targetGenerator";
+import {
+  CLUE_REUSE_CLUE_ID,
+  CLUE_REUSE_COST,
+  INITIAL_LOCKS,
+  locksAvailable as computeLocksAvailable,
+} from "@/lib/game/locks";
 import { validateDailyHistory } from "@/lib/api/dailyValidation";
 import type { ClueId } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
@@ -125,6 +131,24 @@ export async function POST(
   // excludes used ids, so this should be impossible).
   if (validation.chosenClueIds.includes(clueId as (typeof offeredIds)[number])) {
     return NextResponse.json({ error: "clue_reused" }, { status: 409 });
+  }
+
+  // Clue Reuse costs locks; the player must have enough budget AFTER
+  // this turn's redraws to afford it. The validator above already
+  // counts wrong locks from prior history; redraws on the current turn
+  // come in via parsed.data.redraws.
+  if (clueId === CLUE_REUSE_CLUE_ID) {
+    const budgetBeforeTurn = computeLocksAvailable(
+      parsed.data.history as Parameters<typeof computeLocksAvailable>[0],
+      INITIAL_LOCKS,
+    );
+    const budgetAtPick = budgetBeforeTurn - parsed.data.redraws;
+    if (budgetAtPick < CLUE_REUSE_COST) {
+      return NextResponse.json(
+        { error: "clue_reuse_no_budget" },
+        { status: 409 },
+      );
+    }
   }
 
   const clue = getClueById(clueId as (typeof offeredIds)[number]);

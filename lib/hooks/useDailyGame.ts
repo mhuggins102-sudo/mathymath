@@ -18,6 +18,8 @@ import {
 import { pickTwoClues } from "@/lib/game/clueSelector";
 import {
   canUseLockOnGuess,
+  CLUE_REUSE_CLUE_ID,
+  CLUE_REUSE_COST,
   locksAvailable as computeLocksAvailable,
   type LockRecord,
 } from "@/lib/game/locks";
@@ -611,13 +613,22 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       if (!state.pendingGuess) return;
       const clue = state.pendingGuess.options.find((c) => c.id === clueId);
       if (!clue) return;
+      // Defensive: refuse Clue Reuse when the lock budget can't cover
+      // its cost. The chooser button is disabled in that state too;
+      // this guards against a stale render or a programmatic call.
+      if (
+        clueId === CLUE_REUSE_CLUE_ID &&
+        locksAvailableCount < CLUE_REUSE_COST
+      ) {
+        return;
+      }
       if (clue.paramKind) {
         setPendingClueParam({ clueId, paramKind: clue.paramKind });
         return;
       }
       doChooseClue(clueId);
     },
-    [state.pendingGuess, doChooseClue],
+    [state.pendingGuess, doChooseClue, locksAvailableCount],
   );
 
   const confirmClueParam = useCallback(

@@ -19,6 +19,7 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   divisibleBy: "➗",
   totalDeviation: "📐",
   diceCount: "🎲",
+  upsAndDowns: "🌊",
   extraLock: "🔒",
   clueReuse: "🔄",
 };
@@ -45,7 +46,9 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
       return cells.join("");
     }
     case "thermometer": {
-      const map = ["🟩", "🟧", "🟨", "🟦", "⬛"];
+      // 4 tiers: exact / 1-2 off / 3-4 off / 5+ off. Emoji order tracks
+      // the on-screen heat ramp (green → blue → yellow → red).
+      const map = ["🟩", "🟦", "🟨", "🟥"];
       return result.tier.map((t) => map[t] ?? "⬛").join("");
     }
     default: {

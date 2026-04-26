@@ -19,6 +19,8 @@ import {
 } from "@/lib/game/certain";
 import {
   canUseLockOnGuess,
+  CLUE_REUSE_CLUE_ID,
+  CLUE_REUSE_COST,
   locksAvailable as computeLocksAvailable,
 } from "@/lib/game/locks";
 import {
@@ -454,6 +456,16 @@ export function useGame(config: UseGameConfig): UseGameResult {
       if (!state.pendingGuess) return;
       const clue = state.pendingGuess.options.find((c) => c.id === id);
       if (!clue) return;
+      // Defensive: refuse Clue Reuse when the lock budget can't cover
+      // its cost. The chooser button is disabled in that state too,
+      // but a stale render or a programmatic call would otherwise sneak
+      // through.
+      if (
+        id === CLUE_REUSE_CLUE_ID &&
+        locksAvailableCount < CLUE_REUSE_COST
+      ) {
+        return;
+      }
       if (clue.paramKind) {
         // Park in parameter-selection mode; the UI will render a picker.
         setPendingClueParam({ clueId: id, paramKind: clue.paramKind });
@@ -462,7 +474,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
       buzz(18);
     },
-    [state.pendingGuess],
+    [state.pendingGuess, locksAvailableCount],
   );
 
   const confirmClueParam = useCallback(

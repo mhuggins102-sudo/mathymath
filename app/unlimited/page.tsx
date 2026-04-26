@@ -266,6 +266,7 @@ function UnlimitedGame({
               onChoose={chooseClue}
               onRedraw={redraw}
               canRedraw={canRedraw}
+              locksAvailable={locksAvailable}
             />
           ) : state.status === "playing" ? (
             <>

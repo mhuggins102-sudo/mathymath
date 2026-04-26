@@ -5,7 +5,6 @@ export type DigitState =
   | "match"
   | "close"
   | "warm"
-  | "cool"
   | "cold"
   | "hint"
   | "entering"
@@ -41,7 +40,6 @@ const STATE_CLASS: Record<DigitState, string> = {
   match: "border-good/70 bg-good/20 text-good",
   close: "border-close/70 bg-close/15 text-close",
   warm: "border-warn/70 bg-warn/20 text-warn",
-  cool: "border-cool/70 bg-cool/20 text-cool",
   cold: "border-bad/70 bg-bad/20 text-bad",
   hint: "border-warn/50 bg-warn/10 text-foreground",
   "locked-pending": "border-accent/80 bg-accent/15 text-foreground",

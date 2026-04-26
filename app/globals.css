@@ -9,10 +9,9 @@
   --border: #2a2a3a;
   --accent: #7c8cff;
   --good: #52d977;   /* green = exact / match */
-  --close: #80dbff;  /* pale sky blue = within 1 (visually distinct from green) */
-  --warn: #f5c24b;   /* yellow = target higher / within 3 */
-  --cool: #f0935f;   /* orange = within 5 */
-  --bad: #ff6b6b;    /* red = target lower / far */
+  --close: #80dbff;  /* pale sky blue = within 2 (visually distinct from green) */
+  --warn: #f5c24b;   /* yellow = target higher / 3-4 off */
+  --bad: #ff6b6b;    /* red = target lower / 5+ off */
 }
 
 /* Colorblind palette: swaps red/green for a blue/cyan/yellow/magenta scale
@@ -20,13 +19,12 @@
    Applied to <html class="colorblind">.
    Note: --close intentionally lands on a near-white lavender so it does NOT
    share a hue with the blue --good; in an earlier palette both sat on the
-   blue axis and "exact" vs "within 1" cells were hard to tell apart. */
+   blue axis and "exact" vs "within 2" cells were hard to tell apart. */
 html.colorblind {
   --good: #3fa9f5;   /* bright blue = correct */
-  --close: #e4e4f0;  /* near-white lavender = within 1 (off the blue axis) */
+  --close: #e4e4f0;  /* near-white lavender = within 2 (off the blue axis) */
   --warn: #ffcc55;   /* yellow-orange = target higher */
-  --cool: #ff8a5c;   /* orange = within 5 */
-  --bad: #e06eb5;    /* magenta = target lower / far */
+  --bad: #e06eb5;    /* magenta = target lower / 5+ off */
 }
 
 @theme inline {
@@ -41,7 +39,6 @@ html.colorblind {
   --color-close: var(--close);
   --color-bad: var(--bad);
   --color-warn: var(--warn);
-  --color-cool: var(--cool);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }

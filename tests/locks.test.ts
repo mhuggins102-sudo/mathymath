@@ -3,6 +3,7 @@ import {
   canUseLockOnGuess,
   certainDigitsFromLocks,
   countExtraLocksGained,
+  CLUE_REUSE_CLUE_ID,
   EXTRA_LOCK_CLUE_ID,
   INITIAL_LOCKS,
   locksAvailable,
@@ -71,6 +72,21 @@ describe("locksAvailable", () => {
         { clueId: EXTRA_LOCK_CLUE_ID },
       ]),
     ).toBe(1);
+  });
+  it("Clue Reuse picks cost 1 lock", () => {
+    // Start budget 1; pick Clue Reuse → 0 remaining.
+    expect(
+      locksAvailable([{ clueId: CLUE_REUSE_CLUE_ID }]),
+    ).toBe(0);
+    // Two Extra Locks bring cap to 3; one Clue Reuse pick costs 1
+    // → 3 - 1 = 2 remaining.
+    expect(
+      locksAvailable([
+        { clueId: EXTRA_LOCK_CLUE_ID },
+        { clueId: EXTRA_LOCK_CLUE_ID },
+        { clueId: CLUE_REUSE_CLUE_ID },
+      ]),
+    ).toBe(2);
   });
   it("never goes below 0", () => {
     const wrongA: LockRecord = { slot: 0, digit: "1", correct: false };

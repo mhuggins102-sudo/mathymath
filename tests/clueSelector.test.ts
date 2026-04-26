@@ -65,14 +65,14 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
     for (const [, n] of counts) expect(n).toBeGreaterThan(200);
   });
 
-  it("all 17 clues are reachable through the deck (no clue is structurally excluded)", () => {
-    // For each seed, drawing all ~8 possible rounds will visit at least
-    // 14 cards (2 × 7 = 14, out of 17 total). Over enough seeds every
-    // clue id should appear at least once. Acts as a smoke test that
-    // neither deck shuffle accidentally filters a clue out.
+  it("every registered clue is reachable through the deck (no clue is structurally excluded)", () => {
+    // For each seed, drawing across the available rounds visits most
+    // cards. Over enough seeds every clue id should appear at least
+    // once. Acts as a smoke test that neither deck shuffle accidentally
+    // filters a clue out.
     const seen = new Set<ClueId>();
-    for (let i = 0; i < 100 && seen.size < 17; i++) {
-      for (let round = 0; round < 8; round++) {
+    for (let i = 0; i < 200 && seen.size < 20; i++) {
+      for (let round = 0; round < 9; round++) {
         const chosen = Array.from({ length: round }, () => "bullseyes" as ClueId);
         const [a, b] = pickTwoClues(`reach-${i}`, chosen);
         seen.add(a.id);
@@ -98,6 +98,7 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       "divisibleBy",
       "totalDeviation",
       "diceCount",
+      "upsAndDowns",
       "extraLock",
       "clueReuse",
     ] as ClueId[]) {

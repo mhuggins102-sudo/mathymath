@@ -331,6 +331,7 @@ export function DailyGame({
                 onChoose={chooseClue}
                 onRedraw={redraw}
                 canRedraw={canRedraw}
+                locksAvailable={locksAvailable}
               />
             ) : (
               <>
