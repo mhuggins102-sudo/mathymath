@@ -16,7 +16,7 @@ export const extraLockClue: Clue<{ kind: "extraLock" }> = {
   name: "Extra Lock",
   category: "special",
   description:
-    "Grants +1 lock for the rest of the game (max 2). Costs you this round's normal clue — use when you'd rather invest in a future lock than narrow the answer now.",
+    "Grants +1 lock for the rest of the game (cap of 3 total). Costs you this round's normal clue — use when you'd rather invest in a future lock than narrow the answer now.",
   // Medium frequency — common enough to feel learnable, rare enough
   // that every appearance is a real decision point. The registry's
   // "no duplicate clue ids per game" rule caps appearances at 1/game.

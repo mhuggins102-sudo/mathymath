@@ -13,7 +13,7 @@ export const clueReuseClue: Clue<ClueResult> = {
   name: "Clue Reuse",
   category: "special",
   description:
-    "Pick any clue you've already used this game and apply it again to your latest guess.",
+    "Pick any clue you've already used this game and apply it again to your latest guess. Costs 1 🔒 per use.",
   weight: 1.0,
   paramKind: "reuse",
   compute(guess, target, context) {
