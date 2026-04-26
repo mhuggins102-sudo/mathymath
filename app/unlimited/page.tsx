@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
+import { useKeyboardInput } from "@/lib/hooks/useKeyboardInput";
 import { maxGuessesForDigits } from "@/lib/game/stateMachine";
 import type { ClueId } from "@/lib/game/clues/types";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
+import { GearIcon } from "@/components/GearIcon";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
@@ -152,6 +154,17 @@ function UnlimitedGame({
     input.length !== inputCapacity ||
     pendingLockSlot !== null ||
     keypadDisabled;
+
+  // Desktop keyboard parity: 0-9 type into the active row, Backspace /
+  // Delete clear the last typed digit, Enter submits. No-op on mobile
+  // (no physical keyboard); disabled while a clue chooser / picker is
+  // up since the keypad is hidden in those states too.
+  useKeyboardInput({
+    appendDigit,
+    backspace,
+    submit,
+    disabled: keypadDisabled || !!pendingClueParam,
+  });
   const lockMode = pendingLockSlot !== null;
   // Lock hint shows how many are LEFT after accounting for locks the
   // player has committed this turn (but not yet submitted). Updates
@@ -176,11 +189,11 @@ function UnlimitedGame({
         <div className="flex items-center gap-0.5">
           <button
             type="button"
-            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setSettingsOpen(true)}
             aria-label="Settings"
           >
-            ⚙
+            <GearIcon />
           </button>
           <button
             type="button"
