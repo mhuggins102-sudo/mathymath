@@ -1,6 +1,7 @@
 "use client";
 
 import { CLUES } from "@/lib/game/clues/registry";
+import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
 import { GuessRow } from "./GuessRow";
 import { ClueLegend } from "./ClueLegend";
 import { Modal } from "./Modal";
@@ -70,11 +71,13 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           </ul>
           <p>
             You also start each game with one{" "}
-            <span className="text-foreground">🔒 lock</span> — from guess 2
-            on, tap a cell to pin a digit you&apos;re sure of. Correct locks
-            stay; wrong locks are spent. You can also spend a lock to{" "}
+            <span className="text-foreground">🔒 lock</span> — tap a cell on
+            any guess to pin a digit you&apos;re sure of. Correct locks stay;
+            wrong locks are spent. You can also spend a lock to{" "}
             <strong className="text-foreground">redraw</strong> the offered
-            clue pair if neither option appeals.
+            clue pair if neither option appeals, and{" "}
+            <strong className="text-foreground">Clue Reuse</strong> costs 1
+            lock per use.
           </p>
           <p>
             A clue type can only be chosen once per game — used types
@@ -103,7 +106,18 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                 className="bg-surface rounded-lg border border-border p-3"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-sm">{clue.name}</span>
+                  <span className="font-semibold text-sm inline-flex items-center gap-1.5">
+                    {clue.name}
+                    {/* Lock-cost badge for cost-bearing clues so the price
+                        is visible in the help reference card too, not only
+                        in the in-game chooser. Currently only Clue Reuse
+                        has a cost. */}
+                    {clue.id === CLUE_REUSE_CLUE_ID && (
+                      <span className="text-[10px] font-normal text-muted">
+                        🔒×{CLUE_REUSE_COST}
+                      </span>
+                    )}
+                  </span>
                   <span
                     className={`text-[10px] uppercase px-2 py-0.5 rounded ${
                       clue.category === "positional"
