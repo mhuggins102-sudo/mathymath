@@ -57,14 +57,21 @@ export function LifetimeStatsModal({
   // Resolve which slice of the unlimited stats to render based on the
   // toggle. "All" combines 5- and 6-digit; "5" / "6" pick one bucket.
   // The chart's max-guesses cap also flexes per filter so the 5-digit
-  // view doesn't render an empty 8th row.
+  // view doesn't render an empty 8th row. Streaks come from the same
+  // slice so a "5-digit" view shows the streak of 5-digit-only games.
   const unlimitedView: {
     stats: PerDigitStats;
     maxGuesses: number;
   } = useMemo(() => {
     if (!unlimited) {
       return {
-        stats: { played: 0, wins: 0, distribution: {} },
+        stats: {
+          played: 0,
+          wins: 0,
+          distribution: {},
+          currentStreak: 0,
+          bestStreak: 0,
+        },
         maxGuesses: maxGuessesForDigits(5),
       };
     }
@@ -119,8 +126,8 @@ export function LifetimeStatsModal({
             showTitle={mode === "both"}
             played={unlimitedView.stats.played}
             wins={unlimitedView.stats.wins}
-            currentStreak={unlimited?.currentStreak ?? 0}
-            bestStreak={unlimited?.bestStreak ?? 0}
+            currentStreak={unlimitedView.stats.currentStreak}
+            bestStreak={unlimitedView.stats.bestStreak}
             distribution={unlimitedView.stats.distribution}
             maxGuesses={unlimitedView.maxGuesses}
             header={

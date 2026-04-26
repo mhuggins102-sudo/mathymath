@@ -152,7 +152,16 @@ export function DailyGame({
 
     fetch("/api/results", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // `cache: "no-store"` keeps both the browser HTTP cache and any
+      // CDN cache from serving a stale aggregate when a player revisits
+      // the puzzle after others have submitted. Without it, on Cloudflare
+      // Pages a reload could return the player's first-time response
+      // even though new entries already exist in D1.
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      },
       body: JSON.stringify(payload),
     })
       .then(async (res) => {

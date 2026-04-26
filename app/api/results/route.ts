@@ -8,8 +8,23 @@ import {
 import { validateDailyHistory } from "@/lib/api/dailyValidation";
 import { DEFAULT_MAX_GUESSES } from "@/lib/game/stateMachine";
 
+// The leaderboard view depends on every other player's submissions, so
+// this endpoint MUST recompute on every request — no caching at the
+// Next.js layer or the CDN edge. Without these the Cloudflare runtime
+// has been observed to serve a player their own first-write aggregate
+// on reload, even though new entries are already in D1.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const DIGITS = 5;
 const MAX_GUESSES = DEFAULT_MAX_GUESSES;
+
+/** Cache-busting headers for the response: tell every layer that this
+ *  body must NOT be reused for any subsequent request. */
+const NO_STORE_HEADERS = {
+  "cache-control": "no-store, no-cache, must-revalidate",
+  "cdn-cache-control": "no-store",
+};
 
 const historyGuessSchema = z.object({
   guess: z.string(),
@@ -45,18 +60,24 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    return NextResponse.json(
+      { error: "invalid_json" },
+      { status: 400, headers: NO_STORE_HEADERS },
+    );
   }
   const parsed = submitSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid_payload", details: parsed.error.flatten() },
-      { status: 400 },
+      { status: 400, headers: NO_STORE_HEADERS },
     );
   }
   const data = parsed.data;
   if (data.puzzleDate > todayUtcISO()) {
-    return NextResponse.json({ error: "future_date" }, { status: 400 });
+    return NextResponse.json(
+      { error: "future_date" },
+      { status: 400, headers: NO_STORE_HEADERS },
+    );
   }
 
   // Re-derive target and replay the history. This is the integrity gate
@@ -73,13 +94,13 @@ export async function POST(req: Request) {
   if (!validation.ok) {
     return NextResponse.json(
       { error: "history_invalid", detail: validation.error },
-      { status: 409 },
+      { status: 409, headers: NO_STORE_HEADERS },
     );
   }
   if (validation.status === "playing") {
     return NextResponse.json(
       { error: "game_not_over" },
-      { status: 409 },
+      { status: 409, headers: NO_STORE_HEADERS },
     );
   }
 
@@ -98,5 +119,5 @@ export async function POST(req: Request) {
     durationMs: data.durationMs,
     createdAt: Date.now(),
   });
-  return NextResponse.json(res);
+  return NextResponse.json(res, { headers: NO_STORE_HEADERS });
 }
