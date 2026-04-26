@@ -164,16 +164,22 @@ export function saveUnlimitedMode(mode: UnlimitedMode): void {
 
 // --- Personal stats (unlimited mode) ---
 //
-// v2 splits played / wins / distribution per digit count so the stats
-// view can filter by 5-digit, 6-digit, or All. Streaks remain global
-// because a streak crossing puzzle lengths still feels like a streak.
-// v1 stats (predates the 6-digit variant) are migrated as 5-digit.
+// v2 split played / wins / distribution per digit count so the stats
+// view can filter by 5 / 6 / All. v3 also splits streaks per bucket
+// (in addition to a global streak) so the toggle drives streak/best
+// too. v1 stats (predates the 6-digit variant) bucket entirely into
+// "5" on migration; v2 stats keep their existing global streak and
+// initialize per-bucket streaks to 0 (we don't have history to
+// reconstruct them).
 
 const perDigitStatsSchema = z.object({
   played: z.number(),
   wins: z.number(),
   /** guess-count histogram for wins. Keys are stringified guess counts. */
   distribution: z.record(z.string(), z.number()),
+  /** Streak across this digit-count's games only. */
+  currentStreak: z.number(),
+  bestStreak: z.number(),
 });
 
 const personalStatsV1Schema = z.object({
@@ -190,34 +196,59 @@ const personalStatsV2Schema = z.object({
   currentStreak: z.number(),
   bestStreak: z.number(),
   byDigits: z.object({
+    "5": z.object({
+      played: z.number(),
+      wins: z.number(),
+      distribution: z.record(z.string(), z.number()),
+    }),
+    "6": z.object({
+      played: z.number(),
+      wins: z.number(),
+      distribution: z.record(z.string(), z.number()),
+    }),
+  }),
+});
+
+const personalStatsV3Schema = z.object({
+  version: z.literal(3),
+  currentStreak: z.number(),
+  bestStreak: z.number(),
+  byDigits: z.object({
     "5": perDigitStatsSchema,
     "6": perDigitStatsSchema,
   }),
 });
 
 export type PerDigitStats = z.infer<typeof perDigitStatsSchema>;
-export type PersonalStats = z.infer<typeof personalStatsV2Schema>;
+export type PersonalStats = z.infer<typeof personalStatsV3Schema>;
 
 const STATS_KEY_UNLIMITED = "stats:unlimited";
 
 function emptyPerDigit(): PerDigitStats {
-  return { played: 0, wins: 0, distribution: {} };
+  return {
+    played: 0,
+    wins: 0,
+    distribution: {},
+    currentStreak: 0,
+    bestStreak: 0,
+  };
 }
 
 function emptyStats(): PersonalStats {
   return {
-    version: 2,
+    version: 3,
     currentStreak: 0,
     bestStreak: 0,
     byDigits: { "5": emptyPerDigit(), "6": emptyPerDigit() },
   };
 }
 
-/** v1 → v2: any games on record predate the 6-digit variant, so they
- *  bucket entirely into "5". */
+/** v1 → v3: predates 6-digit; bucket everything as 5-digit and copy the
+ *  global streaks into the 5-digit slot too (those games WERE the
+ *  global streak at the time). */
 function migrateV1(v1: z.infer<typeof personalStatsV1Schema>): PersonalStats {
   return {
-    version: 2,
+    version: 3,
     currentStreak: v1.currentStreak,
     bestStreak: v1.bestStreak,
     byDigits: {
@@ -225,8 +256,24 @@ function migrateV1(v1: z.infer<typeof personalStatsV1Schema>): PersonalStats {
         played: v1.played,
         wins: v1.wins,
         distribution: v1.distribution,
+        currentStreak: v1.currentStreak,
+        bestStreak: v1.bestStreak,
       },
       "6": emptyPerDigit(),
+    },
+  };
+}
+
+/** v2 → v3: keep global streaks; per-bucket streaks default to 0
+ *  because the v2 schema didn't track them and we can't reconstruct. */
+function migrateV2(v2: z.infer<typeof personalStatsV2Schema>): PersonalStats {
+  return {
+    version: 3,
+    currentStreak: v2.currentStreak,
+    bestStreak: v2.bestStreak,
+    byDigits: {
+      "5": { ...v2.byDigits["5"], currentStreak: 0, bestStreak: 0 },
+      "6": { ...v2.byDigits["6"], currentStreak: 0, bestStreak: 0 },
     },
   };
 }
@@ -241,9 +288,11 @@ export function loadUnlimitedStats(): PersonalStats {
   } catch {
     return emptyStats();
   }
-  // Try v2 first, then fall back to v1 + migrate.
+  // Try v3, then v2, then v1, then give up.
+  const asV3 = personalStatsV3Schema.safeParse(parsed);
+  if (asV3.success) return asV3.data;
   const asV2 = personalStatsV2Schema.safeParse(parsed);
-  if (asV2.success) return asV2.data;
+  if (asV2.success) return migrateV2(asV2.data);
   const asV1 = personalStatsV1Schema.safeParse(parsed);
   if (asV1.success) return migrateV1(asV1.data);
   return emptyStats();
@@ -262,12 +311,20 @@ export function recordUnlimitedResult(
   bucket.played += 1;
   if (won) {
     bucket.wins += 1;
+    // Global streak: only the just-played bucket affects it (a 5-digit
+    // win still extends the overall streak even if it's a different
+    // length than the previous one).
     s.currentStreak += 1;
     s.bestStreak = Math.max(s.bestStreak, s.currentStreak);
+    // Per-bucket streak: only the matching bucket extends — playing 6
+    // doesn't move the 5-digit streak in either direction.
+    bucket.currentStreak += 1;
+    bucket.bestStreak = Math.max(bucket.bestStreak, bucket.currentStreak);
     bucket.distribution[String(guessCount)] =
       (bucket.distribution[String(guessCount)] ?? 0) + 1;
   } else {
     s.currentStreak = 0;
+    bucket.currentStreak = 0;
   }
   if (typeof window !== "undefined") {
     window.localStorage.setItem(
@@ -279,9 +336,16 @@ export function recordUnlimitedResult(
 }
 
 /** Combined view across digit buckets. Used when the stats UI is set
- *  to "All". */
+ *  to "All": played / wins / distribution sum naturally; streaks use
+ *  the *global* streaks from the parent record (streaks from
+ *  separate buckets can't be added — a streak of 3 in 5-digit and a
+ *  streak of 2 in 6-digit aren't a combined streak of 5). */
 export function combinedUnlimitedStats(s: PersonalStats): PerDigitStats {
-  const out: PerDigitStats = emptyPerDigit();
+  const out: PerDigitStats = {
+    ...emptyPerDigit(),
+    currentStreak: s.currentStreak,
+    bestStreak: s.bestStreak,
+  };
   for (const key of ["5", "6"] as const) {
     const b = s.byDigits[key];
     out.played += b.played;
