@@ -215,6 +215,7 @@ function UnlimitedGame({
           lockedSlots={lockedSlots}
           pendingLockSlot={pendingLockSlot}
           onTapCell={tapCell}
+          compact={session.digits === 6}
         />
 
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
@@ -227,6 +228,7 @@ function UnlimitedGame({
             <SlotPicker
               digits={session.digits}
               certainDigits={certainDigits}
+              compact={session.digits === 6}
               onSelect={(slot) =>
                 confirmClueParam({ selectedSlot: slot })
               }

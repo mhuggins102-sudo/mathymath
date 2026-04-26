@@ -32,6 +32,9 @@ interface GuessRowProps {
   /** Fires when a cell on the active row is tapped. Only connected
    *  when the parent wants to expose the lock tap interaction. */
   onTapCell?: (slot: number) => void;
+  /** Tightens cell width and inter-cell gap so the row fits on phone
+   *  widths when `digits` is 6. Caller (GuessGrid) decides. */
+  compact?: boolean;
 }
 
 /** Per-slot color state derived from the clue result. */
@@ -288,6 +291,7 @@ export function GuessRow({
   pendingLockSlot,
   locks,
   onTapCell,
+  compact = false,
 }: GuessRowProps) {
   // ---------------------------------------------------------------
   // Project a per-cell view for each render mode:
@@ -435,8 +439,18 @@ export function GuessRow({
              `h-10 sm:h-11` matches the digit cell height so the `h-full`
              chain inside ClueLabelContent can genuinely vertically
              center the name + sub-label block against those cells. */}
-        <div className="min-w-[6rem] shrink-0 h-10 sm:h-11">{labelSlot}</div>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div
+          className={`shrink-0 h-10 sm:h-11 ${
+            compact ? "min-w-[4.5rem] sm:min-w-[5rem]" : "min-w-[6rem]"
+          }`}
+        >
+          {labelSlot}
+        </div>
+        <div
+          className={`flex items-center shrink-0 ${
+            compact ? "gap-1 sm:gap-1.5" : "gap-1.5 sm:gap-2"
+          }`}
+        >
           {displayed.map((v, i) => {
             // Active (entering) rows make their non-certain cells
             // tappable when the parent provides `onTapCell`. Certain
@@ -448,7 +462,7 @@ export function GuessRow({
               <Digit
                 key={i}
                 value={v}
-                size="lg"
+                size={compact ? "lg-narrow" : "lg"}
                 state={states[i]}
                 animate={!!result}
                 badge={badges[i]}
