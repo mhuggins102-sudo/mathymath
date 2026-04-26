@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useDailyGame } from "@/lib/hooks/useDailyGame";
 import { useClientId } from "@/lib/hooks/useClientId";
+import { useKeyboardInput } from "@/lib/hooks/useKeyboardInput";
 import { GuessGrid } from "@/components/GuessGrid";
+import { GearIcon } from "@/components/GearIcon";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
@@ -95,6 +97,17 @@ export function DailyGame({
 
   const keypadDisabled =
     state.status !== "playing" || !!state.pendingGuess || loading;
+  // Desktop keyboard parity: 0-9 type into the active row, Backspace /
+  // Delete clear the last typed digit, Enter submits. No-op on mobile.
+  // Also gated off the result popup so the keyboard doesn't sneak input
+  // through while the modal is up.
+  useKeyboardInput({
+    appendDigit,
+    backspace,
+    submit,
+    disabled:
+      keypadDisabled || !!pendingClueParam || resultsPopupOpen,
+  });
   // Submit requires all non-certain non-locked slots to be typed AND no
   // lock still pending (must be committed or cancelled first).
   const submitDisabled =
@@ -234,11 +247,11 @@ export function DailyGame({
           )}
           <button
             type="button"
-            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted text-base hover:text-foreground active:bg-surface-2 transition"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition"
             onClick={() => setSettingsOpen(true)}
             aria-label="Settings"
           >
-            ⚙
+            <GearIcon />
           </button>
           <button
             type="button"
