@@ -1,25 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  combinedUnlimitedStats,
   dailyHistoryStats,
   loadDailyHistory,
   loadUnlimitedStats,
   type DailyHistoryStats,
+  type PerDigitStats,
   type PersonalStats,
 } from "@/lib/persistence/localStore";
-import { DEFAULT_MAX_GUESSES, MAX_GUESSES_BY_DIGITS } from "@/lib/game/stateMachine";
+import {
+  DEFAULT_MAX_GUESSES,
+  maxGuessesForDigits,
+} from "@/lib/game/stateMachine";
 import { Modal } from "./Modal";
 
-// Unlimited mode can include 6-digit games (8-guess budget). The
-// distribution chart renders rows up to whichever cap is in use; daily
-// stays at the 5-digit budget.
-const UNLIMITED_MAX_GUESSES = Math.max(
-  ...Object.values(MAX_GUESSES_BY_DIGITS),
-  DEFAULT_MAX_GUESSES,
-);
-
 export type StatsMode = "daily" | "unlimited" | "both";
+
+/** Filter for the unlimited block when stats are split per digit count. */
+type UnlimitedFilter = "all" | "5" | "6";
 
 interface LifetimeStatsModalProps {
   open: boolean;
@@ -36,6 +36,8 @@ export function LifetimeStatsModal({
 }: LifetimeStatsModalProps) {
   const [daily, setDaily] = useState<DailyHistoryStats | null>(null);
   const [unlimited, setUnlimited] = useState<PersonalStats | null>(null);
+  const [unlimitedFilter, setUnlimitedFilter] =
+    useState<UnlimitedFilter>("all");
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +53,38 @@ export function LifetimeStatsModal({
       : "Lifetime stats";
 
   const titleId = `stats-title-${mode}`;
+
+  // Resolve which slice of the unlimited stats to render based on the
+  // toggle. "All" combines 5- and 6-digit; "5" / "6" pick one bucket.
+  // The chart's max-guesses cap also flexes per filter so the 5-digit
+  // view doesn't render an empty 8th row.
+  const unlimitedView: {
+    stats: PerDigitStats;
+    maxGuesses: number;
+  } = useMemo(() => {
+    if (!unlimited) {
+      return {
+        stats: { played: 0, wins: 0, distribution: {} },
+        maxGuesses: maxGuessesForDigits(5),
+      };
+    }
+    if (unlimitedFilter === "5") {
+      return {
+        stats: unlimited.byDigits["5"],
+        maxGuesses: maxGuessesForDigits(5),
+      };
+    }
+    if (unlimitedFilter === "6") {
+      return {
+        stats: unlimited.byDigits["6"],
+        maxGuesses: maxGuessesForDigits(6),
+      };
+    }
+    return {
+      stats: combinedUnlimitedStats(unlimited),
+      maxGuesses: maxGuessesForDigits(6),
+    };
+  }, [unlimited, unlimitedFilter]);
 
   const content = (
     <>
@@ -83,12 +117,18 @@ export function LifetimeStatsModal({
           <Block
             title="Unlimited"
             showTitle={mode === "both"}
-            played={unlimited?.played ?? 0}
-            wins={unlimited?.wins ?? 0}
+            played={unlimitedView.stats.played}
+            wins={unlimitedView.stats.wins}
             currentStreak={unlimited?.currentStreak ?? 0}
             bestStreak={unlimited?.bestStreak ?? 0}
-            distribution={unlimited?.distribution ?? {}}
-            maxGuesses={UNLIMITED_MAX_GUESSES}
+            distribution={unlimitedView.stats.distribution}
+            maxGuesses={unlimitedView.maxGuesses}
+            header={
+              <UnlimitedFilterToggle
+                value={unlimitedFilter}
+                onChange={setUnlimitedFilter}
+              />
+            }
           />
         )}
       </div>
@@ -112,6 +152,47 @@ export function LifetimeStatsModal({
         {content}
       </div>
     </Modal>
+  );
+}
+
+function UnlimitedFilterToggle({
+  value,
+  onChange,
+}: {
+  value: UnlimitedFilter;
+  onChange: (next: UnlimitedFilter) => void;
+}) {
+  const options: { v: UnlimitedFilter; label: string }[] = [
+    { v: "all", label: "All" },
+    { v: "5", label: "5-digit" },
+    { v: "6", label: "6-digit" },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Unlimited stats filter"
+      className="grid grid-cols-3 gap-1 bg-surface rounded-md p-1 mb-3"
+    >
+      {options.map((opt) => {
+        const selected = value === opt.v;
+        return (
+          <button
+            key={opt.v}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(opt.v)}
+            className={`text-[11px] font-semibold py-1 rounded transition ${
+              selected
+                ? "bg-accent/80 text-background"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -145,6 +226,7 @@ function Block({
   bestStreak,
   distribution,
   maxGuesses,
+  header,
 }: {
   title: string;
   showTitle: boolean;
@@ -154,6 +236,9 @@ function Block({
   bestStreak: number;
   distribution: Record<string, number>;
   maxGuesses: number;
+  /** Optional element rendered between the title and the metrics — used
+   *  by the unlimited block to host its filter toggle. */
+  header?: React.ReactNode;
 }) {
   const winPct = played ? Math.round((wins / played) * 100) : 0;
   const losses = Math.max(0, played - wins);
@@ -167,6 +252,7 @@ function Block({
           {title}
         </h3>
       )}
+      {header}
       {played === 0 ? (
         <p className="text-xs text-muted">
           No games played yet. Your stats will appear here once you finish one.

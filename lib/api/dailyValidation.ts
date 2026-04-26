@@ -66,12 +66,9 @@ function validateLocksForGuess(
   locks: NonNullable<IncomingGuess["locks"]>,
   target: string,
   digits: number,
-  guessIndex: number,
   remainingLocks: number,
 ): string | null {
   if (locks.length === 0) return null;
-  // Rule: no locks on guess 1 (zero-indexed).
-  if (guessIndex === 0) return "locks_on_first_guess";
   // Per-lock structural checks first (dedupe / range / digit) so tests
   // and errors are deterministic regardless of budget state.
   const seenSlots = new Set<number>();
@@ -127,7 +124,6 @@ export function validateDailyHistory(
         g.locks,
         target,
         digits,
-        i,
         locksRemaining - roundRedraws,
       );
       if (lockError !== null) {

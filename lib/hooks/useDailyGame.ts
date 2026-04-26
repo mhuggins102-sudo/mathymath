@@ -254,7 +254,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const capacity = inputCapacity(certain) - lockedSlots.length;
 
   const locksAvailableCount = computeLocksAvailable(state.guesses);
-  const canUseLocks = canUseLockOnGuess(state.guesses.length);
+  const canUseLocks = canUseLockOnGuess();
   const canStartLock =
     canUseLocks && lockedSlots.length < locksAvailableCount;
   const pendingLockDigit = useMemo(() => {

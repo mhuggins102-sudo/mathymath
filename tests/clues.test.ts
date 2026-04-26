@@ -227,13 +227,24 @@ describe("Digit Range (rangeCompare)", () => {
 });
 
 describe("Median", () => {
-  it("compares the sorted-middle digit", () => {
+  it("compares the sorted-middle digit (5-digit)", () => {
     // guess 12345 median=3; target 54321 median=3 => eq
     expect(medianClue.compute("12345", "54321").cmp).toBe("eq");
     // guess 11111 median=1; target 99999 median=9 => target ↑
     expect(medianClue.compute("11111", "99999").cmp).toBe("gt");
     // guess 99999; target 11111 => target ↓
     expect(medianClue.compute("99999", "11111").cmp).toBe("lt");
+  });
+  it("uses the average of the two middle sorted digits for even length (6-digit)", () => {
+    // sorted([1,2,3,4,8,9]) = [1,2,3,4,8,9]; median = (3+4)/2 = 3.5
+    // sorted([0,2,4,5,6,9]) = [0,2,4,5,6,9]; median = (4+5)/2 = 4.5
+    expect(medianClue.compute("123489", "024569").cmp).toBe("gt");
+    // Same median (both 3.5): sorted [1,2,3,4,5,8] vs [0,2,3,4,7,9].
+    // (3+4)/2 = 3.5 in both → eq.
+    expect(medianClue.compute("123458", "023479").cmp).toBe("eq");
+    // Target lower: target sorted [0,1,1,2,3,4] median=1.5; guess sorted
+    // [3,4,5,6,7,8] median=5.5 → lt.
+    expect(medianClue.compute("345678", "012134").cmp).toBe("lt");
   });
 });
 
@@ -297,6 +308,85 @@ describe("Extra Lock (special)", () => {
     const a = extraLockClue.compute("00000", "74827");
     const b = extraLockClue.compute("99999", "11111");
     expect(a).toEqual(b);
+  });
+});
+
+describe("6-digit length sanity", () => {
+  // Targets and guesses chosen to exercise each clue without needing
+  // hand-computed values (the assertions all derive from the inputs).
+  const target6 = "247628";
+  const guess6 = "555555";
+
+  it("Bullseyes: returns hits array of length 6", () => {
+    const r = bullseyesClue.compute(guess6, target6);
+    expect(r.hits).toHaveLength(6);
+    // None of guess's digits (all 5s) match target — none of target's
+    // slots is 5.
+    expect(r.hits.every((h) => !h)).toBe(true);
+  });
+  it("Higher or Lower: per-slot cmp array of length 6", () => {
+    const r = higherLowerClue.compute(guess6, target6);
+    expect(r.cmp).toHaveLength(6);
+    // target[0]=2 < guess 5 → lt
+    expect(r.cmp[0]).toBe("lt");
+    // target[2]=7 > guess 5 → gt
+    expect(r.cmp[2]).toBe("gt");
+  });
+  it("Within 2 / parity mask: arrays of length 6", () => {
+    expect(within2Clue.compute(guess6, target6).mask).toHaveLength(6);
+    expect(within2Clue.compute(guess6, target6).exact).toHaveLength(6);
+    expect(parityMaskClue.compute(guess6, target6).matches).toHaveLength(6);
+  });
+  it("Thermometer: tier array of length 6", () => {
+    expect(thermometerClue.compute(guess6, target6).tier).toHaveLength(6);
+  });
+  it("Sum Delta: digit-sum delta works at any length", () => {
+    // target sum: 2+4+7+6+2+8 = 29; guess sum: 30. delta = -1.
+    expect(sumDeltaClue.compute(guess6, target6).delta).toBe(-1);
+  });
+  it("Digit Overlap: multiset intersection caps correctly", () => {
+    // guess "555555" vs target "247628" — target has zero 5s, so
+    // overlap is 0.
+    expect(digitOverlapClue.compute(guess6, target6).count).toBe(0);
+    // Six 2s against target with two 2s → overlap = 2.
+    expect(digitOverlapClue.compute("222222", target6).count).toBe(2);
+  });
+  it("Distinct Digits: counts up to puzzle length", () => {
+    expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(6);
+    expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(2);
+  });
+  it("Range / parity / prime / dice / total deviation: scale with length", () => {
+    // Range: target 247628 → max 8 - min 2 = 6; guess 555555 → 0. target ↑.
+    expect(rangeCompareClue.compute(guess6, target6).cmp).toBe("gt");
+    // Even count: target 247628 → 4 (2,4,6,2,8); guess all 5s → 0.
+    expect(parityBalanceClue.compute(guess6, target6).cmp).toBe("gt");
+    // Prime count: target 247628 → primes are 2,7,2 = 3; guess 555555 → 6.
+    expect(primeCountClue.compute(guess6, target6).cmp).toBe("lt");
+    // Dice count (1-6): target 247628 → 2,4,6,2 = 4; guess 555555 → 6.
+    expect(diceCountClue.compute(guess6, target6).cmp).toBe("lt");
+    // Total deviation max: 9*6 = 54.
+    expect(totalDeviationClue.compute("000000", "999999").value).toBe(54);
+  });
+  it("Contains Digit: present check works at length 6", () => {
+    expect(
+      containsDigitClue.compute(guess6, target6, { selectedDigit: 7 }).present,
+    ).toBe(true);
+    expect(
+      containsDigitClue.compute(guess6, target6, { selectedDigit: 5 }).present,
+    ).toBe(false);
+  });
+  it("Divisible By: 6-digit numeric value divisibility", () => {
+    // 247628 / 2 = 123814 → divisible by 2.
+    const r = divisibleByClue.compute(guess6, "247628");
+    expect(r.present).toBe(true);
+    // 247628 % 2 === 0; the seeded pick may choose any valid divisor.
+    expect(r.divisor).not.toBeNull();
+    expect(247628 % r.divisor!).toBe(0);
+  });
+  it("Oracle: reveals a slot inside the 6-digit range", () => {
+    const r = oracleClue.compute(guess6, target6, { selectedSlot: 5 });
+    expect(r.slot).toBe(5);
+    expect(r.digit).toBe(8);
   });
 });
 

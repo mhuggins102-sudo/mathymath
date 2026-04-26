@@ -8,7 +8,7 @@ export const totalDeviationClue: Clue<{
   name: "Total Deviation",
   category: "compositional",
   description:
-    "The sum of per-slot absolute differences between your digits and the target's. 0 means every slot is exact; 45 is the worst possible (all digits maximally off).",
+    "The sum of per-slot absolute differences between your digits and the target's. 0 means every slot is exact; the worst case is 9 × the puzzle's length.",
   // Medium-strong compositional clue (0..45 range). Overlaps thermometer
   // in what it measures (|t_i − g_i|) but collapses to a single number —
   // different feel, different pick rhythm, so it lives alongside.

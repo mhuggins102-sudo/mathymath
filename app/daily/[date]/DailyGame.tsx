@@ -334,7 +334,7 @@ export function DailyGame({
                       ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
                       : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
                     : hintLocks > 0
-                    ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available${state.guesses.length === 0 ? " (usable from guess 2)" : " — tap a cell to use"}`
+                    ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available — tap a cell to use`
                     : ""}
                 </p>
               </>

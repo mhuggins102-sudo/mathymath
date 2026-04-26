@@ -155,7 +155,10 @@ function computePrimeCount(s: string): number {
 
 function computeMedian(s: string): number {
   const sorted = [...s].map(Number).sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
+  const n = sorted.length;
+  if (n === 0) return 0;
+  if (n % 2 === 1) return sorted[(n - 1) / 2];
+  return (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
 }
 
 function computeDiceCount(s: string): number {
