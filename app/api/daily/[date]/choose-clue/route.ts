@@ -44,6 +44,12 @@ const clueParamSchema = z
   })
   .optional();
 
+const pendingLockSchema = z.object({
+  slot: z.number().int().min(0).max(DIGITS - 1),
+  digit: z.string().regex(/^[0-9]$/),
+  correct: z.boolean(),
+});
+
 const bodySchema = z.object({
   history: z.array(historyGuessSchema).max(MAX_GUESSES),
   pendingGuess: z.string().length(DIGITS).regex(/^[0-9]+$/),
@@ -53,6 +59,12 @@ const bodySchema = z.object({
    *  burned a lock to advance the deck). The server uses this to derive
    *  which pair the clue was drawn from. */
   redraws: z.number().int().min(0).max(5).default(0),
+  /** Locks resolved on the pending (not-yet-history) guess. Only used
+   *  for the Oracle-win certain-digits check below — a correct lock on
+   *  the pending guess can complete the target when combined with an
+   *  Oracle reveal. The submit-guess endpoint already authoritatively
+   *  resolved correctness, so we trust it as we did for `result`. */
+  pendingLocks: z.array(pendingLockSchema).max(2).optional(),
 });
 
 /**
@@ -169,15 +181,27 @@ export async function POST(
   });
 
   // Oracle-induced win: if this Oracle reveal (possibly via Clue Reuse)
-  // completes the certain set, the player wins immediately. Reveal the
-  // target so the client can render the final state.
+  // completes the certain set, the player wins immediately. Pending
+  // locks count toward certainty here — a correct lock placed on this
+  // turn pins target[slot] just like a prior-history correct lock.
+  // Re-resolve their `correct` flag against the real target so a
+  // tampered client can't fake certainty. Reveal the target on win so
+  // the client can render the final state.
   if (result.kind === "oracle") {
+    const verifiedPendingLocks = (parsed.data.pendingLocks ?? []).map((l) => ({
+      slot: l.slot,
+      digit: l.digit,
+      correct: target[l.slot] === l.digit,
+    }));
     const historyAfter = [
       ...parsed.data.history,
       {
         guess: pendingGuess,
         clueId: clueId as ClueId,
         result,
+        ...(verifiedPendingLocks.length > 0
+          ? { locks: verifiedPendingLocks }
+          : {}),
       },
     ];
     const certain = deriveCertainDigits(

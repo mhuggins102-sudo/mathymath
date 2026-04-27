@@ -255,7 +255,23 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const certain = deriveCertainDigits(state.guesses, state.digits);
   const capacity = inputCapacity(certain) - lockedSlots.length;
 
-  const locksAvailableCount = computeLocksAvailable(state.guesses);
+  // Base budget = locks remaining after the resolved-history accounting.
+  // Once a guess is pending (clue chooser is up), we additionally subtract
+  // this turn's wrong locks and redraws so Clue Reuse gating in the
+  // chooser reflects the budget the player will have IF they pick a
+  // non-Clue-Reuse clue. Without this, a player who burned their last
+  // lock on a wrong-lock attempt still saw Clue Reuse as affordable.
+  const baseLocksAvailable = computeLocksAvailable(state.guesses);
+  const pendingWrongLocksCount = (state.pendingGuess?.locks ?? []).filter(
+    (l) => !l.correct,
+  ).length;
+  const pendingRedrawsCount = state.pendingGuess?.redraws ?? 0;
+  const locksAvailableCount = state.pendingGuess
+    ? Math.max(
+        0,
+        baseLocksAvailable - pendingWrongLocksCount - pendingRedrawsCount,
+      )
+    : baseLocksAvailable;
   const canUseLocks = canUseLockOnGuess();
   const canStartLock =
     canUseLocks && lockedSlots.length < locksAvailableCount;
@@ -562,6 +578,13 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
               clueId,
               ...(clueParam ? { clueParam } : {}),
               redraws: pending.redraws ?? 0,
+              // Pending guess's resolved locks travel separately so the
+              // server can include them in the Oracle-win certain-digits
+              // check (an Oracle reveal that completes the target only
+              // when combined with a correct lock placed this turn).
+              ...(pending.locks && pending.locks.length > 0
+                ? { pendingLocks: pending.locks }
+                : {}),
             }),
           },
         );
@@ -666,15 +689,11 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // Redraw: burn a lock to discard the current pair and advance the
   // deck. Computed locally (pickTwoClues is shared lib, seed = date).
   // The server validates the final choice via the redraws count sent
-  // in the choose-clue request.
-  const pendingRedraws = state.pendingGuess?.redraws ?? 0;
-  const pendingWrongLocks = (state.pendingGuess?.locks ?? []).filter(
-    (l) => !l.correct,
-  ).length;
+  // in the choose-clue request. locksAvailableCount already subtracts
+  // this turn's wrong locks and prior redraws, so a positive budget is
+  // sufficient to afford one more redraw.
   const canRedraw =
-    !!state.pendingGuess &&
-    !pendingClueParam &&
-    locksAvailableCount - pendingWrongLocks - pendingRedraws > 0;
+    !!state.pendingGuess && !pendingClueParam && locksAvailableCount > 0;
 
   const redraw = useCallback(() => {
     if (!canRedraw || !state.pendingGuess) return;

@@ -152,6 +152,10 @@ export function DailyGame({
     // Results endpoint now receives the full history so the server can
     // re-validate against the real target (integrity gate). The
     // derived {won, guessCount, chosenClues} are computed server-side.
+    // locks + redraws must be included or the replay will fail:
+    // missing redraws desync pickTwoClues offsets, and missing locks
+    // hide an Oracle-induced win whose final certain slot came from a
+    // correct lock.
     const payload = {
       clientId,
       puzzleDate: date,
@@ -159,6 +163,8 @@ export function DailyGame({
         guess: g.guess,
         clueId: g.clueId,
         result: g.result,
+        locks: g.locks,
+        redraws: g.redraws,
       })),
       durationMs: Date.now() - startedAtRef.current,
     };
