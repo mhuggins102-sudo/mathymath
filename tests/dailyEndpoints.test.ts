@@ -195,6 +195,149 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     expect(body.result).toEqual(expected);
   });
 
+  it("returns won when an Oracle reveal + pending lock completes certainty", async () => {
+    // 2026-04-17 is a date whose deck offers Oracle in round 4 (pair index
+    // 6/7) and where rounds 1-3 each have a "safe" no-reveal compositional
+    // option. Target = 65097. Plan: prior 3 guesses each pin a slot via
+    // a correct lock; the pending guess locks slot 3 and picks Oracle on
+    // slot 4, completing all 5 certain slots → server should signal `won`.
+    const D = "2026-04-17";
+    const T = generateDailyTarget(D, 5);
+    expect(T).toBe("65097");
+
+    // Use guess "33333" so within2 / median etc. don't accidentally reveal
+    // any slots (no exact matches against 65097).
+    const probe = "33333";
+    const r1Clue = getClueById("within2");
+    const r2Clue = getClueById("median");
+    const r3Clue = getClueById("parityBalance");
+
+    const history = [
+      {
+        guess: probe,
+        clueId: "within2",
+        result: r1Clue.compute(probe, T),
+        locks: [{ slot: 0, digit: "6", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "median",
+        result: r2Clue.compute(probe, T),
+        locks: [{ slot: 1, digit: "5", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "parityBalance",
+        result: r3Clue.compute(probe, T),
+        locks: [{ slot: 2, digit: "0", correct: true }],
+      },
+    ];
+
+    const res = await chooseClue(
+      mockRequest({
+        history,
+        pendingGuess: probe,
+        clueId: "oracle",
+        clueParam: { selectedSlot: 4 },
+        pendingLocks: [{ slot: 3, digit: "9", correct: true }],
+      }),
+      { params: paramsP(D) },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.kind).toBe("won");
+    expect(body.target).toBe(T);
+    expect(body.result).toEqual({ kind: "oracle", slot: 4, digit: 7 });
+  });
+
+  it("returns continue (not won) when pendingLocks are missing on Oracle reveal", async () => {
+    // Same scenario as the win test above, but the client does not send
+    // `pendingLocks`. Without them the server can't see slot-3's lock,
+    // so certainty is incomplete and the response must be `continue`,
+    // NOT `won`. (Pre-fix this was the only path — and it caused the
+    // "next guess line + game freezes on submit" bug the user reported.)
+    const D = "2026-04-17";
+    const T = generateDailyTarget(D, 5);
+    const probe = "33333";
+    const history = [
+      {
+        guess: probe,
+        clueId: "within2",
+        result: getClueById("within2").compute(probe, T),
+        locks: [{ slot: 0, digit: "6", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "median",
+        result: getClueById("median").compute(probe, T),
+        locks: [{ slot: 1, digit: "5", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "parityBalance",
+        result: getClueById("parityBalance").compute(probe, T),
+        locks: [{ slot: 2, digit: "0", correct: true }],
+      },
+    ];
+    const res = await chooseClue(
+      mockRequest({
+        history,
+        pendingGuess: probe,
+        clueId: "oracle",
+        clueParam: { selectedSlot: 4 },
+      }),
+      { params: paramsP(D) },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.kind).toBe("continue");
+  });
+
+  it("ignores a tampered pending lock that lies about correctness", async () => {
+    // Defense-in-depth: a malicious client could send `correct: true` on
+    // a slot that doesn't actually match the target to fake an Oracle
+    // win. The server must re-resolve correctness against the real
+    // target — a wrong lock contributes nothing to certain digits, so
+    // the response is `continue` even if the client claimed `correct`.
+    const D = "2026-04-17";
+    const T = generateDailyTarget(D, 5);
+    const probe = "33333";
+    const history = [
+      {
+        guess: probe,
+        clueId: "within2",
+        result: getClueById("within2").compute(probe, T),
+        locks: [{ slot: 0, digit: "6", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "median",
+        result: getClueById("median").compute(probe, T),
+        locks: [{ slot: 1, digit: "5", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "parityBalance",
+        result: getClueById("parityBalance").compute(probe, T),
+        locks: [{ slot: 2, digit: "0", correct: true }],
+      },
+    ];
+    const res = await chooseClue(
+      mockRequest({
+        history,
+        pendingGuess: probe,
+        clueId: "oracle",
+        clueParam: { selectedSlot: 4 },
+        // target[3] is "9", not "1" — claim true anyway.
+        pendingLocks: [{ slot: 3, digit: "1", correct: true }],
+      }),
+      { params: paramsP(D) },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.kind).toBe("continue");
+  });
+
   it("rejects a clue that was not in the offered pair", async () => {
     // Find any clue id outside the first-round pair.
     const pair = pickTwoClues(DATE, []);
