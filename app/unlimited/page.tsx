@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
@@ -328,15 +328,34 @@ function UnlimitedGame({
                   advancedPositionalCap - effectivePositionalCount,
                 )}
                 hint={
-                  lockMode
-                    ? unlockMode
-                      ? "Press Unlock to remove the lock — or tap a different slot."
-                      : canCommitPendingLock
-                      ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
-                      : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-                    : hintLocks > 0
-                    ? "Tap a cell to lock a digit."
-                    : ""
+                  lockMode ? (
+                    unlockMode ? (
+                      <span className="block">
+                        Press Unlock to remove the lock — or tap a
+                        different slot.
+                      </span>
+                    ) : canCommitPendingLock ? (
+                      <>
+                        <span className="block">Press Lock to confirm</span>
+                        <span className="block">
+                          — Or tap the slot again to cancel.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block">
+                          Pick a digit, then press Lock
+                        </span>
+                        <span className="block">
+                          — Or tap the lock again to cancel.
+                        </span>
+                      </>
+                    )
+                  ) : hintLocks > 0 ? (
+                    <span className="block">Tap a cell to lock a digit.</span>
+                  ) : (
+                    ""
+                  )
                 }
               />
             </>
@@ -430,9 +449,13 @@ function ModeSelector({
  *   - Right column: contextual helper text (lock-mode instructions,
  *     "tap a cell" CTA, etc.). Empty during the chooser phase since
  *     the chooser cards already carry their own affordability copy.
+ *     Accepts ReactNode so callers can supply two-line layouts via
+ *     stacked spans.
  *
- * Sized to a stable min-height so the keypad doesn't shift up/down as
- * the helper text changes between zero, one, and two lines.
+ * Outer `px-1` adds a small breathing buffer to the left of the
+ * balance column and to the right of the hint text. Sized to a stable
+ * min-height so the keypad doesn't shift up/down as the helper text
+ * changes between zero, one, and two lines.
  */
 function ResourceBalance({
   lockBalance,
@@ -443,10 +466,10 @@ function ResourceBalance({
   lockBalance: number;
   advancedMode: boolean;
   positionalRemaining: number;
-  hint?: string;
+  hint?: ReactNode;
 }) {
   return (
-    <div className="mt-2 flex items-start justify-between gap-3 min-h-10">
+    <div className="mt-2 px-1 flex items-start justify-between gap-3 min-h-10">
       <div className="flex flex-col items-start gap-1 shrink-0">
         <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted leading-none">
           <span aria-label={`${lockBalance} locks remaining`}>
@@ -471,9 +494,9 @@ function ResourceBalance({
         )}
       </div>
       {hint ? (
-        <p className="text-[10px] text-muted text-right leading-snug flex-1 min-w-0">
+        <div className="text-[10px] text-muted text-right leading-snug flex-1 min-w-0">
           {hint}
-        </p>
+        </div>
       ) : null}
     </div>
   );

@@ -291,6 +291,56 @@ describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
     expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
   });
 
+  it("never offers Clue Reuse on round 1 even after redraws (standard mode)", () => {
+    // Walk many seeds and many redraws; on round 1 (chosenClueIds=[])
+    // Clue Reuse must never appear regardless of how far the player
+    // burns into the deck. Pre-fix this only held for deckOffset=0
+    // because buildDeck's pair-1 section excluded it; redraws walked
+    // into "rest" where Clue Reuse can sit.
+    for (let s = 0; s < 200; s++) {
+      const seed = `r1-noreuse-std-${s}`;
+      for (let off = 0; off < 6; off++) {
+        const [a, b] = pickTwoClues(seed, [], off, false, false);
+        expect(a.id).not.toBe("clueReuse");
+        expect(b.id).not.toBe("clueReuse");
+      }
+    }
+  });
+
+  it("never offers Clue Reuse on round 1 even after redraws (advanced mode)", () => {
+    for (let s = 0; s < 200; s++) {
+      const seed = `r1-noreuse-adv-${s}`;
+      for (let off = 0; off < 6; off++) {
+        const [a, b] = pickTwoClues(seed, [], off, false, true);
+        expect(a.id).not.toBe("clueReuse");
+        expect(b.id).not.toBe("clueReuse");
+      }
+    }
+  });
+
+  it("CAN offer Clue Reuse from round 2 onward", () => {
+    // Sanity guard: the round-1 exclusion shouldn't bleed into later
+    // rounds. Across enough seeds, Clue Reuse should be reachable in
+    // round 2+ pairs (it's a single card in the deck, but with deck
+    // walks plus modest redraws the chance of hitting it on a given
+    // seed is appreciable).
+    let seenAfterRound1 = false;
+    for (let s = 0; s < 1000 && !seenAfterRound1; s++) {
+      const seed = `r2-reuse-${s}`;
+      // Pretend the player picked sumDelta on round 1 (any non-reuse
+      // clue id works — pickTwoClues uses chosenClueIds.length, not
+      // its content).
+      for (let off = 0; off < 5; off++) {
+        const [a, b] = pickTwoClues(seed, ["sumDelta"], off, false, false);
+        if (a.id === "clueReuse" || b.id === "clueReuse") {
+          seenAfterRound1 = true;
+          break;
+        }
+      }
+    }
+    expect(seenAfterRound1).toBe(true);
+  });
+
   it("standard and advanced modes produce different decks at the same seed", () => {
     // Walking the first 6 rounds at the same seed, the two schemes
     // should disagree on at least one pair somewhere — they use
