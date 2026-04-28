@@ -40,6 +40,12 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
 
         <div className="space-y-1">
           <Toggle
+            label="Advanced unlimited mode"
+            description="At most 2 positional clues per game. Once you've picked your second positional clue, the chooser stops offering positional cards and Clue Reuse can only re-apply non-positional clues. Affects new unlimited games only — the daily puzzle is unchanged."
+            value={settings.advancedMode}
+            onChange={(v) => setSetting("advancedMode", v)}
+          />
+          <Toggle
             label="Colorblind palette"
             description="Use blue/orange instead of red/green so positional clue colors are distinguishable with common forms of color vision deficiency."
             value={settings.colorblind}

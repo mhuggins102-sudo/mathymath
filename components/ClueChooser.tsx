@@ -15,6 +15,10 @@ interface ClueChooserProps {
    *  with an empty budget. Optional — falls back to "always allowed"
    *  for callers that don't track locks. */
   locksAvailable?: number;
+  /** Advanced unlimited mode only: when the positional cap has been
+   *  reached AND the filtered reuse pool would be empty, Clue Reuse
+   *  must be unselectable even if the lock budget covers it. */
+  reusePoolEmpty?: boolean;
 }
 
 /**
@@ -28,6 +32,7 @@ export function ClueChooser({
   onRedraw,
   canRedraw,
   locksAvailable,
+  reusePoolEmpty,
 }: ClueChooserProps) {
   return (
     <div className="w-full max-w-md mx-auto select-none">
@@ -36,19 +41,24 @@ export function ClueChooser({
       </p>
       <div className="flex flex-col gap-2">
         {options.map((clue) => {
-          // Clue Reuse costs CLUE_REUSE_COST locks; disable when the
-          // player can't afford it. Other clues are always selectable.
+          // Clue Reuse has two independent gates:
+          //   1. lock budget can't cover the cost
+          //   2. advanced-mode filtered reuse pool is empty
+          // Either one disables the card; the explanatory hint surfaces
+          // the relevant reason.
           const isClueReuse = clue.id === CLUE_REUSE_CLUE_ID;
-          const unaffordable =
+          const lockUnaffordable =
             isClueReuse &&
             locksAvailable !== undefined &&
             locksAvailable < CLUE_REUSE_COST;
+          const reuseEmpty = isClueReuse && !!reusePoolEmpty;
+          const disabled = lockUnaffordable || reuseEmpty;
           return (
             <button
               key={clue.id}
               type="button"
               onClick={() => onChoose(clue.id)}
-              disabled={unaffordable}
+              disabled={disabled}
               className="w-full text-left bg-surface-2 hover:bg-surface-2/80 active:scale-[0.99] transition rounded-lg px-4 py-3 border border-border disabled:opacity-40 disabled:active:scale-100 disabled:cursor-not-allowed"
             >
               <div className="flex items-center justify-between mb-1 gap-2">
@@ -81,9 +91,14 @@ export function ClueChooser({
               <p className="text-xs text-muted leading-relaxed">
                 {clue.description}
               </p>
-              {unaffordable && (
+              {lockUnaffordable && (
                 <p className="text-[10px] text-bad mt-1">
                   Not enough locks remaining.
+                </p>
+              )}
+              {!lockUnaffordable && reuseEmpty && (
+                <p className="text-[10px] text-bad mt-1">
+                  No non-positional clues left to re-use.
                 </p>
               )}
               {clue.legend && <ClueLegend entries={clue.legend} />}

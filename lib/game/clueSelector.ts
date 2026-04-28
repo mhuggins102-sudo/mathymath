@@ -1,6 +1,82 @@
-import type { Clue, ClueId } from "./clues/types";
+import type { Clue, ClueId, ClueResult } from "./clues/types";
 import { CLUES, getClueById } from "./clues/registry";
 import { seededRng } from "./seededRng";
+
+/** Positional clue ids — derived from the registry so adding a new
+ *  positional clue automatically participates in advanced-mode rules. */
+export const POSITIONAL_CLUE_IDS: ReadonlySet<ClueId> = new Set(
+  CLUES.filter((c) => c.category === "positional").map((c) => c.id),
+);
+
+export function isPositionalClueId(id: string | undefined): boolean {
+  if (!id) return false;
+  return POSITIONAL_CLUE_IDS.has(id as ClueId);
+}
+
+/** Advanced-mode positional cap. Two positional picks (in any
+ *  combination — direct or via Clue Reuse) lock out positional cards
+ *  for the rest of the game. */
+export const ADVANCED_POSITIONAL_CAP = 2;
+
+interface PositionalAccountingGuess {
+  clueId?: string;
+  result?: { kind?: string } | unknown;
+}
+
+/** Counts how many of the player's resolved guesses count as positional
+ *  picks for advanced-mode purposes:
+ *    - direct positional pick (clueId is in POSITIONAL_CLUE_IDS), OR
+ *    - Clue Reuse pick whose result.kind is positional (i.e. the player
+ *      reused a positional clue).
+ *  Clue Reuse on a non-positional clue does NOT count. */
+export function countEffectivePositionalUses(
+  history: readonly PositionalAccountingGuess[],
+): number {
+  let n = 0;
+  for (const g of history) {
+    if (isPositionalClueId(g.clueId)) {
+      n++;
+      continue;
+    }
+    if (g.clueId === "clueReuse" && g.result && typeof g.result === "object") {
+      const r = g.result as { kind?: string };
+      if (isPositionalClueId(r.kind)) n++;
+    }
+  }
+  return n;
+}
+
+/** Returns the set of positional clue ids that have been "used" so far —
+ *  either picked directly or reused via Clue Reuse. Used to filter the
+ *  Clue-Reuse picker's pool in advanced mode (so a positional clue that
+ *  was previously used can't be re-applied once the cap is reached). */
+export function effectiveUsedPositionalIds(
+  history: readonly PositionalAccountingGuess[],
+): ReadonlySet<ClueId> {
+  const out = new Set<ClueId>();
+  for (const g of history) {
+    if (isPositionalClueId(g.clueId)) {
+      out.add(g.clueId as ClueId);
+      continue;
+    }
+    if (g.clueId === "clueReuse" && g.result && typeof g.result === "object") {
+      const r = g.result as { kind?: string };
+      if (isPositionalClueId(r.kind)) out.add(r.kind as ClueId);
+    }
+  }
+  return out;
+}
+
+/** True iff advanced-mode rules apply AND the positional cap has been
+ *  reached — meaning future pairs must omit positional cards and the
+ *  Clue-Reuse pool must exclude positional clues. */
+export function advancedPositionalCapReached(
+  advancedMode: boolean,
+  history: readonly PositionalAccountingGuess[],
+): boolean {
+  if (!advancedMode) return false;
+  return countEffectivePositionalUses(history) >= ADVANCED_POSITIONAL_CAP;
+}
 
 /**
  * Deterministic deck for one game, built from the seed.
@@ -74,15 +150,42 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * the round. `deckOffset` adds extra positions consumed by redraws
  * (the burn-lock-to-redraw mechanic). In the deck model the pair is
  * simply `deck[(round + offset) * 2]` and `deck[(round + offset) * 2 + 1]`.
+ *
+ * When `excludePositional` is true (advanced-mode positional cap
+ * reached), positional cards in the deck are skipped past — the pair
+ * is the next two non-positional cards from `base` onward. The
+ * skipped cards are treated as discarded (the deck pointer effectively
+ * leapfrogs them) so the rest of the deck stays in the same relative
+ * order. End-of-deck fallback returns the last two non-positional ids
+ * in the deck so a near-end round still produces a valid pair.
  */
 export function pickTwoClues(
   seed: string,
   chosenClueIds: readonly ClueId[],
   deckOffset: number = 0,
+  excludePositional: boolean = false,
 ): [Clue, Clue] {
   const deck = buildDeck(seed);
   const base = (chosenClueIds.length + deckOffset) * 2;
-  const aId = deck[base] ?? deck[deck.length - 2];
-  const bId = deck[base + 1] ?? deck[deck.length - 1];
-  return [getClueById(aId), getClueById(bId)];
+  if (!excludePositional) {
+    const aId = deck[base] ?? deck[deck.length - 2];
+    const bId = deck[base + 1] ?? deck[deck.length - 1];
+    return [getClueById(aId), getClueById(bId)];
+  }
+  const eligible: ClueId[] = [];
+  for (let i = base; i < deck.length; i++) {
+    if (!isPositionalClueId(deck[i])) eligible.push(deck[i]);
+    if (eligible.length === 2) break;
+  }
+  if (eligible.length < 2) {
+    // Pathological end-of-deck: backfill from the last two non-positional
+    // cards anywhere in the deck. Player should never realistically
+    // reach this in a 7-guess game since the deck has 12+ non-positional
+    // cards, but the function must always return a valid pair.
+    const allNonPositional = deck.filter((id) => !isPositionalClueId(id));
+    while (eligible.length < 2 && allNonPositional.length > 0) {
+      eligible.push(allNonPositional[allNonPositional.length - eligible.length - 1]);
+    }
+  }
+  return [getClueById(eligible[0]), getClueById(eligible[1])];
 }

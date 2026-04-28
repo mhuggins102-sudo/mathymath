@@ -16,6 +16,7 @@ import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
+import { loadSettings } from "@/lib/settings";
 import {
   loadUnlimitedMode,
   saveUnlimitedMode,
@@ -26,6 +27,10 @@ interface Session {
   target: string;
   seed: string;
   digits: number;
+  /** Captured at session creation so toggling Advanced mid-game has no
+   *  effect on the in-progress game — only the next "New puzzle" picks
+   *  up the new flag. */
+  advancedMode: boolean;
 }
 
 /** Resolves the chosen mode to a concrete digit count for the next
@@ -38,7 +43,16 @@ function resolveDigits(mode: UnlimitedMode): number {
 
 function newSession(mode: UnlimitedMode): Session {
   const digits = resolveDigits(mode);
-  return { target: generateRandomTarget(digits), seed: uuidv4(), digits };
+  // Read the advanced flag at session creation. SSR-safe: loadSettings
+  // returns the default (false) when window is undefined, and the
+  // useEffect that creates the first session runs client-side anyway.
+  const settings = loadSettings();
+  return {
+    target: generateRandomTarget(digits),
+    seed: uuidv4(),
+    digits,
+    advancedMode: settings.advancedMode,
+  };
 }
 
 export default function UnlimitedPage() {
@@ -139,12 +153,18 @@ function UnlimitedGame({
     canRedraw,
     tapCell,
     commitLock,
+    advancedMode,
+    effectivePositionalCount,
+    advancedPositionalCap,
+    positionalCapReached,
+    advancedReusePoolEmpty,
   } = useGame({
     target: session.target,
     seed: session.seed,
     digits: session.digits,
     maxGuesses,
     trackStats: true,
+    advancedMode: session.advancedMode,
   });
 
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
@@ -216,6 +236,23 @@ function UnlimitedGame({
 
       <ModeSelector mode={mode} onChange={onModeChange} />
 
+      {/* Advanced-mode indicator: shows the player's positional progress
+          toward the 2-clue cap. Hidden in standard mode and on terminal
+          states (no more picks to make). The "cap reached" copy fades to
+          good after the second pick so the player knows what to expect
+          next. */}
+      {advancedMode && state.status === "playing" && (
+        <p
+          className={`text-[11px] text-center mb-2 ${
+            positionalCapReached ? "text-good" : "text-muted"
+          }`}
+          aria-live="polite"
+        >
+          Advanced — Positional {effectivePositionalCount}/{advancedPositionalCap}
+          {positionalCapReached ? " · cap reached" : ""}
+        </p>
+      )}
+
       <div className="flex-1 flex flex-col">
         <GuessGrid
           state={state}
@@ -252,6 +289,7 @@ function UnlimitedGame({
                 confirmClueParam({ reusedClueId: clueId })
               }
               onCancel={cancelClueParam}
+              excludePositional={positionalCapReached}
             />
           ) : pendingClueParam?.paramKind === "digit" ? (
             <DigitPicker
@@ -267,6 +305,7 @@ function UnlimitedGame({
               onRedraw={redraw}
               canRedraw={canRedraw}
               locksAvailable={locksAvailable}
+              reusePoolEmpty={advancedReusePoolEmpty}
             />
           ) : state.status === "playing" ? (
             <>

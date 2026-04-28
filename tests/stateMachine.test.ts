@@ -135,6 +135,7 @@ describe("stateMachine", () => {
       maxGuesses: 7,
       seed: "t",
       deckOffset: 0,
+      advancedMode: false,
       status: "playing",
       guesses: [
         { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 } },
@@ -167,6 +168,7 @@ describe("stateMachine", () => {
       maxGuesses: 7,
       seed: "t",
       deckOffset: 0,
+      advancedMode: false,
       status: "playing",
       guesses: [
         { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 } },
@@ -183,6 +185,186 @@ describe("stateMachine", () => {
       param: { selectedSlot: 0 },
     });
     expect(next.status).toBe("playing");
+  });
+});
+
+describe("stateMachine — advanced mode (positional cap)", () => {
+  it("standard and advanced modes diverge once the player has used 2 positional clues", () => {
+    // Hand-craft a history with two positional picks, then dispatch a
+    // SUBMIT to derive what the chooser would offer next. In standard
+    // mode the deck pointer is free to surface positional cards; in
+    // advanced mode positional cards must be filtered out. Picking the
+    // same fixed seed/history ensures any divergence is purely the
+    // cap's doing.
+    const target = "12345";
+    const baseHistory = [
+      {
+        guess: "99999",
+        clueId: "oracle" as const,
+        result: { kind: "oracle" as const, slot: 0, digit: 1 },
+      },
+      {
+        guess: "88888",
+        clueId: "thermometer" as const,
+        result: getClueById("thermometer").compute("88888", target),
+      },
+    ];
+    let std = initGameState({
+      target,
+      seed: "diverge",
+      maxGuesses: 7,
+      advancedMode: false,
+    });
+    std = { ...std, guesses: baseHistory };
+    std = reduce(std, { type: "SUBMIT_GUESS", guess: "77777" });
+    let adv = initGameState({
+      target,
+      seed: "diverge",
+      maxGuesses: 7,
+      advancedMode: true,
+    });
+    adv = { ...adv, guesses: baseHistory };
+    adv = reduce(adv, { type: "SUBMIT_GUESS", guess: "77777" });
+    // Advanced mode: every offered card must be non-positional.
+    for (const c of adv.pendingGuess!.options) {
+      expect(c.category).not.toBe("positional");
+    }
+    // Sanity: standard mode at the SAME seed/round may legitimately
+    // offer a positional card. We don't require it (deck shuffle-
+    // dependent), but at minimum standard mode must not be filtered
+    // by advanced rules — assert by checking the two pairs differ
+    // structurally OR std contains a positional.
+    const advIds = adv.pendingGuess!.options.map((c) => c.id).sort();
+    const stdIds = std.pendingGuess!.options.map((c) => c.id).sort();
+    const stdHasPositional = std.pendingGuess!.options.some(
+      (c) => c.category === "positional",
+    );
+    if (stdHasPositional) {
+      // The defining symptom of the divergence: std offered a
+      // positional, adv did not.
+      expect(advIds).not.toEqual(stdIds);
+    }
+  });
+
+  it("advanced mode stops offering positional clues after 2 picks", () => {
+    let s = initGameState({
+      target: "12345",
+      seed: "advmode",
+      maxGuesses: 7,
+      advancedMode: true,
+    });
+    // Pick positional whenever it's available, until we've used 2.
+    let positionalPicks = 0;
+    for (let i = 0; i < 7 && positionalPicks < 2 && s.status === "playing"; i++) {
+      s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
+      if (!s.pendingGuess) break;
+      const positional = s.pendingGuess.options.find(
+        (c) => c.category === "positional",
+      );
+      if (positional) {
+        positionalPicks++;
+        s = reduce(s, {
+          type: "CHOOSE_CLUE",
+          clueId: positional.id,
+          param:
+            positional.id === "oracle" ? { selectedSlot: 0 } : undefined,
+        });
+      } else {
+        // Take any non-positional and try again next round.
+        const fallback = s.pendingGuess.options[0];
+        s = reduce(s, { type: "CHOOSE_CLUE", clueId: fallback.id });
+      }
+    }
+    expect(positionalPicks).toBe(2);
+    // Next 3 rounds: every offered card must be non-positional.
+    for (let i = 0; i < 3 && s.status === "playing"; i++) {
+      s = reduce(s, { type: "SUBMIT_GUESS", guess: "88888" });
+      if (!s.pendingGuess) break;
+      for (const c of s.pendingGuess.options) {
+        expect(c.category).not.toBe("positional");
+      }
+      const fallback = s.pendingGuess.options[0];
+      s = reduce(s, { type: "CHOOSE_CLUE", clueId: fallback.id });
+    }
+  });
+
+  it("REDRAW respects the advanced-mode cap", () => {
+    let s = initGameState({
+      target: "12345",
+      seed: "advredraw",
+      maxGuesses: 7,
+      advancedMode: true,
+    });
+    // Burn 2 positional picks to reach the cap.
+    let positionalPicks = 0;
+    for (let i = 0; i < 7 && positionalPicks < 2; i++) {
+      s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
+      const positional = s.pendingGuess!.options.find(
+        (c) => c.category === "positional",
+      );
+      if (positional) {
+        positionalPicks++;
+        s = reduce(s, {
+          type: "CHOOSE_CLUE",
+          clueId: positional.id,
+          param:
+            positional.id === "oracle" ? { selectedSlot: 0 } : undefined,
+        });
+      } else {
+        const fb = s.pendingGuess!.options[0];
+        s = reduce(s, { type: "CHOOSE_CLUE", clueId: fb.id });
+      }
+    }
+    // Submit the next guess and immediately redraw; both pre-redraw
+    // and post-redraw pairs must be free of positional cards.
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "88888" });
+    for (const c of s.pendingGuess!.options) {
+      expect(c.category).not.toBe("positional");
+    }
+    s = reduce(s, { type: "REDRAW" });
+    for (const c of s.pendingGuess!.options) {
+      expect(c.category).not.toBe("positional");
+    }
+  });
+
+  it("Clue Reuse counts toward the cap when reusing a positional clue", () => {
+    // Hand-craft a state where the player has used Oracle directly and
+    // then Clue Reuse on Higher/Lower. The cap should fire (2 effective
+    // positional uses) on the next SUBMIT.
+    const target = "12345";
+    let s: GameState = initGameState({
+      target,
+      seed: "reusecap",
+      maxGuesses: 7,
+      advancedMode: true,
+    });
+    s = {
+      ...s,
+      guesses: [
+        {
+          guess: "99999",
+          clueId: "oracle",
+          result: { kind: "oracle", slot: 0, digit: 1 },
+        },
+        {
+          guess: "88888",
+          clueId: "higherLower",
+          result: getClueById("higherLower").compute("88888", target),
+        },
+        {
+          guess: "77777",
+          clueId: "clueReuse",
+          // The reuse re-applied higherLower (positional) → counts as
+          // a positional use for advanced-mode purposes. Combined with
+          // Oracle that's 3 effective positional uses; cap fires.
+          result: getClueById("higherLower").compute("77777", target),
+        },
+      ],
+    };
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "66666" });
+    for (const c of s.pendingGuess!.options) {
+      expect(c.category).not.toBe("positional");
+    }
   });
 });
 

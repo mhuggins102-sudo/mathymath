@@ -24,6 +24,11 @@ import {
   locksAvailable as computeLocksAvailable,
 } from "@/lib/game/locks";
 import {
+  ADVANCED_POSITIONAL_CAP,
+  countEffectivePositionalUses,
+  effectiveUsedPositionalIds,
+} from "@/lib/game/clueSelector";
+import {
   clearGame,
   loadGame,
   loadUnlimitedStats,
@@ -41,6 +46,9 @@ export interface UseGameConfig {
   storageKey?: string;
   /** If true, records personal stats on terminal state. */
   trackStats?: boolean;
+  /** "Advanced" rules: cap positional clues at 2 per game. Captured on
+   *  game start; mid-game flips don't affect the in-progress reducer. */
+  advancedMode?: boolean;
 }
 
 export interface UseGameResult {
@@ -77,6 +85,24 @@ export interface UseGameResult {
     clueId: string;
     paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
   } | null;
+  /** Whether the game is being played under advanced rules. */
+  advancedMode: boolean;
+  /** Effective positional uses so far (direct + Clue-Reuse-of-positional).
+   *  Always populated; UI can decide whether to surface it based on
+   *  `advancedMode`. */
+  effectivePositionalCount: number;
+  /** Cap that applies under advanced rules. */
+  advancedPositionalCap: number;
+  /** Set of previously-used positional clue ids, used by the reuse
+   *  picker to filter the reusable pool when the cap is reached. */
+  usedPositionalClueIds: ReadonlySet<string>;
+  /** True when advanced rules + cap reached — Clue Reuse must restrict
+   *  its pool to non-positional previously-used clues. */
+  positionalCapReached: boolean;
+  /** True when advanced rules + cap reached AND the filtered reuse pool
+   *  would be empty. The chooser uses this to additionally disable the
+   *  Clue Reuse card. */
+  advancedReusePoolEmpty: boolean;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
@@ -116,6 +142,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       seed: config.seed,
       digits: config.digits,
       maxGuesses: config.maxGuesses ?? DEFAULT_MAX_GUESSES,
+      advancedMode: config.advancedMode,
     }),
   );
 
@@ -224,6 +251,19 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const canUseLocks = canUseLockOnGuess();
   const canStartLock =
     canUseLocks && lockedSlots.length < locksAvailableCount;
+
+  // Advanced-mode positional accounting. Always computed so the UI can
+  // surface a "Positional X/2" hint when advancedMode is on, and so the
+  // chooser/picker can know whether the cap has been reached. Clue
+  // Reuse counts here only when its result.kind is positional.
+  const effectivePositionalCount = countEffectivePositionalUses(state.guesses);
+  const usedPositionalClueIds = useMemo(
+    () => effectiveUsedPositionalIds(state.guesses),
+    [state.guesses],
+  );
+  const positionalCapReached =
+    state.advancedMode &&
+    effectivePositionalCount >= ADVANCED_POSITIONAL_CAP;
   const pendingLockDigit = useMemo(() => {
     if (pendingLockSlot === null) return null;
     return (
@@ -467,6 +507,23 @@ export function useGame(config: UseGameConfig): UseGameResult {
     paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
   } | null>(null);
 
+  // Clue-Reuse gating in advanced mode: once the positional cap is
+  // reached, the reuse pool is restricted to previously-used non-
+  // positional clues. If that filtered pool is empty, Clue Reuse is
+  // unselectable even when the lock budget would otherwise cover it.
+  const advancedReusePoolEmpty = useMemo(() => {
+    if (!positionalCapReached) return false;
+    // Set is typed over ClueId; widen to a string-keyed view for the
+    // membership check so the loop below doesn't fight the type system.
+    const positionalIds = usedPositionalClueIds as ReadonlySet<string>;
+    for (const g of state.guesses) {
+      if (!g.clueId) continue;
+      if (g.clueId === CLUE_REUSE_CLUE_ID) continue;
+      if (!positionalIds.has(g.clueId)) return false;
+    }
+    return true;
+  }, [positionalCapReached, state.guesses, usedPositionalClueIds]);
+
   const chooseClue = useCallback(
     (id: string) => {
       if (!state.pendingGuess) return;
@@ -482,6 +539,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
       ) {
         return;
       }
+      // Advanced mode: also refuse Clue Reuse when its filtered pool
+      // would be empty (positional cap reached AND every prior used
+      // clue was positional).
+      if (id === CLUE_REUSE_CLUE_ID && advancedReusePoolEmpty) {
+        return;
+      }
       if (clue.paramKind) {
         // Park in parameter-selection mode; the UI will render a picker.
         setPendingClueParam({ clueId: id, paramKind: clue.paramKind });
@@ -490,7 +553,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
       buzz(18);
     },
-    [state.pendingGuess, locksAvailableCount],
+    [state.pendingGuess, locksAvailableCount, advancedReusePoolEmpty],
   );
 
   const confirmClueParam = useCallback(
@@ -556,11 +619,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
         seed: params.seed,
         digits: config.digits,
         maxGuesses: config.maxGuesses,
+        advancedMode: config.advancedMode,
       });
       setInput("");
       setError(null);
     },
-    [config.storageKey, config.digits, config.maxGuesses],
+    [config.storageKey, config.digits, config.maxGuesses, config.advancedMode],
   );
 
   return {
@@ -578,6 +642,12 @@ export function useGame(config: UseGameConfig): UseGameResult {
     canCommitPendingLock,
     unlockMode,
     pendingClueParam,
+    advancedMode: state.advancedMode,
+    effectivePositionalCount,
+    advancedPositionalCap: ADVANCED_POSITIONAL_CAP,
+    usedPositionalClueIds,
+    positionalCapReached,
+    advancedReusePoolEmpty,
     appendDigit,
     backspace,
     submit,

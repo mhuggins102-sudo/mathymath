@@ -1,6 +1,9 @@
 import type { Clue, ClueId, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
-import { pickTwoClues } from "./clueSelector";
+import {
+  advancedPositionalCapReached,
+  pickTwoClues,
+} from "./clueSelector";
 import { deriveCertainDigits, knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
@@ -58,6 +61,10 @@ export interface GameState {
    *  prior rounds. Used by pickTwoClues to advance past consumed
    *  pairs. Starts at 0; each REDRAW bumps by 1. */
   deckOffset: number;
+  /** "Advanced" rules toggle, captured at game start. Setting changes
+   *  during a game don't affect the in-progress reducer — only the next
+   *  RESET picks up the new flag. Daily mode never enables this. */
+  advancedMode: boolean;
   /** Current pending guess waiting for the player to choose a clue.
    *  `locks` travels with the pending guess so the chosen clue handler
    *  can append them to the resolved history alongside the clue result. */
@@ -74,13 +81,21 @@ export type GameAction =
   | { type: "SUBMIT_GUESS"; guess: string; locks?: readonly LockAttempt[] }
   | { type: "CHOOSE_CLUE"; clueId: ClueId; param?: { selectedSlot?: number; selectedDigit?: number } }
   | { type: "REDRAW" }
-  | { type: "RESET"; target: string; seed: string; digits?: number; maxGuesses?: number };
+  | {
+      type: "RESET";
+      target: string;
+      seed: string;
+      digits?: number;
+      maxGuesses?: number;
+      advancedMode?: boolean;
+    };
 
 export function initGameState(params: {
   target: string;
   seed: string;
   digits?: number;
   maxGuesses?: number;
+  advancedMode?: boolean;
 }): GameState {
   return {
     target: params.target,
@@ -89,6 +104,7 @@ export function initGameState(params: {
     maxGuesses: params.maxGuesses ?? DEFAULT_MAX_GUESSES,
     guesses: [],
     deckOffset: 0,
+    advancedMode: params.advancedMode ?? false,
     pendingGuess: null,
     status: "playing",
   };
@@ -102,6 +118,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
         seed: action.seed,
         digits: action.digits,
         maxGuesses: action.maxGuesses,
+        advancedMode: action.advancedMode,
       });
 
     case "SUBMIT_GUESS": {
@@ -151,7 +168,16 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const usedClueIds = state.guesses
         .map((g) => g.clueId)
         .filter((id): id is ClueId => id !== undefined);
-      const options = pickTwoClues(state.seed, usedClueIds, state.deckOffset);
+      const excludePositional = advancedPositionalCapReached(
+        state.advancedMode,
+        state.guesses,
+      );
+      const options = pickTwoClues(
+        state.seed,
+        usedClueIds,
+        state.deckOffset,
+        excludePositional,
+      );
       return {
         ...state,
         pendingGuess: {
@@ -171,7 +197,16 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const usedClueIds = state.guesses
         .map((g) => g.clueId)
         .filter((id): id is ClueId => id !== undefined);
-      const newOptions = pickTwoClues(state.seed, usedClueIds, newOffset);
+      const excludePositional = advancedPositionalCapReached(
+        state.advancedMode,
+        state.guesses,
+      );
+      const newOptions = pickTwoClues(
+        state.seed,
+        usedClueIds,
+        newOffset,
+        excludePositional,
+      );
       return {
         ...state,
         deckOffset: newOffset,
