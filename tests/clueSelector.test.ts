@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { pickTwoClues } from "@/lib/game/clueSelector";
+import {
+  ADVANCED_POSITIONAL_CAP,
+  advancedPositionalCapReached,
+  countEffectivePositionalUses,
+  effectiveUsedPositionalIds,
+  isPositionalClueId,
+  pickTwoClues,
+} from "@/lib/game/clueSelector";
 import { getClueById } from "@/lib/game/clues/registry";
 import type { ClueId } from "@/lib/game/clues/types";
 
@@ -106,5 +113,129 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       expect(getClueById(c).id).toBe(c);
       expect(seen.has(c)).toBe(true);
     }
+  });
+});
+
+describe("isPositionalClueId", () => {
+  it("returns true for the 6 positional clue ids", () => {
+    for (const id of [
+      "bullseyes",
+      "higherLower",
+      "within2",
+      "parityMask",
+      "oracle",
+      "thermometer",
+    ] as const) {
+      expect(isPositionalClueId(id)).toBe(true);
+    }
+  });
+  it("returns false for non-positional, special, and unknown ids", () => {
+    expect(isPositionalClueId("sumDelta")).toBe(false);
+    expect(isPositionalClueId("clueReuse")).toBe(false);
+    expect(isPositionalClueId("extraLock")).toBe(false);
+    expect(isPositionalClueId(undefined)).toBe(false);
+    expect(isPositionalClueId("madeUp")).toBe(false);
+  });
+});
+
+describe("countEffectivePositionalUses", () => {
+  it("counts direct positional picks", () => {
+    expect(
+      countEffectivePositionalUses([
+        { clueId: "oracle" },
+        { clueId: "sumDelta" },
+        { clueId: "thermometer" },
+      ]),
+    ).toBe(2);
+  });
+
+  it("counts Clue Reuse only when result.kind is positional", () => {
+    expect(
+      countEffectivePositionalUses([
+        { clueId: "clueReuse", result: { kind: "thermometer" } },
+        { clueId: "clueReuse", result: { kind: "sumDelta" } },
+        { clueId: "clueReuse", result: { kind: "oracle" } },
+      ]),
+    ).toBe(2);
+  });
+
+  it("ignores Clue Reuse with non-object or missing result", () => {
+    expect(
+      countEffectivePositionalUses([
+        { clueId: "clueReuse" },
+        { clueId: "clueReuse", result: null },
+        { clueId: "clueReuse", result: { kind: "extraLock" } },
+      ]),
+    ).toBe(0);
+  });
+});
+
+describe("effectiveUsedPositionalIds", () => {
+  it("returns the set of positional clue ids used directly OR via Clue Reuse", () => {
+    const set = effectiveUsedPositionalIds([
+      { clueId: "oracle" },
+      { clueId: "sumDelta" },
+      { clueId: "clueReuse", result: { kind: "thermometer" } },
+    ]);
+    expect(set.has("oracle")).toBe(true);
+    expect(set.has("thermometer")).toBe(true);
+    expect(set.has("sumDelta")).toBe(false);
+  });
+});
+
+describe("advancedPositionalCapReached", () => {
+  it("only fires when advancedMode is on AND count >= cap", () => {
+    expect(
+      advancedPositionalCapReached(false, [
+        { clueId: "oracle" },
+        { clueId: "thermometer" },
+      ]),
+    ).toBe(false);
+    expect(
+      advancedPositionalCapReached(true, [
+        { clueId: "oracle" },
+        { clueId: "thermometer" },
+      ]),
+    ).toBe(true);
+    expect(
+      advancedPositionalCapReached(true, [{ clueId: "oracle" }]),
+    ).toBe(false);
+  });
+});
+
+describe("pickTwoClues with excludePositional", () => {
+  it("never offers a positional card when excludePositional is true", () => {
+    // Walk a long range of seeds × rounds and verify the constraint
+    // holds across deck shuffle variation.
+    for (let s = 0; s < 50; s++) {
+      for (let round = 0; round < 7; round++) {
+        const chosen = Array.from(
+          { length: round },
+          () => "sumDelta" as ClueId,
+        );
+        const [a, b] = pickTwoClues(`adv-${s}`, chosen, 0, true);
+        expect(a.category).not.toBe("positional");
+        expect(b.category).not.toBe("positional");
+      }
+    }
+  });
+
+  it("returns two distinct clues even when excluding positionals", () => {
+    for (let s = 0; s < 50; s++) {
+      const [a, b] = pickTwoClues(`adv-distinct-${s}`, [], 0, true);
+      expect(a.id).not.toBe(b.id);
+    }
+  });
+
+  it("falls back to standard pair when excludePositional is false (regression guard)", () => {
+    const seed = "regression-1";
+    const chosen: ClueId[] = ["sumDelta"];
+    const standard = pickTwoClues(seed, chosen, 0, false);
+    const implicit = pickTwoClues(seed, chosen, 0);
+    expect(standard.map((c) => c.id)).toEqual(implicit.map((c) => c.id));
+  });
+
+  it("ADVANCED_POSITIONAL_CAP is 2", () => {
+    expect(ADVANCED_POSITIONAL_CAP).toBe(2);
   });
 });

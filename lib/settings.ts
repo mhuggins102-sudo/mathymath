@@ -4,6 +4,12 @@ import { z } from "zod";
 
 const settingsSchema = z.object({
   version: z.literal(1),
+  /** Unlimited-mode "Advanced" rules: at most 2 positional clues across
+   *  the game; once reached, the chooser stops offering positional cards
+   *  and Clue Reuse is restricted to previously-used non-positional
+   *  clues. Daily play is unaffected — the daily puzzle always uses the
+   *  standard ruleset so leaderboards stay comparable. */
+  advancedMode: z.boolean().default(false),
   colorblind: z.boolean().default(false),
   haptics: z.boolean().default(true),
 });
@@ -13,7 +19,7 @@ export type Settings = z.infer<typeof settingsSchema>;
 const KEY = "mathymath:settings";
 
 export function defaultSettings(): Settings {
-  return { version: 1, colorblind: false, haptics: true };
+  return { version: 1, advancedMode: false, colorblind: false, haptics: true };
 }
 
 export function loadSettings(): Settings {
