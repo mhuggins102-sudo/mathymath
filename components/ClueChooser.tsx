@@ -110,7 +110,7 @@ export function ClueChooser({
         <button
           type="button"
           onClick={onRedraw}
-          className="w-full mt-3 text-xs text-muted hover:text-foreground py-1"
+          className="w-full mt-3 text-xs text-muted hover:text-foreground py-1 text-right"
         >
           Redraw (costs 🔒×1)
         </button>

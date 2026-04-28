@@ -179,13 +179,18 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * every call within a single game so the deck stays consistent across
  * rounds.
  *
- * When `excludePositional` is true (advanced-mode positional cap
- * reached), positional cards in the deck are skipped past — the pair
- * is the next two non-positional cards from `base` onward. The
- * skipped cards are treated as discarded (the deck pointer effectively
- * leapfrogs them) so the rest of the deck stays in the same relative
- * order. End-of-deck fallback returns the last two non-positional ids
- * in the deck so a near-end round still produces a valid pair.
+ * Eligibility filter: cards that fail `isEligible` (locked-out
+ * positional after the cap; Clue Reuse on round 1) are skipped past —
+ * the deck pointer leapfrogs them. The skipped cards are effectively
+ * discarded for the rest of the game, but downstream offsets remain
+ * the same, so subsequent rounds are deterministic from the seed.
+ *
+ * Round-1 Clue Reuse exclusion: pair 1 of the standard deck already
+ * lacks Clue Reuse (the buildDeck "rest" section is where it lives),
+ * but a redraw on round 1 walks into "rest" where Clue Reuse may sit,
+ * which previously surfaced it before the player had any used clues to
+ * re-apply. The eligibility check here suppresses that on every
+ * round-1 draw regardless of redraws.
  */
 export function pickTwoClues(
   seed: string,
@@ -196,24 +201,44 @@ export function pickTwoClues(
 ): [Clue, Clue] {
   const deck = buildDeck(seed, advancedMode);
   const base = (chosenClueIds.length + deckOffset) * 2;
-  if (!excludePositional) {
-    const aId = deck[base] ?? deck[deck.length - 2];
-    const bId = deck[base + 1] ?? deck[deck.length - 1];
-    return [getClueById(aId), getClueById(bId)];
+  const isRound1 = chosenClueIds.length === 0;
+
+  const isEligible = (id: ClueId): boolean => {
+    if (excludePositional && isPositionalClueId(id)) return false;
+    if (isRound1 && id === "clueReuse") return false;
+    return true;
+  };
+
+  // Fast path: when both base/base+1 cards pass the filter, take them
+  // directly. Preserves the existing offset semantics for the common
+  // case (no positional cap, not round 1, or round 1 with no redraw).
+  const headA = deck[base];
+  const headB = deck[base + 1];
+  if (
+    headA !== undefined &&
+    headB !== undefined &&
+    isEligible(headA) &&
+    isEligible(headB)
+  ) {
+    return [getClueById(headA), getClueById(headB)];
   }
+
+  // Otherwise walk the deck from base, taking the next two eligible
+  // cards.
   const eligible: ClueId[] = [];
   for (let i = base; i < deck.length; i++) {
-    if (!isPositionalClueId(deck[i])) eligible.push(deck[i]);
+    if (isEligible(deck[i])) eligible.push(deck[i]);
     if (eligible.length === 2) break;
   }
   if (eligible.length < 2) {
-    // Pathological end-of-deck: backfill from the last two non-positional
-    // cards anywhere in the deck. Player should never realistically
-    // reach this in a 7-guess game since the deck has 12+ non-positional
-    // cards, but the function must always return a valid pair.
-    const allNonPositional = deck.filter((id) => !isPositionalClueId(id));
-    while (eligible.length < 2 && allNonPositional.length > 0) {
-      eligible.push(allNonPositional[allNonPositional.length - eligible.length - 1]);
+    // Pathological end-of-deck: backfill from the eligible pool
+    // anywhere in the deck. Player should never realistically reach
+    // this in a 7-guess game (the deck has plenty of non-positional
+    // non-reuse cards), but the function must always return a valid
+    // pair.
+    const backfill = deck.filter(isEligible);
+    while (eligible.length < 2 && backfill.length > 0) {
+      eligible.push(backfill[backfill.length - eligible.length - 1]);
     }
   }
   return [getClueById(eligible[0]), getClueById(eligible[1])];
