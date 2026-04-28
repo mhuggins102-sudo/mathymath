@@ -283,20 +283,17 @@ function UnlimitedGame({
             />
           ) : state.pendingGuess ? (
             <>
+              {/* Unlimited renders the Redraw control inside the
+                  ResourceBalance row below (so it sits on the same
+                  line as the balance column) rather than as a full-
+                  width button under the chooser cards. The chooser
+                  itself just shows the two clue cards. */}
               <ClueChooser
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
-                onRedraw={redraw}
-                canRedraw={canRedraw}
                 locksAvailable={locksAvailable}
                 reusePoolEmpty={advancedReusePoolEmpty}
               />
-              {/* Balance row stays visible below the chooser too, so
-                  the player can still see their lock + positional
-                  budget while picking a clue. The right-side helper
-                  slot is empty here — the chooser cards carry their
-                  own affordability copy (Clue Reuse cost, "no non-
-                  positional clues left", etc.). */}
               <ResourceBalance
                 lockBalance={hintLocks}
                 advancedMode={advancedMode}
@@ -304,7 +301,19 @@ function UnlimitedGame({
                   0,
                   advancedPositionalCap - effectivePositionalCount,
                 )}
-                hint=""
+                hint={
+                  canRedraw ? (
+                    <button
+                      type="button"
+                      onClick={redraw}
+                      className="text-xs text-muted hover:text-foreground"
+                    >
+                      Redraw (costs 🔒×1)
+                    </button>
+                  ) : (
+                    ""
+                  )
+                }
               />
             </>
           ) : state.status === "playing" ? (
@@ -331,14 +340,13 @@ function UnlimitedGame({
                   lockMode ? (
                     unlockMode ? (
                       <span className="block">
-                        Press Unlock to remove the lock — or tap a
-                        different slot.
+                        Press Unlock to remove the lock.
                       </span>
                     ) : canCommitPendingLock ? (
                       <>
                         <span className="block">Press Lock to confirm</span>
                         <span className="block">
-                          — Or tap the slot again to cancel.
+                          Or tap the slot again to cancel.
                         </span>
                       </>
                     ) : (
@@ -347,7 +355,7 @@ function UnlimitedGame({
                           Pick a digit, then press Lock
                         </span>
                         <span className="block">
-                          — Or tap the lock again to cancel.
+                          Or tap the lock again to cancel.
                         </span>
                       </>
                     )
@@ -452,10 +460,10 @@ function ModeSelector({
  *     Accepts ReactNode so callers can supply two-line layouts via
  *     stacked spans.
  *
- * Outer `px-1` adds a small breathing buffer to the left of the
- * balance column and to the right of the hint text. Sized to a stable
- * min-height so the keypad doesn't shift up/down as the helper text
- * changes between zero, one, and two lines.
+ * Outer `px-2` adds a small breathing buffer to the left of the
+ * balance column and to the right of the hint/redraw slot. Sized to a
+ * stable min-height so the keypad doesn't shift up/down as the helper
+ * text changes between zero, one, and two lines.
  */
 function ResourceBalance({
   lockBalance,
@@ -469,7 +477,7 @@ function ResourceBalance({
   hint?: ReactNode;
 }) {
   return (
-    <div className="mt-2 px-1 flex items-start justify-between gap-3 min-h-10">
+    <div className="mt-2 px-2 flex items-start justify-between gap-3 min-h-10">
       <div className="flex flex-col items-start gap-1 shrink-0">
         <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted leading-none">
           <span aria-label={`${lockBalance} locks remaining`}>
