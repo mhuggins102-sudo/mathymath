@@ -9,7 +9,6 @@ import {
   saveDailyGame,
   type SavedDailyGame,
 } from "@/lib/persistence/localStore";
-import { buzz } from "@/lib/settings";
 import {
   buildGuessFromInput,
   deriveCertainDigits,
@@ -440,13 +439,11 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       setLockedSlots(newLocked);
       setPendingLockSlot(null);
       setUnlockMode(false);
-      buzz(18);
       return;
     }
     if (pendingLockDigit === null) return;
     setPendingLockSlot(null);
     setUnlockMode(false);
-    buzz(18);
   }, [pendingLockSlot, pendingLockDigit, unlockMode, lockedSlots]);
 
   const submit = useCallback(async () => {
@@ -466,7 +463,6 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     inFlightRef.current = true;
     setError(null);
     setLoading(true);
-    buzz(12);
     try {
       const res = await fetch(
         `/api/daily/${encodeURIComponent(state.date)}/submit-guess`,
@@ -567,7 +563,6 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       inFlightRef.current = true;
       setError(null);
       setLoading(true);
-      buzz(18);
       try {
         const res = await fetch(
           `/api/daily/${encodeURIComponent(state.date)}/choose-clue`,
@@ -715,7 +710,6 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           }
         : null,
     }));
-    buzz(12);
   }, [canRedraw, state.pendingGuess, state.deckOffset, state.guesses, state.date]);
 
   return {

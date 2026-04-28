@@ -177,6 +177,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
         usedClueIds,
         state.deckOffset,
         excludePositional,
+        state.advancedMode,
       );
       return {
         ...state,
@@ -206,6 +207,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
         usedClueIds,
         newOffset,
         excludePositional,
+        state.advancedMode,
       );
       return {
         ...state,

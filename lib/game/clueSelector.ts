@@ -81,23 +81,47 @@ export function advancedPositionalCapReached(
 /**
  * Deterministic deck for one game, built from the seed.
  *
- * Rules (the "deck_1p1c" scheme, chosen by sim head-to-head over the
+ * Standard scheme (`deck_1p1c`, chosen by sim head-to-head over the
  * prior weighted selector):
  *   - Top two cards of the deck are exactly 1 positional + 1
  *     non-positional (compositional or special), shuffled within the
  *     pair. Pair 1 is always a category-contrast decision.
  *   - The rest of the deck is the remaining 5 positional + 10
  *     non-positional, shuffled together.
- *   - Cards are drawn two at a time in deck order. Offered-but-
- *     unpicked cards are not returned to the pool — they're discarded
- *     permanently. (This is enforced implicitly: pair k reads positions
- *     k*2 and k*2+1; no clue id ever appears twice in the deck.)
  *
- * Two independent RNGs plus a pair-shuffle RNG keep daily fairness:
- * two players on the same puzzle derive the same deck, so the same
- * pair is always offered at the same round.
+ * Advanced scheme (`deck_full_shuffle`, used when the player toggles
+ * Advanced unlimited mode):
+ *   - The full clue roster (minus Clue Reuse) is shuffled freely, so
+ *     pair 1 may end up positional/positional, comp/comp, or any other
+ *     mix — the category-contrast guarantee is dropped.
+ *   - Clue Reuse is still excluded from pair 1 (no previously-used
+ *     clues to reuse on round 1) and slotted into the post-pair-1 deck
+ *     before that section is shuffled.
+ *
+ * Both schemes share the "discard offered-but-unpicked" rule: a pair is
+ * read at positions k*2 / k*2+1 and never returned to the pool. The
+ * advanced scheme uses a different RNG namespace (`deckFullShuffle:`)
+ * so toggling Advanced mid-game-prep yields a structurally distinct
+ * order rather than a permutation of the standard deck.
  */
-function buildDeck(seed: string): ClueId[] {
+function buildDeck(seed: string, advancedMode: boolean = false): ClueId[] {
+  const clueReuseId = CLUES.find((c) => c.id === "clueReuse")?.id;
+
+  if (advancedMode) {
+    const allExceptReuse = CLUES.filter((c) => c.id !== "clueReuse").map(
+      (c) => c.id,
+    );
+    const rngTop = seededRng(`deckFullShuffle:top:${seed}`);
+    const shuffled = fisherYates(allExceptReuse, rngTop);
+    const pair1 = shuffled.slice(0, 2);
+    const rngRest = seededRng(`deckFullShuffle:rest:${seed}`);
+    const rest = fisherYates(
+      [...shuffled.slice(2), ...(clueReuseId ? [clueReuseId] : [])],
+      rngRest,
+    );
+    return [...pair1, ...rest];
+  }
+
   const positional = CLUES.filter((c) => c.category === "positional");
   // Clue Reuse is excluded from the top pair (pair 1) because there
   // are no previously-used clues to reuse on round 1. It's pushed
@@ -105,7 +129,6 @@ function buildDeck(seed: string): ClueId[] {
   const otherForPair1 = CLUES.filter(
     (c) => c.category !== "positional" && c.id !== "clueReuse",
   );
-  const clueReuseId = CLUES.find((c) => c.id === "clueReuse")?.id;
 
   const rngP = seededRng(`deck1p1cP:${seed}`);
   const shuffledP = fisherYates(
@@ -151,6 +174,11 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * (the burn-lock-to-redraw mechanic). In the deck model the pair is
  * simply `deck[(round + offset) * 2]` and `deck[(round + offset) * 2 + 1]`.
  *
+ * `advancedMode` switches to the fully-shuffled deck variant (no
+ * pair-1 category-contrast guarantee). It must be threaded through on
+ * every call within a single game so the deck stays consistent across
+ * rounds.
+ *
  * When `excludePositional` is true (advanced-mode positional cap
  * reached), positional cards in the deck are skipped past — the pair
  * is the next two non-positional cards from `base` onward. The
@@ -164,8 +192,9 @@ export function pickTwoClues(
   chosenClueIds: readonly ClueId[],
   deckOffset: number = 0,
   excludePositional: boolean = false,
+  advancedMode: boolean = false,
 ): [Clue, Clue] {
-  const deck = buildDeck(seed);
+  const deck = buildDeck(seed, advancedMode);
   const base = (chosenClueIds.length + deckOffset) * 2;
   if (!excludePositional) {
     const aId = deck[base] ?? deck[deck.length - 2];

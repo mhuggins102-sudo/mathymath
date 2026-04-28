@@ -239,3 +239,80 @@ describe("pickTwoClues with excludePositional", () => {
     expect(ADVANCED_POSITIONAL_CAP).toBe(2);
   });
 });
+
+describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
+  it("does NOT enforce the standard 1-positional + 1-non-positional pair-1 rule", () => {
+    // Across many seeds the standard scheme is locked to exactly one
+    // positional in pair 1; the advanced scheme has no such constraint,
+    // so categorical mixes other than "1+1" must occur.
+    let standardOnePositional = 0;
+    let advancedOnePositional = 0;
+    let advancedZeroOrTwo = 0;
+    for (let i = 0; i < 500; i++) {
+      const seed = `adv-shuf-${i}`;
+      const std = pickTwoClues(seed, [], 0, false, false);
+      const adv = pickTwoClues(seed, [], 0, false, true);
+      const stdPos = std.filter((c) => c.category === "positional").length;
+      const advPos = adv.filter((c) => c.category === "positional").length;
+      if (stdPos === 1) standardOnePositional++;
+      if (advPos === 1) advancedOnePositional++;
+      else advancedZeroOrTwo++;
+    }
+    // Standard always 1 positional in pair 1 (regression guard).
+    expect(standardOnePositional).toBe(500);
+    // Advanced should produce a meaningful number of pair-1 outcomes
+    // that are NOT 1-and-1. A fully random shuffle of 6 positionals
+    // among 19 cards gives roughly P(both positional) ≈ 8.8%,
+    // P(neither positional) ≈ 51% — together >40% of seeds. A
+    // conservative floor of 100/500 (20%) is well below the expected
+    // value but well above noise.
+    expect(advancedZeroOrTwo).toBeGreaterThan(100);
+    expect(advancedOnePositional).toBeLessThan(500);
+  });
+
+  it("never offers Clue Reuse on round 1 (no prior clues to re-use)", () => {
+    for (let i = 0; i < 500; i++) {
+      const seed = `adv-no-reuse-r1-${i}`;
+      const adv = pickTwoClues(seed, [], 0, false, true);
+      for (const c of adv) expect(c.id).not.toBe("clueReuse");
+    }
+  });
+
+  it("returns two distinct clues even in advanced mode", () => {
+    for (let i = 0; i < 200; i++) {
+      const [a, b] = pickTwoClues(`adv-distinct-${i}`, [], 0, false, true);
+      expect(a.id).not.toBe(b.id);
+    }
+  });
+
+  it("is deterministic across calls for the same seed in advanced mode", () => {
+    const a = pickTwoClues("seedX", ["sumDelta"], 0, false, true);
+    const b = pickTwoClues("seedX", ["sumDelta"], 0, false, true);
+    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+  });
+
+  it("standard and advanced modes produce different decks at the same seed", () => {
+    // Walking the first 6 rounds at the same seed, the two schemes
+    // should disagree on at least one pair somewhere — they use
+    // different RNG namespaces and a different roster split.
+    let diverged = 0;
+    for (let i = 0; i < 50; i++) {
+      const seed = `cmp-${i}`;
+      let chosen: ClueId[] = [];
+      let differs = false;
+      for (let r = 0; r < 6; r++) {
+        const std = pickTwoClues(seed, chosen, 0, false, false);
+        const adv = pickTwoClues(seed, chosen, 0, false, true);
+        const stdIds = std.map((c) => c.id).sort().join(",");
+        const advIds = adv.map((c) => c.id).sort().join(",");
+        if (stdIds !== advIds) {
+          differs = true;
+          break;
+        }
+        chosen = [...chosen, std[0].id];
+      }
+      if (differs) diverged++;
+    }
+    expect(diverged).toBe(50);
+  });
+});
