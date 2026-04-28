@@ -13,6 +13,7 @@ import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
+import { ResourceBalance } from "@/components/ResourceBalance";
 import {
   DailyResultPanel,
   type DailyPercentileData,
@@ -332,13 +333,35 @@ export function DailyGame({
                 onCancel={cancelClueParam}
               />
             ) : state.pendingGuess ? (
-              <ClueChooser
-                options={state.pendingGuess.options}
-                onChoose={chooseClue}
-                onRedraw={redraw}
-                canRedraw={canRedraw}
-                locksAvailable={locksAvailable}
-              />
+              <>
+                {/* Daily mirrors unlimited: ClueChooser shows just the
+                    two clue cards, with the Redraw control sliding
+                    into the ResourceBalance row's right slot below so
+                    it sits on the same line as the lock balance. */}
+                <ClueChooser
+                  options={state.pendingGuess.options}
+                  onChoose={chooseClue}
+                  locksAvailable={locksAvailable}
+                />
+                <ResourceBalance
+                  lockBalance={hintLocks}
+                  advancedMode={false}
+                  positionalRemaining={0}
+                  hint={
+                    canRedraw ? (
+                      <button
+                        type="button"
+                        onClick={redraw}
+                        className="text-xs text-muted hover:text-foreground"
+                      >
+                        Redraw (costs 🔒×1)
+                      </button>
+                    ) : (
+                      ""
+                    )
+                  }
+                />
+              </>
             ) : (
               <>
                 <Keypad
@@ -352,20 +375,42 @@ export function DailyGame({
                   lockCommitDisabled={!canCommitPendingLock && !unlockMode}
                   unlockMode={unlockMode}
                 />
-                {/* Lock hint sits BELOW the keypad so it doesn't push
-                    the keypad down as messages appear/disappear and is
-                    visible next to the thumbs. */}
-                <p className="text-[10px] text-muted text-center mt-2 min-h-4">
-                  {lockMode
-                    ? unlockMode
-                      ? "Press Unlock to remove the lock — or tap a different slot."
-                      : canCommitPendingLock
-                      ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
-                      : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-                    : hintLocks > 0
-                    ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available — tap a cell to use`
-                    : ""}
-                </p>
+                <ResourceBalance
+                  lockBalance={hintLocks}
+                  advancedMode={false}
+                  positionalRemaining={0}
+                  hint={
+                    lockMode ? (
+                      unlockMode ? (
+                        <span className="block">
+                          Press Unlock to remove the lock.
+                        </span>
+                      ) : canCommitPendingLock ? (
+                        <>
+                          <span className="block">Press Lock to confirm</span>
+                          <span className="block">
+                            Or tap the slot again to cancel.
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="block">
+                            Pick a digit, then press Lock
+                          </span>
+                          <span className="block">
+                            Or tap the lock again to cancel.
+                          </span>
+                        </>
+                      )
+                    ) : hintLocks > 0 ? (
+                      <span className="block">
+                        Tap a cell to lock a digit.
+                      </span>
+                    ) : (
+                      ""
+                    )
+                  }
+                />
               </>
             )}
           </div>

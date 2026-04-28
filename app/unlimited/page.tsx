@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
@@ -16,6 +16,7 @@ import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
+import { ResourceBalance } from "@/components/ResourceBalance";
 import { loadSettings } from "@/lib/settings";
 import {
   loadUnlimitedMode,
@@ -447,65 +448,3 @@ function ModeSelector({
   );
 }
 
-/**
- * Bottom-of-play resource panel. Two slots:
- *   - Left column: the player's current balance, stacked. Lock row
- *     always renders so there's a stable place to glance for the
- *     resource. Positional row only renders in Advanced mode (and
- *     stays at 0x once the cap is hit, rather than disappearing —
- *     keeps the layout from jumping).
- *   - Right column: contextual helper text (lock-mode instructions,
- *     "tap a cell" CTA, etc.). Empty during the chooser phase since
- *     the chooser cards already carry their own affordability copy.
- *     Accepts ReactNode so callers can supply two-line layouts via
- *     stacked spans.
- *
- * Outer `px-2` adds a small breathing buffer to the left of the
- * balance column and to the right of the hint/redraw slot. Sized to a
- * stable min-height so the keypad doesn't shift up/down as the helper
- * text changes between zero, one, and two lines.
- */
-function ResourceBalance({
-  lockBalance,
-  advancedMode,
-  positionalRemaining,
-  hint,
-}: {
-  lockBalance: number;
-  advancedMode: boolean;
-  positionalRemaining: number;
-  hint?: ReactNode;
-}) {
-  return (
-    <div className="mt-2 px-2 flex items-start justify-between gap-3 min-h-10">
-      <div className="flex flex-col items-start gap-1 shrink-0">
-        <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted leading-none">
-          <span aria-label={`${lockBalance} locks remaining`}>
-            {lockBalance}x
-          </span>
-          <span aria-hidden="true">🔒</span>
-        </span>
-        {advancedMode && (
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted leading-none">
-            <span
-              aria-label={`${positionalRemaining} positional clues remaining`}
-            >
-              {positionalRemaining}x
-            </span>
-            <span
-              className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent/20 text-accent"
-              aria-hidden="true"
-            >
-              positional
-            </span>
-          </span>
-        )}
-      </div>
-      {hint ? (
-        <div className="text-[10px] text-muted text-right leading-snug flex-1 min-w-0">
-          {hint}
-        </div>
-      ) : null}
-    </div>
-  );
-}
