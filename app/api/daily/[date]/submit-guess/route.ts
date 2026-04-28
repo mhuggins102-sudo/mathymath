@@ -150,7 +150,20 @@ export async function POST(
 
   // Non-final wrong guess → offer a pair. Only the ids travel over the
   // wire; the client reconstructs the Clue objects via getClueById.
-  const options = pickTwoClues(date, validation.chosenClueIds);
+  // Sum prior rounds' redraws so the deck pointer advances past
+  // already-offered (and discarded) pairs from earlier redraws — without
+  // this, the next round re-offered the same pair the player redrew
+  // into, and the subsequent choose-clue rejected the pick because its
+  // own pickTwoClues call DID account for redraws.
+  const priorRedraws = parsed.data.history.reduce(
+    (sum, g) => sum + (g.redraws ?? 0),
+    0,
+  );
+  const options = pickTwoClues(
+    date,
+    validation.chosenClueIds,
+    priorRedraws,
+  );
   return NextResponse.json({
     kind: "pending",
     options: [options[0].id, options[1].id],

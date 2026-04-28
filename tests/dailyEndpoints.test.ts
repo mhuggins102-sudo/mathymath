@@ -173,6 +173,97 @@ describe("POST /api/daily/[date]/submit-guess", () => {
     const body = await res.json();
     expect(body.error).toBe("locks_budget_exceeded");
   });
+
+  it("advances the deck past prior redraws when offering the next pair", async () => {
+    // Round 1: player redrew once (history[0].redraws = 1) and picked
+    // the first option from the redrawn pair (deck[2]). Round 2's
+    // offered pair MUST be deck[4]/deck[5] — not deck[2]/deck[3] (the
+    // pair already shown last round). Without the deckOffset fix,
+    // submit-guess re-offered deck[2]/deck[3] and the subsequent
+    // choose-clue rejected the player's pick with `clue_not_offered`
+    // because its own pickTwoClues call DID account for redraws.
+    const round1Pair = pickTwoClues(DATE, [], 1); // deck[2]/deck[3]
+    const r1Clue = round1Pair[0];
+    const g1 = {
+      guess: "11111",
+      clueId: r1Clue.id,
+      result: r1Clue.compute("11111", TARGET),
+      redraws: 1,
+    };
+    const res = await submitGuess(
+      mockRequest({ history: [g1], guess: "22222" }),
+      { params: paramsP(DATE) },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.kind).toBe("pending");
+    // Expected: deck[4]/deck[5] = pickTwoClues(DATE, [r1Clue.id], 1).
+    const expectedNext = pickTwoClues(DATE, [r1Clue.id] as never, 1);
+    expect(body.options).toEqual([expectedNext[0].id, expectedNext[1].id]);
+    // And critically NOT the prior redrawn pair.
+    const priorRedrawnPair = pickTwoClues(DATE, [], 1);
+    expect(body.options).not.toEqual([
+      priorRedrawnPair[0].id,
+      priorRedrawnPair[1].id,
+    ]);
+  });
+
+  it("end-to-end: redraw on round 1, pick on round 2 → choose-clue accepts", async () => {
+    // Stitches submit-guess (round 1 pending) → choose-clue (round 1
+    // resolve) → submit-guess (round 2 pending) → choose-clue (round 2
+    // resolve). With the deckOffset fix, both choose-clue calls accept
+    // the pick. Pre-fix this failed at the round-2 choose-clue step
+    // with "clue_not_offered".
+    const r1Pair = pickTwoClues(DATE, [], 1); // pair after a redraw
+    const r1Clue = r1Pair[0];
+    // Round 1 resolve via choose-clue (server replays the redraw).
+    const r1ResolveRes = await chooseClue(
+      mockRequest({
+        history: [],
+        pendingGuess: "11111",
+        clueId: r1Clue.id,
+        redraws: 1,
+      }),
+      { params: paramsP(DATE) },
+    );
+    expect(r1ResolveRes.status).toBe(200);
+    const r1Body = await r1ResolveRes.json();
+    expect(r1Body.kind).toBe("continue");
+    const g1 = {
+      guess: "11111",
+      clueId: r1Clue.id,
+      result: r1Body.result,
+      redraws: 1,
+    };
+    // Round 2: submit-guess returns the next pair.
+    const r2SubmitRes = await submitGuess(
+      mockRequest({ history: [g1], guess: "22222" }),
+      { params: paramsP(DATE) },
+    );
+    expect(r2SubmitRes.status).toBe(200);
+    const r2SubmitBody = await r2SubmitRes.json();
+    const r2OfferedIds = r2SubmitBody.options as string[];
+    // Pick the first offered clue, then commit it via choose-clue.
+    const r2Pick = r2OfferedIds[0];
+    // Skip clues that need a parameter — they'd require extra wiring.
+    const safeIdx = r2OfferedIds.findIndex((id) => {
+      const c = getClueById(id as never);
+      return !c.paramKind && c.id !== "extraLock";
+    });
+    const pickIdx = safeIdx >= 0 ? safeIdx : 0;
+    const r2ChosenId = r2OfferedIds[pickIdx] ?? r2Pick;
+    const r2ResolveRes = await chooseClue(
+      mockRequest({
+        history: [g1],
+        pendingGuess: "22222",
+        clueId: r2ChosenId,
+      }),
+      { params: paramsP(DATE) },
+    );
+    expect(r2ResolveRes.status).toBe(200);
+    const r2ResolveBody = await r2ResolveRes.json();
+    expect(["continue", "won"]).toContain(r2ResolveBody.kind);
+  });
 });
 
 describe("POST /api/daily/[date]/choose-clue", () => {

@@ -204,7 +204,23 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // capacity for typed input = digits − certain − locks committed this turn.
   const capacity = inputCapacity(certain) - lockedSlots.length;
 
-  const locksAvailableCount = computeLocksAvailable(state.guesses);
+  // While a guess is pending (clue chooser is up), every lock placed on
+  // this turn — correct OR incorrect — counts against the displayed
+  // budget along with any redraws taken. Correct locks are refunded
+  // when the round closes (the resolved guess lands in state.guesses
+  // and the spec-level locksAvailable formula no longer treats them as
+  // spent). The strict-during-chooser display keeps Clue Reuse and
+  // redraw-again from looking affordable when the same-turn refund
+  // hasn't actually happened yet. Mirrors useDailyGame.
+  const baseLocksAvailable = computeLocksAvailable(state.guesses);
+  const pendingLocksUsedCount = state.pendingGuess?.locks?.length ?? 0;
+  const pendingRedrawsCount = state.pendingGuess?.redraws ?? 0;
+  const locksAvailableCount = state.pendingGuess
+    ? Math.max(
+        0,
+        baseLocksAvailable - pendingLocksUsedCount - pendingRedrawsCount,
+      )
+    : baseLocksAvailable;
   const canUseLocks = canUseLockOnGuess();
   const canStartLock =
     canUseLocks && lockedSlots.length < locksAvailableCount;
@@ -518,19 +534,11 @@ export function useGame(config: UseGameConfig): UseGameResult {
   }, []);
 
   // Redraw: burn a lock to discard the current pair and advance the
-  // deck. Lock cost is borne by the reducer's deckOffset + the
-  // resolved guess's `redraws` field (counted as spent in
-  // locksAvailable). Guard: must have a pending guess AND remaining
-  // locks (accounting for locks already pending on this turn's locks +
-  // this turn's prior redraws).
-  const pendingRedraws = state.pendingGuess?.redraws ?? 0;
-  const pendingWrongLocks = (state.pendingGuess?.locks ?? []).filter(
-    (l) => !l.correct,
-  ).length;
+  // deck. locksAvailableCount above already subtracts this turn's
+  // pending locks and prior redraws when a guess is pending, so a
+  // positive budget is sufficient to afford one more redraw.
   const canRedraw =
-    !!state.pendingGuess &&
-    !pendingClueParam &&
-    locksAvailableCount - pendingWrongLocks - pendingRedraws > 0;
+    !!state.pendingGuess && !pendingClueParam && locksAvailableCount > 0;
 
   const redraw = useCallback(() => {
     if (!canRedraw) return;

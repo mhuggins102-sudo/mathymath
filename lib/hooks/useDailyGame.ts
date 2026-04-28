@@ -256,20 +256,22 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const capacity = inputCapacity(certain) - lockedSlots.length;
 
   // Base budget = locks remaining after the resolved-history accounting.
-  // Once a guess is pending (clue chooser is up), we additionally subtract
-  // this turn's wrong locks and redraws so Clue Reuse gating in the
-  // chooser reflects the budget the player will have IF they pick a
-  // non-Clue-Reuse clue. Without this, a player who burned their last
-  // lock on a wrong-lock attempt still saw Clue Reuse as affordable.
+  // While a guess is pending (clue chooser is up), every lock placed on
+  // this turn — correct OR incorrect — counts against the displayed
+  // budget along with any redraws taken. Correct locks are refunded
+  // when the round closes (the resolved guess lands in state.guesses
+  // and the spec-level locksAvailable formula no longer treats them as
+  // spent). The strict-during-chooser display matches the player's
+  // mental model that a placed lock and a redraw are both "uses" of a
+  // lock budget, and prevents Clue Reuse from looking affordable when
+  // the same-turn refund hasn't actually happened yet.
   const baseLocksAvailable = computeLocksAvailable(state.guesses);
-  const pendingWrongLocksCount = (state.pendingGuess?.locks ?? []).filter(
-    (l) => !l.correct,
-  ).length;
+  const pendingLocksUsedCount = state.pendingGuess?.locks?.length ?? 0;
   const pendingRedrawsCount = state.pendingGuess?.redraws ?? 0;
   const locksAvailableCount = state.pendingGuess
     ? Math.max(
         0,
-        baseLocksAvailable - pendingWrongLocksCount - pendingRedrawsCount,
+        baseLocksAvailable - pendingLocksUsedCount - pendingRedrawsCount,
       )
     : baseLocksAvailable;
   const canUseLocks = canUseLockOnGuess();
