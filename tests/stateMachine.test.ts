@@ -247,77 +247,70 @@ describe("stateMachine — advanced mode (positional cap)", () => {
   });
 
   it("advanced mode stops offering positional clues after 2 picks", () => {
-    let s = initGameState({
-      target: "12345",
-      seed: "advmode",
+    // Hand-craft a state with the positional cap already exhausted, so
+    // the test isn't sensitive to the deck shuffle order (which in
+    // advanced mode is intentionally not constrained to surface a
+    // positional in pair 1).
+    const target = "12345";
+    let s: GameState = initGameState({
+      target,
+      seed: "adv-cap",
       maxGuesses: 7,
       advancedMode: true,
     });
-    // Pick positional whenever it's available, until we've used 2.
-    let positionalPicks = 0;
-    for (let i = 0; i < 7 && positionalPicks < 2 && s.status === "playing"; i++) {
-      s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
-      if (!s.pendingGuess) break;
-      const positional = s.pendingGuess.options.find(
-        (c) => c.category === "positional",
-      );
-      if (positional) {
-        positionalPicks++;
-        s = reduce(s, {
-          type: "CHOOSE_CLUE",
-          clueId: positional.id,
-          param:
-            positional.id === "oracle" ? { selectedSlot: 0 } : undefined,
-        });
-      } else {
-        // Take any non-positional and try again next round.
-        const fallback = s.pendingGuess.options[0];
-        s = reduce(s, { type: "CHOOSE_CLUE", clueId: fallback.id });
-      }
-    }
-    expect(positionalPicks).toBe(2);
-    // Next 3 rounds: every offered card must be non-positional.
+    s = {
+      ...s,
+      guesses: [
+        {
+          guess: "99999",
+          clueId: "oracle",
+          result: { kind: "oracle", slot: 0, digit: 1 },
+        },
+        {
+          guess: "88888",
+          clueId: "thermometer",
+          result: getClueById("thermometer").compute("88888", target),
+        },
+      ],
+    };
+    // Walk three more rounds; every offered pair must omit positionals.
     for (let i = 0; i < 3 && s.status === "playing"; i++) {
-      s = reduce(s, { type: "SUBMIT_GUESS", guess: "88888" });
+      s = reduce(s, { type: "SUBMIT_GUESS", guess: "77777" });
       if (!s.pendingGuess) break;
       for (const c of s.pendingGuess.options) {
         expect(c.category).not.toBe("positional");
       }
-      const fallback = s.pendingGuess.options[0];
-      s = reduce(s, { type: "CHOOSE_CLUE", clueId: fallback.id });
+      const next = s.pendingGuess.options[0];
+      s = reduce(s, { type: "CHOOSE_CLUE", clueId: next.id });
     }
   });
 
   it("REDRAW respects the advanced-mode cap", () => {
-    let s = initGameState({
-      target: "12345",
-      seed: "advredraw",
+    const target = "12345";
+    let s: GameState = initGameState({
+      target,
+      seed: "adv-redraw",
       maxGuesses: 7,
       advancedMode: true,
     });
-    // Burn 2 positional picks to reach the cap.
-    let positionalPicks = 0;
-    for (let i = 0; i < 7 && positionalPicks < 2; i++) {
-      s = reduce(s, { type: "SUBMIT_GUESS", guess: "99999" });
-      const positional = s.pendingGuess!.options.find(
-        (c) => c.category === "positional",
-      );
-      if (positional) {
-        positionalPicks++;
-        s = reduce(s, {
-          type: "CHOOSE_CLUE",
-          clueId: positional.id,
-          param:
-            positional.id === "oracle" ? { selectedSlot: 0 } : undefined,
-        });
-      } else {
-        const fb = s.pendingGuess!.options[0];
-        s = reduce(s, { type: "CHOOSE_CLUE", clueId: fb.id });
-      }
-    }
-    // Submit the next guess and immediately redraw; both pre-redraw
-    // and post-redraw pairs must be free of positional cards.
-    s = reduce(s, { type: "SUBMIT_GUESS", guess: "88888" });
+    s = {
+      ...s,
+      guesses: [
+        {
+          guess: "99999",
+          clueId: "oracle",
+          result: { kind: "oracle", slot: 0, digit: 1 },
+        },
+        {
+          guess: "88888",
+          clueId: "thermometer",
+          result: getClueById("thermometer").compute("88888", target),
+        },
+      ],
+    };
+    // Submit and redraw; both pre- and post-redraw pairs must be
+    // free of positional cards because the cap is already exhausted.
+    s = reduce(s, { type: "SUBMIT_GUESS", guess: "77777" });
     for (const c of s.pendingGuess!.options) {
       expect(c.category).not.toBe("positional");
     }

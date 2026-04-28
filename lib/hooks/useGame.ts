@@ -36,7 +36,6 @@ import {
   saveGame,
   type PersonalStats,
 } from "@/lib/persistence/localStore";
-import { buzz } from "@/lib/settings";
 
 export interface UseGameConfig {
   target: string;
@@ -191,7 +190,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // storageKey) still gets stats recorded.
   useEffect(() => {
     if (state.status === "playing") return;
-    if (state.status === "won") buzz(40);
     if (!config.trackStats) return;
     if (statsRecordedRef.current) return;
     const updated = recordUnlimitedResult(
@@ -456,13 +454,11 @@ export function useGame(config: UseGameConfig): UseGameResult {
       setLockedSlots(newLocked);
       setPendingLockSlot(null);
       setUnlockMode(false);
-      buzz(18);
       return;
     }
     if (pendingLockDigit === null) return;
     setPendingLockSlot(null);
     setUnlockMode(false);
-    buzz(18);
   }, [pendingLockSlot, pendingLockDigit, unlockMode, cancelPendingLock, lockedSlots, inputInsertIdx]);
 
   const submit = useCallback(() => {
@@ -492,7 +488,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
     // lag, even when two locks are in play.
     setLockedSlots([]);
     setPendingLockSlot(null);
-    buzz(12);
   }, [pendingLockSlot, input, state.digits, certain, lockedSlots]);
 
   // --- Clue-parameter selection state ---
@@ -551,7 +546,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
         return;
       }
       dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
-      buzz(18);
     },
     [state.pendingGuess, locksAvailableCount, advancedReusePoolEmpty],
   );
@@ -587,7 +581,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
         param: mergedParam,
       });
       setPendingClueParam(null);
-      buzz(18);
     },
     [pendingClueParam],
   );
@@ -606,7 +599,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const redraw = useCallback(() => {
     if (!canRedraw) return;
     dispatch({ type: "REDRAW" });
-    buzz(12);
   }, [canRedraw]);
 
   const reset = useCallback(

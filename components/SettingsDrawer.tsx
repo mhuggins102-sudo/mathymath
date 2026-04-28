@@ -41,7 +41,7 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
         <div className="space-y-1">
           <Toggle
             label="Advanced unlimited mode"
-            description="At most 2 positional clues per game. Once you've picked your second positional clue, the chooser stops offering positional cards and Clue Reuse can only re-apply non-positional clues. Affects new unlimited games only — the daily puzzle is unchanged."
+            description="At most 2 positional clues per game. Clue cards are fully shuffled — any combination can show up on round 1 (no compositional/positional pairing guarantee). Once you've picked your second positional clue, the chooser stops offering positional cards and Clue Reuse can only re-apply non-positional clues. Affects new unlimited games only — the daily puzzle is unchanged."
             value={settings.advancedMode}
             onChange={(v) => setSetting("advancedMode", v)}
           />
@@ -50,12 +50,6 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
             description="Use blue/orange instead of red/green so positional clue colors are distinguishable with common forms of color vision deficiency."
             value={settings.colorblind}
             onChange={(v) => setSetting("colorblind", v)}
-          />
-          <Toggle
-            label="Haptics"
-            description="Short vibration on guess submit, clue reveal, and win. No-op on devices without vibration support."
-            value={settings.haptics}
-            onChange={(v) => setSetting("haptics", v)}
           />
         </div>
 

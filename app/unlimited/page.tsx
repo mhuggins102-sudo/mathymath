@@ -236,23 +236,6 @@ function UnlimitedGame({
 
       <ModeSelector mode={mode} onChange={onModeChange} />
 
-      {/* Advanced-mode indicator: shows the player's positional progress
-          toward the 2-clue cap. Hidden in standard mode and on terminal
-          states (no more picks to make). The "cap reached" copy fades to
-          good after the second pick so the player knows what to expect
-          next. */}
-      {advancedMode && state.status === "playing" && (
-        <p
-          className={`text-[11px] text-center mb-2 ${
-            positionalCapReached ? "text-good" : "text-muted"
-          }`}
-          aria-live="polite"
-        >
-          Advanced — Positional {effectivePositionalCount}/{advancedPositionalCap}
-          {positionalCapReached ? " · cap reached" : ""}
-        </p>
-      )}
-
       <div className="flex-1 flex flex-col">
         <GuessGrid
           state={state}
@@ -299,14 +282,33 @@ function UnlimitedGame({
               onCancel={cancelClueParam}
             />
           ) : state.pendingGuess ? (
-            <ClueChooser
-              options={state.pendingGuess.options}
-              onChoose={chooseClue}
-              onRedraw={redraw}
-              canRedraw={canRedraw}
-              locksAvailable={locksAvailable}
-              reusePoolEmpty={advancedReusePoolEmpty}
-            />
+            <>
+              <ClueChooser
+                options={state.pendingGuess.options}
+                onChoose={chooseClue}
+                onRedraw={redraw}
+                canRedraw={canRedraw}
+                locksAvailable={locksAvailable}
+                reusePoolEmpty={advancedReusePoolEmpty}
+              />
+              {/* Advanced-mode positional progress indicator. Sits at
+                  the bottom of the chooser, mirroring the lock-hint
+                  position under the keypad. Only renders during clue
+                  selection (the param pickers above replace the
+                  chooser entirely so it isn't shown there). */}
+              {advancedMode && (
+                <p
+                  className={`text-[11px] text-center mt-3 ${
+                    positionalCapReached ? "text-good" : "text-muted"
+                  }`}
+                  aria-live="polite"
+                >
+                  Advanced — Positional {effectivePositionalCount}/
+                  {advancedPositionalCap}
+                  {positionalCapReached ? " · cap reached" : ""}
+                </p>
+              )}
+            </>
           ) : state.status === "playing" ? (
             <>
               <Keypad
