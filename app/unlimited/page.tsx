@@ -291,23 +291,21 @@ function UnlimitedGame({
                 locksAvailable={locksAvailable}
                 reusePoolEmpty={advancedReusePoolEmpty}
               />
-              {/* Advanced-mode positional progress indicator. Sits at
-                  the bottom of the chooser, mirroring the lock-hint
-                  position under the keypad. Only renders during clue
-                  selection (the param pickers above replace the
-                  chooser entirely so it isn't shown there). */}
-              {advancedMode && (
-                <p
-                  className={`text-[11px] text-center mt-3 ${
-                    positionalCapReached ? "text-good" : "text-muted"
-                  }`}
-                  aria-live="polite"
-                >
-                  Advanced — Positional {effectivePositionalCount}/
-                  {advancedPositionalCap}
-                  {positionalCapReached ? " · cap reached" : ""}
-                </p>
-              )}
+              {/* Balance row stays visible below the chooser too, so
+                  the player can still see their lock + positional
+                  budget while picking a clue. The right-side helper
+                  slot is empty here — the chooser cards carry their
+                  own affordability copy (Clue Reuse cost, "no non-
+                  positional clues left", etc.). */}
+              <ResourceBalance
+                lockBalance={hintLocks}
+                advancedMode={advancedMode}
+                positionalRemaining={Math.max(
+                  0,
+                  advancedPositionalCap - effectivePositionalCount,
+                )}
+                hint=""
+              />
             </>
           ) : state.status === "playing" ? (
             <>
@@ -322,19 +320,25 @@ function UnlimitedGame({
                 lockCommitDisabled={!canCommitPendingLock && !unlockMode}
                 unlockMode={unlockMode}
               />
-              {/* Lock hint sits below the keypad so it doesn't shift
-                  the keypad around as it appears/disappears. */}
-              <p className="text-[10px] text-muted text-center mt-2 min-h-4">
-                {lockMode
-                  ? unlockMode
-                    ? "Press Unlock to remove the lock — or tap a different slot."
-                    : canCommitPendingLock
-                    ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
-                    : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
-                  : hintLocks > 0
-                  ? `🔒 ${hintLocks} lock${hintLocks === 1 ? "" : "s"} available — tap a cell to use`
-                  : ""}
-              </p>
+              <ResourceBalance
+                lockBalance={hintLocks}
+                advancedMode={advancedMode}
+                positionalRemaining={Math.max(
+                  0,
+                  advancedPositionalCap - effectivePositionalCount,
+                )}
+                hint={
+                  lockMode
+                    ? unlockMode
+                      ? "Press Unlock to remove the lock — or tap a different slot."
+                      : canCommitPendingLock
+                      ? "Press Lock to confirm — or pick a different digit, or tap the slot again to cancel."
+                      : "Pick a digit for the highlighted slot, then press Lock — or tap the slot again to cancel."
+                    : hintLocks > 0
+                    ? "Tap a cell to lock a digit."
+                    : ""
+                }
+              />
             </>
           ) : (
             <div className="text-center space-y-4">
@@ -412,6 +416,65 @@ function ModeSelector({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Bottom-of-play resource panel. Two slots:
+ *   - Left column: the player's current balance, stacked. Lock row
+ *     always renders so there's a stable place to glance for the
+ *     resource. Positional row only renders in Advanced mode (and
+ *     stays at 0x once the cap is hit, rather than disappearing —
+ *     keeps the layout from jumping).
+ *   - Right column: contextual helper text (lock-mode instructions,
+ *     "tap a cell" CTA, etc.). Empty during the chooser phase since
+ *     the chooser cards already carry their own affordability copy.
+ *
+ * Sized to a stable min-height so the keypad doesn't shift up/down as
+ * the helper text changes between zero, one, and two lines.
+ */
+function ResourceBalance({
+  lockBalance,
+  advancedMode,
+  positionalRemaining,
+  hint,
+}: {
+  lockBalance: number;
+  advancedMode: boolean;
+  positionalRemaining: number;
+  hint?: string;
+}) {
+  return (
+    <div className="mt-2 flex items-start justify-between gap-3 min-h-10">
+      <div className="flex flex-col items-start gap-1 shrink-0">
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted leading-none">
+          <span aria-label={`${lockBalance} locks remaining`}>
+            {lockBalance}x
+          </span>
+          <span aria-hidden="true">🔒</span>
+        </span>
+        {advancedMode && (
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted leading-none">
+            <span
+              aria-label={`${positionalRemaining} positional clues remaining`}
+            >
+              {positionalRemaining}x
+            </span>
+            <span
+              className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent/20 text-accent"
+              aria-hidden="true"
+            >
+              positional
+            </span>
+          </span>
+        )}
+      </div>
+      {hint ? (
+        <p className="text-[10px] text-muted text-right leading-snug flex-1 min-w-0">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
