@@ -191,6 +191,15 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * which previously surfaced it before the player had any used clues to
  * re-apply. The eligibility check here suppresses that on every
  * round-1 draw regardless of redraws.
+ *
+ * `excludeIds` is a "soft" filter: cards in this set are avoided when
+ * possible but allowed as a last-resort fallback if the hard-eligible
+ * pool runs dry. Callers use it to track previously-offered clue ids
+ * so the walk-forward path can't resurrect them in a later round.
+ * Without this, advanced-mode rounds where `deck[base]` is positional
+ * after the cap walk past the boundary and consume cards from the
+ * next pair's region — which then re-appear when the next round's
+ * `base` lands on them.
  */
 export function pickTwoClues(
   seed: string,
@@ -198,6 +207,7 @@ export function pickTwoClues(
   deckOffset: number = 0,
   excludePositional: boolean = false,
   advancedMode: boolean = false,
+  excludeIds: ReadonlySet<ClueId> = EMPTY_ID_SET,
 ): [Clue, Clue] {
   const deck = buildDeck(seed, advancedMode);
   const base = (chosenClueIds.length + deckOffset) * 2;
@@ -208,8 +218,10 @@ export function pickTwoClues(
     if (isRound1 && id === "clueReuse") return false;
     return true;
   };
+  const isFresh = (id: ClueId): boolean =>
+    isEligible(id) && !excludeIds.has(id);
 
-  // Fast path: when both base/base+1 cards pass the filter, take them
+  // Fast path: when both base/base+1 cards are fresh, take them
   // directly. Preserves the existing offset semantics for the common
   // case (no positional cap, not round 1, or round 1 with no redraw).
   const headA = deck[base];
@@ -217,29 +229,41 @@ export function pickTwoClues(
   if (
     headA !== undefined &&
     headB !== undefined &&
-    isEligible(headA) &&
-    isEligible(headB)
+    isFresh(headA) &&
+    isFresh(headB)
   ) {
     return [getClueById(headA), getClueById(headB)];
   }
 
-  // Otherwise walk the deck from base, taking the next two eligible
-  // cards.
-  const eligible: ClueId[] = [];
+  // Otherwise walk the deck from base, taking the next two fresh
+  // cards. Skipping previously-offered ids here is what stops the
+  // walk-forward leak from re-offering them in a later round.
+  const fresh: ClueId[] = [];
   for (let i = base; i < deck.length; i++) {
-    if (isEligible(deck[i])) eligible.push(deck[i]);
-    if (eligible.length === 2) break;
+    if (isFresh(deck[i])) fresh.push(deck[i]);
+    if (fresh.length === 2) break;
   }
-  if (eligible.length < 2) {
-    // Pathological end-of-deck: backfill from the eligible pool
-    // anywhere in the deck. Player should never realistically reach
-    // this in a 7-guess game (the deck has plenty of non-positional
-    // non-reuse cards), but the function must always return a valid
-    // pair.
-    const backfill = deck.filter(isEligible);
-    while (eligible.length < 2 && backfill.length > 0) {
-      eligible.push(backfill[backfill.length - eligible.length - 1]);
-    }
+  if (fresh.length === 2) {
+    return [getClueById(fresh[0]), getClueById(fresh[1])];
   }
-  return [getClueById(eligible[0]), getClueById(eligible[1])];
+
+  // Forward walk didn't find two fresh cards. Backfill from the rest
+  // of the deck, preferring fresh ids first, then any eligible id as
+  // a last-resort (a duplicate is better than throwing — the player
+  // should never realistically reach this in a 7-guess game).
+  const result: ClueId[] = [...fresh];
+  const pushUnique = (id: ClueId): void => {
+    if (!result.includes(id)) result.push(id);
+  };
+  for (const id of deck) {
+    if (result.length === 2) break;
+    if (isFresh(id)) pushUnique(id);
+  }
+  for (const id of deck) {
+    if (result.length === 2) break;
+    if (isEligible(id)) pushUnique(id);
+  }
+  return [getClueById(result[0]), getClueById(result[1])];
 }
+
+const EMPTY_ID_SET: ReadonlySet<ClueId> = new Set();

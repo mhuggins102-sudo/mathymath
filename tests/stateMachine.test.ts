@@ -135,6 +135,7 @@ describe("stateMachine", () => {
       maxGuesses: 7,
       seed: "t",
       deckOffset: 0,
+      offeredClueIds: [],
       advancedMode: false,
       status: "playing",
       guesses: [
@@ -168,6 +169,7 @@ describe("stateMachine", () => {
       maxGuesses: 7,
       seed: "t",
       deckOffset: 0,
+      offeredClueIds: [],
       advancedMode: false,
       status: "playing",
       guesses: [
@@ -370,5 +372,84 @@ describe("maxGuessesForDigits", () => {
   });
   it("falls back to the default for unlisted digit counts", () => {
     expect(maxGuessesForDigits(4)).toBe(7);
+  });
+});
+
+describe("stateMachine — no duplicate clue offers (advanced mode)", () => {
+  it("never re-offers a previously-offered clue across a full advanced game", () => {
+    // Walk many seeds to a 7-round advanced-mode finish, picking an
+    // option each round. After each SUBMIT/CHOOSE pair, every id ever
+    // offered must be unique — this is the bug the offeredClueIds
+    // exclusion fixes. Pre-fix, after the positional cap the walk-
+    // forward path could leak a card from the next pair's region,
+    // which then re-appeared as the next round's deck head.
+    for (let s = 0; s < 100; s++) {
+      const seed = `nodup-${s}`;
+      let state: GameState = initGameState({
+        target: "12345",
+        seed,
+        maxGuesses: 7,
+        advancedMode: true,
+      });
+      const sawTwice: string[] = [];
+      const seen = new Set<string>();
+      for (let round = 0; round < 6 && state.status === "playing"; round++) {
+        state = reduce(state, { type: "SUBMIT_GUESS", guess: "99999" });
+        if (!state.pendingGuess) break;
+        for (const c of state.pendingGuess.options) {
+          if (seen.has(c.id)) sawTwice.push(c.id);
+          seen.add(c.id);
+        }
+        // Prefer picking a positional clue when available so the cap
+        // fires early and we exercise the post-cap walk-forward path.
+        const positional = state.pendingGuess.options.find(
+          (c) => c.category === "positional",
+        );
+        const pick = positional ?? state.pendingGuess.options[0];
+        state = reduce(state, { type: "CHOOSE_CLUE", clueId: pick.id });
+      }
+      expect(sawTwice).toEqual([]);
+    }
+  });
+
+  it("REDRAW does not re-offer the just-burned pair", () => {
+    // A REDRAW replaces the current pendingGuess.options with a fresh
+    // pair drawn from the next deck slot. The burned pair is still
+    // "offered" — it must not re-appear in the new options.
+    for (let s = 0; s < 50; s++) {
+      const seed = `redraw-nodup-${s}`;
+      let state: GameState = initGameState({
+        target: "12345",
+        seed,
+        maxGuesses: 7,
+        advancedMode: true,
+      });
+      state = reduce(state, { type: "SUBMIT_GUESS", guess: "99999" });
+      const burned = new Set(
+        state.pendingGuess!.options.map((c) => c.id),
+      );
+      state = reduce(state, { type: "REDRAW" });
+      for (const c of state.pendingGuess!.options) {
+        expect(burned.has(c.id)).toBe(false);
+      }
+    }
+  });
+
+  it("offeredClueIds tracks every option ever shown", () => {
+    let state: GameState = initGameState({
+      target: "12345",
+      seed: "track-offered",
+      maxGuesses: 7,
+      advancedMode: true,
+    });
+    expect(state.offeredClueIds).toEqual([]);
+    state = reduce(state, { type: "SUBMIT_GUESS", guess: "99999" });
+    expect(state.offeredClueIds).toHaveLength(2);
+    const offeredAfterSubmit = new Set(state.offeredClueIds);
+    for (const c of state.pendingGuess!.options) {
+      expect(offeredAfterSubmit.has(c.id)).toBe(true);
+    }
+    state = reduce(state, { type: "REDRAW" });
+    expect(state.offeredClueIds).toHaveLength(4);
   });
 });

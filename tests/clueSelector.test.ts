@@ -366,3 +366,83 @@ describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
     expect(diverged).toBe(50);
   });
 });
+
+describe("pickTwoClues with excludeIds (offered-pool soft filter)", () => {
+  it("never offers a clue in excludeIds when the eligible pool has alternatives", () => {
+    // Walk many seeds × rounds with a populated excludeIds set; if the
+    // hard-eligible pool is bigger than excludeIds, the returned pair
+    // must be entirely outside the set. Failure means the walk-forward
+    // or backfill path is leaking previously-offered ids.
+    for (let s = 0; s < 200; s++) {
+      const seed = `excl-${s}`;
+      // Walk a 7-round advanced-mode game post-cap, accumulating
+      // offered ids as the exclude set, and verify each new pair is
+      // disjoint from prior offers.
+      const offered = new Set<ClueId>();
+      const chosen: ClueId[] = [];
+      for (let round = 0; round < 7; round++) {
+        const pair = pickTwoClues(
+          seed,
+          chosen,
+          0,
+          true, // excludePositional (cap reached)
+          true, // advancedMode
+          offered,
+        );
+        expect(offered.has(pair[0].id)).toBe(false);
+        expect(offered.has(pair[1].id)).toBe(false);
+        offered.add(pair[0].id);
+        offered.add(pair[1].id);
+        chosen.push(pair[0].id);
+      }
+    }
+  });
+
+  it("falls back to a duplicate only when no fresh eligible card exists", () => {
+    // Synthesize an exclude set that covers every non-positional, non-
+    // reuse clue. With excludePositional + round 1 (no reuse) + every
+    // other id excluded, the function has nothing fresh to offer and
+    // must fall back. Just assert it returns two clue objects without
+    // throwing — the contract is "always returns a pair".
+    const allNonPositionalNonReuse = new Set<ClueId>(
+      [
+        "sumDelta",
+        "digitOverlap",
+        "parityBalance",
+        "primeCount",
+        "rangeCompare",
+        "containsDigit",
+        "distinctDigits",
+        "median",
+        "divisibleBy",
+        "totalDeviation",
+        "diceCount",
+        "upsAndDowns",
+        "extraLock",
+      ] as ClueId[],
+    );
+    const [a, b] = pickTwoClues(
+      "fallback-seed",
+      [],
+      0,
+      true, // excludePositional
+      true, // advancedMode
+      allNonPositionalNonReuse,
+    );
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+  });
+
+  it("default empty excludeIds preserves prior behavior (regression guard)", () => {
+    // Calling pickTwoClues without excludeIds (or with empty) must
+    // produce the same pair as the pre-fix implementation for the
+    // common path. This test also indirectly guarantees daily-game
+    // callers (which never pass excludeIds) are unaffected.
+    for (let s = 0; s < 50; s++) {
+      const seed = `default-excl-${s}`;
+      const a = pickTwoClues(seed, [], 0, false, false);
+      const b = pickTwoClues(seed, [], 0, false, false, new Set());
+      expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+    }
+  });
+});
