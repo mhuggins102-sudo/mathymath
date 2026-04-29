@@ -61,6 +61,15 @@ export interface GameState {
    *  prior rounds. Used by pickTwoClues to advance past consumed
    *  pairs. Starts at 0; each REDRAW bumps by 1. */
   deckOffset: number;
+  /** Every clue id ever offered to the player in this game (both
+   *  picked and unpicked options across all pairs, including those
+   *  burned via redraws). Passed to pickTwoClues as a soft exclusion
+   *  so the walk-forward / backfill paths can't re-surface a card the
+   *  player has already seen — the bug this prevents shows up in
+   *  advanced mode after the positional cap, where filtering positional
+   *  cards out of the walk burns extra deck positions that would
+   *  otherwise leak forward into the next pair's region. */
+  offeredClueIds: ClueId[];
   /** "Advanced" rules toggle, captured at game start. Setting changes
    *  during a game don't affect the in-progress reducer — only the next
    *  RESET picks up the new flag. Daily mode never enables this. */
@@ -104,6 +113,7 @@ export function initGameState(params: {
     maxGuesses: params.maxGuesses ?? DEFAULT_MAX_GUESSES,
     guesses: [],
     deckOffset: 0,
+    offeredClueIds: [],
     advancedMode: params.advancedMode ?? false,
     pendingGuess: null,
     status: "playing",
@@ -172,15 +182,18 @@ export function reduce(state: GameState, action: GameAction): GameState {
         state.advancedMode,
         state.guesses,
       );
+      const excludeIds = new Set(state.offeredClueIds);
       const options = pickTwoClues(
         state.seed,
         usedClueIds,
         state.deckOffset,
         excludePositional,
         state.advancedMode,
+        excludeIds,
       );
       return {
         ...state,
+        offeredClueIds: appendOfferedIds(state.offeredClueIds, options),
         pendingGuess: {
           guess: action.guess,
           options,
@@ -202,16 +215,19 @@ export function reduce(state: GameState, action: GameAction): GameState {
         state.advancedMode,
         state.guesses,
       );
+      const excludeIds = new Set(state.offeredClueIds);
       const newOptions = pickTwoClues(
         state.seed,
         usedClueIds,
         newOffset,
         excludePositional,
         state.advancedMode,
+        excludeIds,
       );
       return {
         ...state,
         deckOffset: newOffset,
+        offeredClueIds: appendOfferedIds(state.offeredClueIds, newOptions),
         pendingGuess: {
           ...state.pendingGuess,
           options: newOptions,
@@ -273,4 +289,19 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
 export function remainingGuesses(state: GameState): number {
   return Math.max(0, state.maxGuesses - state.guesses.length);
+}
+
+function appendOfferedIds(
+  prior: readonly ClueId[],
+  options: readonly { id: ClueId }[],
+): ClueId[] {
+  const seen = new Set(prior);
+  const out = prior.slice();
+  for (const o of options) {
+    if (!seen.has(o.id)) {
+      seen.add(o.id);
+      out.push(o.id);
+    }
+  }
+  return out;
 }
