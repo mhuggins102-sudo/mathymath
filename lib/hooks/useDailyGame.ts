@@ -115,7 +115,9 @@ function initialState(config: UseDailyGameConfig): DailyGameState {
   };
 }
 
-function toSaved(state: DailyGameState): SavedDailyGame {
+/** Exported for unit tests. Hook consumers should not call this — use
+ *  the hook itself, which wires saveDailyGame on every state change. */
+export function toSaved(state: DailyGameState): SavedDailyGame {
   return {
     version: 1,
     date: state.date,
@@ -126,6 +128,12 @@ function toSaved(state: DailyGameState): SavedDailyGame {
       clueId: g.clueId,
       result: g.result,
       locks: g.locks,
+      // `redraws` MUST round-trip: the /api/results replay uses it to
+      // reconstruct the deck offset (each redraw advances the pair
+      // pointer). Dropping it here means a hydrated game's resubmit
+      // hits clue_not_offered → history_invalid, even though the
+      // first-time submit (from in-memory state) succeeded.
+      redraws: g.redraws,
     })),
     pendingGuess: state.pendingGuess
       ? {
@@ -135,6 +143,7 @@ function toSaved(state: DailyGameState): SavedDailyGame {
             state.pendingGuess.options[1].id,
           ],
           locks: state.pendingGuess.locks,
+          redraws: state.pendingGuess.redraws,
         }
       : null,
     status: state.status,
@@ -142,7 +151,8 @@ function toSaved(state: DailyGameState): SavedDailyGame {
   };
 }
 
-function fromSaved(
+/** Exported for unit tests. See toSaved above. */
+export function fromSaved(
   saved: SavedDailyGame,
   config: UseDailyGameConfig,
 ): DailyGameState {
@@ -162,7 +172,7 @@ function fromSaved(
         guess: saved.pendingGuess.guess,
         options: [a, b],
         locks: saved.pendingGuess.locks,
-        redraws: 0,
+        redraws: saved.pendingGuess.redraws ?? 0,
       };
     } catch {
       // Unknown clue id (e.g. a retired clue in older saves). Drop

@@ -89,6 +89,9 @@ const savedDailyPendingSchema = z.object({
    *  Stashed here so that CHOOSE_CLUE can merge them into the next
    *  resolved guess, and so a refresh mid-pending preserves them. */
   locks: z.array(savedLockSchema).optional(),
+  /** Redraws burned on this pending pair before the player picked.
+   *  Round-trips so a refresh mid-pending preserves the deck offset. */
+  redraws: z.number().int().min(0).optional(),
 });
 
 const savedDailyGameSchema = z.object({
