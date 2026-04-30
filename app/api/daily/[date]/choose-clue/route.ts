@@ -171,12 +171,18 @@ export async function POST(
     parsed.data.history as Parameters<typeof knownSlotsFromHistory>[0],
     DIGITS,
   );
+  const priorResults = parsed.data.history
+    .map((g) => g.result as import("@/lib/game/clues/types").ClueResult | undefined)
+    .filter(
+      (r): r is import("@/lib/game/clues/types").ClueResult => r !== undefined,
+    );
   // Player-selected params (Oracle → selectedSlot; Contains Digit →
   // selectedDigit) are forwarded into the compute context alongside
   // knownSlots. Clues without a paramKind simply ignore them.
   const { clueParam } = parsed.data;
   const result = clue.compute(pendingGuess, target, {
     knownSlots,
+    priorResults,
     ...clueParam,
   });
 

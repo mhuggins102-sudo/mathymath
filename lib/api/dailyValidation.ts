@@ -186,6 +186,10 @@ export function validateDailyHistory(
       history.slice(0, i) as Parameters<typeof knownSlotsFromHistory>[0],
       digits,
     );
+    const priorResults = history
+      .slice(0, i)
+      .map((h) => h.result as ClueResult | undefined)
+      .filter((r): r is ClueResult => r !== undefined);
     // For clues with paramKind (Oracle, Contains Digit): the player's
     // selection is encoded in the result itself. Oracle stores slot,
     // Contains Digit stores digit. Extract and pass so compute
@@ -208,6 +212,7 @@ export function validateDailyHistory(
     }
     const expected = clue.compute(g.guess, target, {
       knownSlots: priorKnownSlots,
+      priorResults,
       ...clueParam,
     });
     if (!resultsMatch(g.result, expected)) {

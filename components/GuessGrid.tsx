@@ -46,6 +46,22 @@ interface GuessGridProps {
 }
 
 /**
+ * True for the last resolved guess when the game ended in an
+ * Oracle-induced win (Oracle revealed the final unknown slot, possibly
+ * via Clue Reuse). The row should be repainted to look like a literal
+ * correct guess — full target shown, every slot in match state — even
+ * though the player's typed guess wasn't the target.
+ */
+export function isOracleWinRow(
+  state: Pick<GuessGridState, "status" | "guesses">,
+  rowIndex: number,
+): boolean {
+  if (state.status !== "won") return false;
+  if (rowIndex !== state.guesses.length - 1) return false;
+  return state.guesses[rowIndex]?.result?.kind === "oracle";
+}
+
+/**
  * Renders only the rows that actually exist:
  *  - every resolved guess (with its revealed clue)
  *  - either the pending (awaiting-clue) row OR the current-input row,
@@ -66,6 +82,7 @@ export function GuessGrid({
 
   for (let i = 0; i < state.guesses.length; i++) {
     const g = state.guesses[i];
+    const isOracleWin = isOracleWinRow(state, i);
     rows.push(
       <GuessRow
         key={`done-${i}`}
@@ -75,6 +92,8 @@ export function GuessGrid({
         locks={g.locks}
         interactive
         compact={compact}
+        winRow={isOracleWin}
+        certainDigits={isOracleWin ? certainDigits : undefined}
       />,
     );
   }

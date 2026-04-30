@@ -64,6 +64,12 @@ export interface ClueComputeContext {
   selectedDigit?: number;
   /** Player-chosen previously-used clue to reuse (Clue Reuse special). */
   reusedClueId?: string;
+  /** Resolved results from prior guesses, in order. Used by clues that
+   *  prefer not to repeat already-revealed information when they're
+   *  re-applied (e.g. Divisible By picks a fresh divisor when one is
+   *  available). Null entries (from the final lost-guess row) are not
+   *  included. */
+  priorResults?: readonly ClueResult[];
 }
 
 /** The parameter the player chose when a clue requires paramKind.
