@@ -28,14 +28,27 @@ export const divisibleByClue: Clue<{
     { state: "match", label: "divisible" },
     { state: "cold", label: "not divisible" },
   ],
-  compute(guess, target) {
+  compute(guess, target, context) {
     const n = Number(target);
     const valid = DIVISORS.filter((d) => n % d === 0);
     if (valid.length === 0) {
       return { kind: "divisibleBy", divisor: null, present: false };
     }
+    // When re-applied (via Clue Reuse) on a target that has multiple
+    // valid divisors, prefer one the player hasn't seen yet — re-
+    // revealing a divisor would convey no new information. Falls back
+    // to the full set when every valid divisor has already been shown
+    // (e.g. only one divisor matches in the first place).
+    const revealed = new Set<number>();
+    for (const r of context?.priorResults ?? []) {
+      if (r.kind === "divisibleBy" && r.present && r.divisor !== null) {
+        revealed.add(r.divisor);
+      }
+    }
+    const fresh = valid.filter((d) => !revealed.has(d));
+    const pool = fresh.length > 0 ? fresh : valid;
     const rng = seededRng(`divisibleBy:${guess}:${target}`);
-    const divisor = valid[Math.floor(rng() * valid.length)];
+    const divisor = pool[Math.floor(rng() * pool.length)];
     return { kind: "divisibleBy", divisor, present: true };
   },
   example(target) {

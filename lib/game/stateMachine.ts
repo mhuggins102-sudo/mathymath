@@ -248,8 +248,12 @@ export function reduce(state: GameState, action: GameAction): GameState {
         state.guesses,
         state.digits,
       );
+      const priorResults = state.guesses
+        .map((g) => g.result)
+        .filter((r): r is NonNullable<typeof r> => r !== undefined);
       const result = clue.compute(guess, state.target, {
         knownSlots,
+        priorResults,
         ...action.param,
       });
       const { redraws } = state.pendingGuess;

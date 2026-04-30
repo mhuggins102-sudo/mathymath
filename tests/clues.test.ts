@@ -277,6 +277,47 @@ describe("Divisible By", () => {
     const b = divisibleByClue.compute("12345", "67890");
     expect(a).toEqual(b);
   });
+  it("avoids a previously-revealed divisor when re-applied (Clue Reuse)", () => {
+    // Target 12345 has valid divisors {3, 5}. If 3 was already
+    // revealed, a re-application must pick 5 to provide new info.
+    const r = divisibleByClue.compute("99999", "12345", {
+      priorResults: [{ kind: "divisibleBy", divisor: 3, present: true }],
+    });
+    expect(r.present).toBe(true);
+    expect(r.divisor).toBe(5);
+  });
+  it("falls back to repeating the only valid divisor when no fresh option exists", () => {
+    // Target 100007 is technically prime-ish; pick a target with a
+    // single divisor in 2-9 to force the fallback. 10003 % 7 === 4
+    // (so 7 doesn't divide), but 10001 = 73 × 137 — none of 2..9 divide.
+    // Use 10009 which is prime. Need a single-divisor target instead.
+    // 10004 = 2^2 × 41 × 61: divisors 2-9 = {2, 4}. Choose target with
+    // exactly one divisor in 2-9 → 12343 = 12343/7? 12343/7 = 1763.28…
+    // Use 12121 = 11 × 1102 + r; check explicitly.
+    // Simpler: 11111 = 41 × 271 → none of 2-9 divide. Not helpful.
+    // 22229 = prime-ish? Skip the manual hunt: use a synthetic
+    // approach where we KNOW only one divisor matches.
+    // Target 10003: 10003 % 2..9: 10003 odd, not 3 (1+0+0+0+3=4), not
+    // 4..6 (odd / not %3), 10003/7 = 1429 exact → 7 divides. Check 8
+    // (no, odd). 9 (1+0+0+0+3=4, no). So only 7. ✓
+    const r = divisibleByClue.compute("99999", "10003", {
+      priorResults: [{ kind: "divisibleBy", divisor: 7, present: true }],
+    });
+    expect(r.present).toBe(true);
+    expect(r.divisor).toBe(7);
+  });
+  it("ignores priorResults from other clue kinds", () => {
+    // Other-kind results in priorResults should not affect the divisor
+    // chosen — only prior divisibleBy reveals do.
+    const r = divisibleByClue.compute("00000", "12345", {
+      priorResults: [
+        { kind: "sumDelta", delta: 9 },
+        { kind: "containsDigit", digit: 3, present: true },
+      ],
+    });
+    expect(r.present).toBe(true);
+    expect([3, 5]).toContain(r.divisor);
+  });
 });
 
 describe("Total Deviation", () => {

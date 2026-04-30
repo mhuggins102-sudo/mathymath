@@ -375,6 +375,60 @@ describe("maxGuessesForDigits", () => {
   });
 });
 
+describe("stateMachine — Clue Reuse threads priorResults", () => {
+  it("Clue Reuse on Divisible By avoids re-revealing a known divisor", () => {
+    // Target 12345 has divisors {3, 5} in 2-9. Plant a prior
+    // divisibleBy result that revealed 3, then re-apply via Clue
+    // Reuse and assert the result is the OTHER divisor.
+    const target = "12345";
+    const divisibleBy = getClueById("divisibleBy");
+    const clueReuse = getClueById("clueReuse");
+    const sumDelta = getClueById("sumDelta");
+    const state: GameState = {
+      target,
+      digits: 5,
+      maxGuesses: 7,
+      seed: "reuse-divis",
+      deckOffset: 0,
+      offeredClueIds: ["divisibleBy", "sumDelta", "clueReuse", "thermometer"],
+      advancedMode: false,
+      status: "playing",
+      guesses: [
+        {
+          guess: "11111",
+          clueId: "divisibleBy",
+          // The fixed divisor here is what the player has already seen.
+          result: { kind: "divisibleBy", divisor: 3, present: true },
+        },
+      ],
+      pendingGuess: {
+        guess: "22222",
+        options: [clueReuse, sumDelta] as [typeof clueReuse, typeof sumDelta],
+        redraws: 0,
+      },
+    };
+    const next = reduce(state, {
+      type: "CHOOSE_CLUE",
+      clueId: "clueReuse",
+      param: { reusedClueId: "divisibleBy" } as never,
+    });
+    const resolved = next.guesses[next.guesses.length - 1];
+    expect(resolved.result?.kind).toBe("divisibleBy");
+    if (resolved.result?.kind === "divisibleBy") {
+      expect(resolved.result.present).toBe(true);
+      expect(resolved.result.divisor).toBe(5);
+    }
+    // Sanity: divisibleBy on its own (no prior reveals) for the same
+    // target genuinely has both 3 and 5 in the candidate pool, so the
+    // post-reuse pick is a real exclusion of 3 rather than the RNG
+    // happening to land on 5 in both cases.
+    const fresh = divisibleBy.compute("22222", target);
+    if (fresh.kind === "divisibleBy") {
+      expect([3, 5]).toContain(fresh.divisor);
+    }
+  });
+});
+
 describe("stateMachine — no duplicate clue offers (advanced mode)", () => {
   it("never re-offers a previously-offered clue across a full advanced game", () => {
     // Walk many seeds to a 7-round advanced-mode finish, picking an

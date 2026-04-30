@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { subLabelFor } from "@/components/GuessRow";
+import { isOracleWinRow } from "@/components/GuessGrid";
 
 describe("subLabelFor — cmp clues show symbol + player's own value", () => {
   it("Digit Range (rangeCompare)", () => {
@@ -110,5 +111,76 @@ describe("subLabelFor — other clues unchanged", () => {
     expect(
       subLabelFor("11111", { kind: "containsDigit", digit: 7, present: false }),
     ).toEqual({ text: "7? no", className: "text-bad" });
+  });
+});
+
+describe("isOracleWinRow", () => {
+  // The grid uses this to decide when to repaint the last resolved
+  // row as a full match (target shown across every slot) instead of
+  // showing only the single Oracle-revealed slot.
+  const oracleGuess = {
+    guess: "12340",
+    clueId: "oracle" as const,
+    result: { kind: "oracle" as const, slot: 4, digit: 5 },
+  };
+  const sumDeltaGuess = {
+    guess: "11111",
+    clueId: "sumDelta" as const,
+    result: { kind: "sumDelta" as const, delta: 9 },
+  };
+  it("fires on the last row when status is won and result is Oracle", () => {
+    const state = {
+      status: "won" as const,
+      guesses: [sumDeltaGuess, oracleGuess],
+    };
+    expect(isOracleWinRow(state, 1)).toBe(true);
+  });
+  it("does NOT fire on earlier rows even if they used Oracle", () => {
+    const state = {
+      status: "won" as const,
+      guesses: [oracleGuess, sumDeltaGuess, oracleGuess],
+    };
+    expect(isOracleWinRow(state, 0)).toBe(false);
+    expect(isOracleWinRow(state, 1)).toBe(false);
+    expect(isOracleWinRow(state, 2)).toBe(true);
+  });
+  it("does NOT fire while the game is still playing", () => {
+    const state = {
+      status: "playing" as const,
+      guesses: [oracleGuess],
+    };
+    expect(isOracleWinRow(state, 0)).toBe(false);
+  });
+  it("does NOT fire on a bullseyes / non-oracle win row", () => {
+    const state = {
+      status: "won" as const,
+      guesses: [
+        {
+          guess: "12345",
+          clueId: "bullseyes" as const,
+          result: {
+            kind: "bullseyes" as const,
+            hits: [true, true, true, true, true],
+          },
+        },
+      ],
+    };
+    expect(isOracleWinRow(state, 0)).toBe(false);
+  });
+  it("fires when Oracle was reached via Clue Reuse (result.kind, not clueId)", () => {
+    // Clue Reuse delegates to the underlying clue, so result.kind is
+    // "oracle" even though the stored clueId is "clueReuse". The grid
+    // keys off result.kind so this case still triggers the win paint.
+    const state = {
+      status: "won" as const,
+      guesses: [
+        {
+          guess: "12340",
+          clueId: "clueReuse" as const,
+          result: { kind: "oracle" as const, slot: 4, digit: 5 },
+        },
+      ],
+    };
+    expect(isOracleWinRow(state, 0)).toBe(true);
   });
 });

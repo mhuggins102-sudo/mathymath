@@ -35,6 +35,13 @@ interface GuessRowProps {
   /** Tightens cell width and inter-cell gap so the row fits on phone
    *  widths when `digits` is 6. Caller (GuessGrid) decides. */
   compact?: boolean;
+  /** When true, this resolved row terminated the game in a win even
+   *  though the typed `guess` is not the target — i.e. an Oracle (or
+   *  Clue-Reuse-of-Oracle) reveal completed the certain set. The row
+   *  is repainted to show the full target with every slot in match
+   *  state, mirroring how a literal correct guess renders. Requires
+   *  `certainDigits` to carry the full target. */
+  winRow?: boolean;
 }
 
 /** Per-slot color state derived from the clue result. */
@@ -316,6 +323,7 @@ export function GuessRow({
   locks,
   onTapCell,
   compact = false,
+  winRow = false,
 }: GuessRowProps) {
   // ---------------------------------------------------------------
   // Project a per-cell view for each render mode:
@@ -331,11 +339,22 @@ export function GuessRow({
   const selected: boolean[] = new Array(digits).fill(false);
 
   if (result) {
-    const d = displayDigits(guess, digits, result);
-    const s = cellStates(result, digits);
-    for (let i = 0; i < digits; i++) {
-      displayed[i] = d[i];
-      states[i] = s[i];
+    if (winRow && certainDigits) {
+      // Oracle-induced win: paint the full target and mark every slot
+      // as match, so the row reads the same as a literal correct
+      // guess. `certainDigits` is authoritative here — by the time the
+      // game ends this way, every slot is known.
+      for (let i = 0; i < digits; i++) {
+        displayed[i] = certainDigits[i] ?? guess[i] ?? null;
+        states[i] = "match";
+      }
+    } else {
+      const d = displayDigits(guess, digits, result);
+      const s = cellStates(result, digits);
+      for (let i = 0; i < digits; i++) {
+        displayed[i] = d[i];
+        states[i] = s[i];
+      }
     }
     // Post-submit lock badges + override for correct locks (they're
     // always visually match regardless of what the chosen clue says
