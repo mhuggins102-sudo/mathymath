@@ -22,7 +22,11 @@ import { Modal } from "@/components/Modal";
 import { buildShareText } from "@/lib/game/share";
 import type { ClueId } from "@/lib/game/clues/types";
 import { computeDailyNumber } from "@/lib/game/targetGenerator";
-import { recordDailyResult } from "@/lib/persistence/localStore";
+import {
+  loadDailyPercentile,
+  recordDailyResult,
+  saveDailyPercentile,
+} from "@/lib/persistence/localStore";
 
 interface DailyGameProps {
   date: string;
@@ -147,7 +151,24 @@ export function DailyGame({
     if (submittedRef.current) return;
     submittedRef.current = true;
 
-    setStatsLoading(true);
+    // Show any cached percentile for this date immediately. Two
+    // wins from doing this:
+    //   - Snappy revisit: no loading flash on a puzzle the player
+    //     already submitted (we still re-fetch in the background to
+    //     pick up newer leaderboard entries).
+    //   - Graceful fallback for older saves whose history can't be
+    //     re-validated server-side (legacy entries missing redraws,
+    //     etc.) — the cached numbers stay on screen and we suppress
+    //     the technical error.
+    const cached = loadDailyPercentile(date);
+    if (cached) {
+      setPercentile({
+        percentile: cached.percentile,
+        aggregate: cached.aggregate,
+      });
+    } else {
+      setStatsLoading(true);
+    }
     setStatsError(null);
 
     // Results endpoint now receives the full history so the server can
@@ -187,9 +208,16 @@ export function DailyGame({
       .then(async (res) => {
         const j = await res.json();
         if (!res.ok) throw new Error(j.error ?? "server_error");
-        setPercentile({ percentile: j.percentile, aggregate: j.aggregate });
+        const fresh = { percentile: j.percentile, aggregate: j.aggregate };
+        setPercentile(fresh);
+        saveDailyPercentile(date, fresh);
       })
-      .catch((e: Error) => setStatsError(e.message))
+      .catch((e: Error) => {
+        // If a cached value is on screen, prefer staying silent — the
+        // user already sees usable numbers. Surface the error only
+        // when there's nothing to show.
+        if (!cached) setStatsError(e.message);
+      })
       .finally(() => setStatsLoading(false));
   }, [hydrated, state.status, state.guesses, clientId, date]);
 

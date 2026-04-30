@@ -64,8 +64,15 @@ export function DailyResultPanel({
         <p className="text-center text-muted text-sm">Loading global stats…</p>
       )}
       {error && (
-        <p className="text-center text-bad text-xs">
-          Couldn&apos;t load global stats: {error}
+        <p className="text-center text-muted text-xs">
+          {/* Older puzzles whose saved history predates the redraws-
+              persistence fix can't be re-validated server-side. Those
+              come back as `history_invalid` here; show a friendly
+              note instead of the raw error code. Other failures
+              (network, server) still surface generically. */}
+          {error === "history_invalid"
+            ? "Global stats unavailable for this puzzle."
+            : "Couldn't load global stats. Try again later."}
         </p>
       )}
       {data && (

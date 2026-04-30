@@ -447,6 +447,68 @@ export function dailyHistoryStats(h: DailyHistory): DailyHistoryStats {
   return stats;
 }
 
+// --- Daily percentile cache ---
+//
+// The /api/results POST returns the player's percentile + the global
+// distribution. Caching that response per puzzle date keeps the result
+// panel snappy on revisit (no loading flash) and — more importantly —
+// gives us a fallback when a re-submit fails, e.g. for puzzles whose
+// localStorage save predates the redraws-persistence fix and so can't
+// be replayed by the server. The cache is overwritten every time the
+// server returns a fresh response, so leaderboard freshness still
+// catches up as the puzzle ages.
+
+const dailyPercentileCacheSchema = z.object({
+  version: z.literal(1),
+  percentile: z.number(),
+  aggregate: z.object({
+    total: z.number(),
+    wins: z.number(),
+    distribution: z.record(z.string(), z.number()),
+  }),
+  cachedAt: z.number(),
+});
+
+export type DailyPercentileCache = z.infer<typeof dailyPercentileCacheSchema>;
+
+const DAILY_PERCENTILE_PREFIX = "dailyPercentile:";
+
+export function saveDailyPercentile(
+  date: string,
+  value: { percentile: number; aggregate: DailyPercentileCache["aggregate"] },
+): void {
+  if (typeof window === "undefined") return;
+  const payload: DailyPercentileCache = {
+    version: 1,
+    percentile: value.percentile,
+    aggregate: value.aggregate,
+    cachedAt: Date.now(),
+  };
+  try {
+    window.localStorage.setItem(
+      STORAGE_PREFIX + DAILY_PERCENTILE_PREFIX + date,
+      JSON.stringify(payload),
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export function loadDailyPercentile(
+  date: string,
+): DailyPercentileCache | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(
+    STORAGE_PREFIX + DAILY_PERCENTILE_PREFIX + date,
+  );
+  if (!raw) return null;
+  try {
+    return dailyPercentileCacheSchema.parse(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
 /** Clear all local mathymath data. Used by settings "reset" action. */
 export function clearAllLocalData(): void {
   if (typeof window === "undefined") return;
