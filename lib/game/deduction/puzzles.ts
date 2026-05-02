@@ -1,4 +1,5 @@
 import type { ClueId, ClueResult } from "@/lib/game/clues/types";
+import { CAPTURED_DEDUCTION_PUZZLES } from "./captured";
 
 export interface DeductionPuzzle {
   id: string;
@@ -116,11 +117,20 @@ export const DEDUCTION_PUZZLES: DeductionPuzzle[] = [
   },
 ];
 
+/** Combined pool: hand-written tutorials + sim-mined "interesting"
+ *  puzzles (each requires combining multiple clues to deduce a target
+ *  with 2+ uncertain digit slots). Captured puzzles are appended so
+ *  the original 5 still appear regularly. */
+export const ALL_DEDUCTION_PUZZLES: DeductionPuzzle[] = [
+  ...DEDUCTION_PUZZLES,
+  ...CAPTURED_DEDUCTION_PUZZLES,
+];
+
 /** Pick a random puzzle, excluding `excludeId` when possible (for "Try another"). */
 export function pickDeductionPuzzle(excludeId?: string): DeductionPuzzle {
   const pool = excludeId
-    ? DEDUCTION_PUZZLES.filter((p) => p.id !== excludeId)
-    : DEDUCTION_PUZZLES;
-  const candidates = pool.length > 0 ? pool : DEDUCTION_PUZZLES;
+    ? ALL_DEDUCTION_PUZZLES.filter((p) => p.id !== excludeId)
+    : ALL_DEDUCTION_PUZZLES;
+  const candidates = pool.length > 0 ? pool : ALL_DEDUCTION_PUZZLES;
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
