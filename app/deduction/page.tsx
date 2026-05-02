@@ -18,13 +18,16 @@ import {
 import {
   pickDeductionPuzzle,
   type DeductionPuzzle,
+  type Difficulty,
 } from "@/lib/game/deduction/puzzles";
+import { explainWrongGuess } from "@/lib/game/deduction/explain";
 
 type Phase = "playing" | "correct" | "wrong";
 
 export default function DeductionPage() {
+  const [difficulty, setDifficulty] = useState<Difficulty>("all");
   const [puzzle, setPuzzle] = useState<DeductionPuzzle>(() =>
-    pickDeductionPuzzle(),
+    pickDeductionPuzzle("all"),
   );
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<Phase>("playing");
@@ -95,12 +98,31 @@ export default function DeductionPage() {
   const submitDisabled = input.length !== capacity || phase !== "playing";
 
   const handleNext = useCallback(() => {
-    const next = pickDeductionPuzzle(puzzle.id);
+    const next = pickDeductionPuzzle(difficulty, puzzle.id);
     setPuzzle(next);
     setInput("");
     setPhase("playing");
     setFinalGuess(null);
-  }, [puzzle.id]);
+  }, [difficulty, puzzle.id]);
+
+  const handleDifficultyChange = useCallback(
+    (next: Difficulty) => {
+      if (next === difficulty) return;
+      setDifficulty(next);
+      // Switching difficulty starts a fresh puzzle from the new bucket.
+      const fresh = pickDeductionPuzzle(next);
+      setPuzzle(fresh);
+      setInput("");
+      setPhase("playing");
+      setFinalGuess(null);
+    },
+    [difficulty],
+  );
+
+  const failures = useMemo(() => {
+    if (phase !== "wrong" || finalGuess === null) return undefined;
+    return explainWrongGuess(puzzle, finalGuess);
+  }, [phase, finalGuess, puzzle]);
 
   return (
     <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
@@ -122,6 +144,11 @@ export default function DeductionPage() {
           </button>
         </div>
       </header>
+
+      <DifficultySelector
+        difficulty={difficulty}
+        onChange={handleDifficultyChange}
+      />
 
       <p className="text-xs text-muted text-center mb-3">
         Study the clue history — you get one guess.
@@ -146,7 +173,7 @@ export default function DeductionPage() {
             <DeductionResultCard
               phase={phase}
               target={puzzle.target}
-              explanation={puzzle.explanation}
+              failures={failures}
               onNext={handleNext}
             />
           )}
@@ -155,5 +182,51 @@ export default function DeductionPage() {
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </main>
+  );
+}
+
+/** Four-way segmented control for picking the puzzle pool's difficulty.
+ *  Same visual idiom as Unlimited's 5/6/Mix selector. */
+function DifficultySelector({
+  difficulty,
+  onChange,
+}: {
+  difficulty: Difficulty;
+  onChange: (next: Difficulty) => void;
+}) {
+  const options: { value: Difficulty; label: string }[] = [
+    { value: "easy", label: "Easy" },
+    { value: "medium", label: "Medium" },
+    { value: "hard", label: "Hard" },
+    { value: "all", label: "All" },
+  ];
+  return (
+    <div className="mb-3">
+      <div
+        role="radiogroup"
+        aria-label="Puzzle difficulty"
+        className="grid grid-cols-4 gap-1 bg-surface-2 rounded-md p-1"
+      >
+        {options.map((opt) => {
+          const selected = difficulty === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(opt.value)}
+              className={`text-xs font-semibold py-1.5 rounded transition ${
+                selected
+                  ? "bg-accent/80 text-background"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

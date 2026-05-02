@@ -3,14 +3,16 @@
 interface DeductionResultCardProps {
   phase: "correct" | "wrong";
   target: string;
-  explanation: string;
+  /** One sentence per clue the player's guess violates. Empty means
+   *  no clues were broken (only possible on a correct guess). */
+  failures?: string[];
   onNext: () => void;
 }
 
 export function DeductionResultCard({
   phase,
   target,
-  explanation,
+  failures,
   onNext,
 }: DeductionResultCardProps) {
   return (
@@ -24,7 +26,13 @@ export function DeductionResultCard({
             The answer was{" "}
             <span className="font-mono font-bold text-foreground">{target}</span>
           </p>
-          <p className="text-xs text-muted leading-relaxed">{explanation}</p>
+          {failures && failures.length > 0 && (
+            <ul className="text-xs text-muted leading-relaxed text-left list-disc pl-5 space-y-1">
+              {failures.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       <button

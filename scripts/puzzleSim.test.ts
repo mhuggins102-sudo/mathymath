@@ -10,19 +10,23 @@
  *   2. At least 2 digit slots remain UNCERTAIN (the player can't read
  *      the answer off bullseyes / oracle / higher-lower equality —
  *      multiple slots have to be deduced from compositional clues).
- *   3. Every clue in the history is necessary — removing any single
- *      one would leave > 1 candidate. No redundant clues; the player
- *      must combine all of them to converge on the target.
+ *   3. At least N clues are necessary (default = all). When set to 2
+ *      via PUZZLE_SIM_NECESSARY_MIN, the puzzle may contain redundant
+ *      clues but still requires combining ≥ 2 to converge.
  *
  * Output:
- *   - Writes captured puzzles (sorted by interestingness) to
- *     `scripts/captured-puzzles.json`.
+ *   - Writes captured puzzles (sorted by interestingness) to the path
+ *     given by PUZZLE_SIM_OUT (default: scripts/captured-puzzles.json).
  *   - Prints summary stats and a preview of the top puzzles to stdout.
  *
  * Invoke:
  *   pnpm puzzleSim                          # defaults: N=2000
  *   PUZZLE_SIM_N=500 pnpm puzzleSim
  *   PUZZLE_SIM_LIMIT=200 pnpm puzzleSim     # cap captured puzzles in JSON
+ *   PUZZLE_SIM_FIRST=random PUZZLE_SIM_NECESSARY_MIN=2 \
+ *     PUZZLE_SIM_OUT=scripts/captured-puzzles-v2.json \
+ *     PUZZLE_SIM_TAG=r2 pnpm puzzleSim     # v2 run: random first guess,
+ *                                            relaxed necessity, distinct ids.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -437,14 +441,17 @@ interface CapturedPuzzle {
    *  the final clue had more work to do; smaller means the deduction
    *  was already mostly converged when the last clue landed. */
   candidatesBeforeFinal: number;
-  /** Per-clue "leave-one-out" candidate counts. Each entry is the size
-   *  of the candidate pool you'd be left with if that clue's info were
-   *  removed. All entries are > 1 (otherwise the puzzle wouldn't have
-   *  passed the "all clues necessary" filter). */
+  /** Per-clue "leave-one-out" candidate counts. Entry [i] = size of the
+   *  candidate pool you'd be left with if clue i were removed. Entries
+   *  ≤ 1 indicate redundant clues; entries > 1 = "necessary" clues. */
   looCandidates: number[];
-  /** Sum-of-products score: more digits to deduce + bigger LOO counts =
-   *  more interesting. Used to sort the captured set. */
-  interest: number;
+  /** Number of clues whose LOO count > 1 (i.e. clues actually required
+   *  to reach a unique answer). Always ≥ the configured min. */
+  necessaryCount: number;
+  /** Composite difficulty/interest score:
+   *    unknownSlots*10 + log2(candidatesBeforeFinal)*3 + necessaryCount.
+   *  Higher = harder. */
+  difficulty: number;
 }
 
 interface PuzzleEvalResult {
@@ -452,11 +459,13 @@ interface PuzzleEvalResult {
   capture: boolean;
   unknownSlots: number;
   looCandidates: number[];
+  necessaryCount: number;
 }
 
 function evalPrefix(
   target: string,
   history: readonly CapturedGuess[],
+  necessaryMin: number,
 ): PuzzleEvalResult | null {
   if (history.length < 2) return null;
   // The player knows their prior guesses were wrong (they didn't win),
@@ -477,22 +486,33 @@ function evalPrefix(
   const unknown = certain.filter((c) => !c).length;
   if (unknown < 2) return null;
 
-  // 3. Every clue is necessary.
+  // 3. At least `necessaryMin` clues must be necessary. A clue is
+  //    "necessary" iff removing it leaves > 1 candidate.
   const looCandidates: number[] = [];
+  let necessaryCount = 0;
   for (let skip = 0; skip < history.length; skip++) {
     let cands: string[] = ALL.filter((c) => !guessed.has(c));
     for (let i = 0; i < history.length; i++) {
       if (i === skip) continue;
       cands = filterCandidates(cands, history[i].guess, history[i].result);
     }
-    if (cands.length <= 1) {
-      // Skipping clue `skip` still leaves ≤ 1 candidate → that clue was
-      // redundant. Reject the prefix.
-      return { capture: false, unknownSlots: unknown, looCandidates: [] };
-    }
     looCandidates.push(cands.length);
+    if (cands.length > 1) necessaryCount++;
   }
-  return { capture: true, unknownSlots: unknown, looCandidates };
+  if (necessaryCount < necessaryMin) {
+    return {
+      capture: false,
+      unknownSlots: unknown,
+      looCandidates,
+      necessaryCount,
+    };
+  }
+  return {
+    capture: true,
+    unknownSlots: unknown,
+    looCandidates,
+    necessaryCount,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -510,6 +530,11 @@ function playOne(
   target: string,
   seed: string,
   budget: number,
+  opts: {
+    firstGuess: "greedy" | "random";
+    necessaryMin: number;
+    idTag: string;
+  },
 ): PlayResult {
   const deck = buildPuzzleDeck(seed);
   let candidates = ALL.slice();
@@ -517,8 +542,15 @@ function playOne(
   const history: CapturedGuess[] = [];
   const out: PlayResult = { won: false, guessCount: 0, captures: [] };
 
+  // Seeded RNG used to pick the round-1 guess in "random" mode. Keeps
+  // the run reproducible from the seed.
+  const firstGuessRng = seededRng(`firstGuess:${seed}`);
+
   for (let g = 0; g < budget; g++) {
-    const guess = candidates[0];
+    const guess =
+      g === 0 && opts.firstGuess === "random"
+        ? candidates[Math.floor(firstGuessRng() * candidates.length)]
+        : candidates[0];
     out.guessCount += 1;
     if (guess === target) {
       out.won = true;
@@ -562,22 +594,18 @@ function playOne(
     // candidate sizes we see in practice (post-clue-2 the pool is
     // usually small).
     if (history.length >= 2) {
-      const evalRes = evalPrefix(target, history);
+      const evalRes = evalPrefix(target, history, opts.necessaryMin);
       if (evalRes && evalRes.capture) {
-        const looSum = evalRes.looCandidates.reduce(
-          (s, x) => s + Math.log2(x),
-          0,
-        );
-        const interest = evalRes.unknownSlots * 10 + looSum;
         out.captures.push({
-          id: `${seed}@${history.length}`,
+          id: `${opts.idTag}-${seed}@${history.length}`,
           digits: DIGITS,
           target,
           guesses: history.map((h) => ({ ...h })),
           unknownSlots: evalRes.unknownSlots,
-          candidatesBeforeFinal: -1, // filled below
+          candidatesBeforeFinal: -1, // filled below (annotateCandidatesBeforeFinal)
           looCandidates: evalRes.looCandidates,
-          interest,
+          necessaryCount: evalRes.necessaryCount,
+          difficulty: 0, // filled below (annotateDifficulty)
         });
       }
     }
@@ -599,6 +627,24 @@ function annotateCandidatesBeforeFinal(captures: CapturedPuzzle[]): void {
     }
     c.candidatesBeforeFinal = cands.length;
   }
+}
+
+/** Composite difficulty score (higher = harder).
+ *  Mirrors the formula advertised to the user via AskUserQuestion. */
+export function difficultyScore(p: {
+  unknownSlots: number;
+  candidatesBeforeFinal: number;
+  necessaryCount: number;
+}): number {
+  return (
+    p.unknownSlots * 10 +
+    Math.log2(Math.max(2, p.candidatesBeforeFinal)) * 3 +
+    p.necessaryCount
+  );
+}
+
+function annotateDifficulty(captures: CapturedPuzzle[]): void {
+  for (const c of captures) c.difficulty = difficultyScore(c);
 }
 
 // ---------------------------------------------------------------------------
@@ -670,7 +716,7 @@ function renderResult(result: ClueResult): string {
 function renderPuzzle(p: CapturedPuzzle): string {
   const lines: string[] = [];
   lines.push(
-    `  [${p.id}] target=${p.target}  unknown=${p.unknownSlots}  beforeFinal=${p.candidatesBeforeFinal}  loo=[${p.looCandidates.join(",")}]  interest=${p.interest.toFixed(1)}`,
+    `  [${p.id}] target=${p.target}  unknown=${p.unknownSlots}  beforeFinal=${p.candidatesBeforeFinal}  loo=[${p.looCandidates.join(",")}]  necessary=${p.necessaryCount}  difficulty=${p.difficulty.toFixed(1)}`,
   );
   for (let i = 0; i < p.guesses.length; i++) {
     const g = p.guesses[i];
@@ -695,10 +741,25 @@ describe.skipIf(!runSim)("puzzle-mining simulation", () => {
       const N = Number(process.env.PUZZLE_SIM_N ?? 2000);
       const BUDGET = Number(process.env.PUZZLE_SIM_BUDGET ?? 6);
       const LIMIT = Number(process.env.PUZZLE_SIM_LIMIT ?? 500);
+      const FIRST_GUESS = (process.env.PUZZLE_SIM_FIRST ?? "greedy") as
+        | "greedy"
+        | "random";
+      // Default = "all clues necessary"; env-set to 2 to relax to "any
+      // 2+ clues are necessary" (so the puzzle may have redundant clues
+      // but still requires combining ≥ 2 to converge).
+      const NECESSARY_MIN = Number(process.env.PUZZLE_SIM_NECESSARY_MIN ?? -1);
+      const ID_TAG = process.env.PUZZLE_SIM_TAG ?? "g";
+      const OUT_PATH =
+        process.env.PUZZLE_SIM_OUT ??
+        path.join(path.dirname(__filename), "captured-puzzles.json");
 
       console.log(
         `\nMining puzzles: N=${N}  budget=${BUDGET}  output cap=${LIMIT}`,
       );
+      console.log(
+        `  first guess: ${FIRST_GUESS}    necessaryMin: ${NECESSARY_MIN === -1 ? "all" : NECESSARY_MIN}    id tag: "${ID_TAG}"`,
+      );
+      console.log(`  output path: ${OUT_PATH}`);
       console.log(
         `Candidate pool (post-degenerate-filter): ${ALL.length} / 100000`,
       );
@@ -711,13 +772,32 @@ describe.skipIf(!runSim)("puzzle-mining simulation", () => {
       let totalGuesses = 0;
 
       const t0 = Date.now();
+      const necessaryMin =
+        NECESSARY_MIN === -1 ? Number.POSITIVE_INFINITY : NECESSARY_MIN;
       for (let i = 0; i < N; i++) {
         const seed = `puzzle-${i}`;
         const target = generateDailyTarget(seed, DIGITS);
-        const r = playOne(target, seed, BUDGET);
+        const r = playOne(target, seed, BUDGET, {
+          firstGuess: FIRST_GUESS,
+          // For the legacy strict-LOO mode (NECESSARY_MIN = -1) we want
+          // every clue to be necessary, which means looCandidates count
+          // must equal history.length. Setting necessaryMin = Infinity
+          // would always reject; instead we use history.length and
+          // dynamically check inside evalPrefix.
+          necessaryMin: necessaryMin === Number.POSITIVE_INFINITY ? 1 : necessaryMin,
+          idTag: ID_TAG,
+        });
         if (r.won) wins++;
         totalGuesses += r.guessCount;
-        allCaptures.push(...r.captures);
+        // Strict mode: post-filter to only puzzles where every clue is
+        // necessary (every LOO entry > 1). Legacy v1 behavior.
+        const filtered =
+          necessaryMin === Number.POSITIVE_INFINITY
+            ? r.captures.filter((c) =>
+                c.looCandidates.every((n) => n > 1),
+              )
+            : r.captures;
+        allCaptures.push(...filtered);
 
         if ((i + 1) % 100 === 0) {
           const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
@@ -728,19 +808,10 @@ describe.skipIf(!runSim)("puzzle-mining simulation", () => {
       }
 
       annotateCandidatesBeforeFinal(allCaptures);
+      annotateDifficulty(allCaptures);
 
-      // Sort by: more unknown slots first, then larger candidatesBeforeFinal
-      // (the final clue had more work), then larger LOO sum (more
-      // interdependent clues).
-      allCaptures.sort((a, b) => {
-        if (b.unknownSlots !== a.unknownSlots) {
-          return b.unknownSlots - a.unknownSlots;
-        }
-        if (b.candidatesBeforeFinal !== a.candidatesBeforeFinal) {
-          return b.candidatesBeforeFinal - a.candidatesBeforeFinal;
-        }
-        return b.interest - a.interest;
-      });
+      // Sort hardest → easiest by composite difficulty score.
+      allCaptures.sort((a, b) => b.difficulty - a.difficulty);
 
       const trimmed = allCaptures.slice(0, LIMIT);
 
@@ -787,15 +858,22 @@ describe.skipIf(!runSim)("puzzle-mining simulation", () => {
       }
 
       // Write output JSON.
-      const outDir = path.dirname(__filename);
-      const outPath = path.join(outDir, "captured-puzzles.json");
       const payload = {
         generatedAt: new Date().toISOString(),
-        config: { N, budget: BUDGET, digits: DIGITS, limit: LIMIT },
+        config: {
+          N,
+          budget: BUDGET,
+          digits: DIGITS,
+          limit: LIMIT,
+          firstGuess: FIRST_GUESS,
+          necessaryMin:
+            NECESSARY_MIN === -1 ? "all" : (NECESSARY_MIN as number),
+          idTag: ID_TAG,
+        },
         criteria: {
           uniqueCandidate: true,
           minUnknownSlots: 2,
-          allCluesNecessary: true,
+          necessaryMin: NECESSARY_MIN === -1 ? "all" : NECESSARY_MIN,
         },
         totals: {
           captured: allCaptures.length,
@@ -804,8 +882,9 @@ describe.skipIf(!runSim)("puzzle-mining simulation", () => {
         },
         puzzles: trimmed,
       };
-      fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
-      console.log(`\nWrote ${trimmed.length} puzzles to ${outPath}`);
+      fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
+      fs.writeFileSync(OUT_PATH, JSON.stringify(payload, null, 2));
+      console.log(`\nWrote ${trimmed.length} puzzles to ${OUT_PATH}`);
 
       // Smoke assertions: the sim should be producing both some wins and
       // some captures. If either is zero, something is broken upstream.
