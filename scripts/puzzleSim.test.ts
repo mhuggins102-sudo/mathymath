@@ -1,0 +1,816 @@
+/**
+ * Puzzle-mining simulator.
+ *
+ * Plays N games with a greedy info-maximizing solver. After each clue
+ * resolves, evaluates the prefix-history and captures it as a puzzle
+ * template iff:
+ *
+ *   1. The candidate pool has narrowed to exactly 1 (target uniquely
+ *      determined → next guess is guaranteed correct).
+ *   2. At least 2 digit slots remain UNCERTAIN (the player can't read
+ *      the answer off bullseyes / oracle / higher-lower equality —
+ *      multiple slots have to be deduced from compositional clues).
+ *   3. Every clue in the history is necessary — removing any single
+ *      one would leave > 1 candidate. No redundant clues; the player
+ *      must combine all of them to converge on the target.
+ *
+ * Output:
+ *   - Writes captured puzzles (sorted by interestingness) to
+ *     `scripts/captured-puzzles.json`.
+ *   - Prints summary stats and a preview of the top puzzles to stdout.
+ *
+ * Invoke:
+ *   pnpm puzzleSim                          # defaults: N=2000
+ *   PUZZLE_SIM_N=500 pnpm puzzleSim
+ *   PUZZLE_SIM_LIMIT=200 pnpm puzzleSim     # cap captured puzzles in JSON
+ */
+import { describe, it, expect } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { CLUES, getClueById } from "@/lib/game/clues/registry";
+import { seededRng } from "@/lib/game/seededRng";
+import {
+  generateDailyTarget,
+  isDegenerateTarget,
+} from "@/lib/game/targetGenerator";
+import type {
+  Clue,
+  ClueId,
+  ClueResult,
+  ClueComputeContext,
+} from "@/lib/game/clues/types";
+import { directionRuns } from "@/lib/game/clues/upsAndDowns";
+import { medianValue } from "@/lib/game/clues/median";
+
+const DIGITS = 5;
+
+// ---------------------------------------------------------------------------
+// Candidate pool
+// ---------------------------------------------------------------------------
+
+function allCandidates(): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < 10 ** DIGITS; i++) {
+    const s = String(i).padStart(DIGITS, "0");
+    if (!isDegenerateTarget(s)) out.push(s);
+  }
+  return out;
+}
+const ALL = allCandidates();
+
+// ---------------------------------------------------------------------------
+// targetMatchesResult — hand-coded matcher per clue kind. Uses the result's
+// own fields (not a recompute-and-key-compare) so candidates aren't
+// accidentally pruned by seeded-RNG drift on clues whose params depend on
+// the target (oracle, containsDigit, divisibleBy).
+// ---------------------------------------------------------------------------
+
+function digitSum(s: string): number {
+  let n = 0;
+  for (const ch of s) n += +ch;
+  return n;
+}
+function digitRange(s: string): number {
+  const ds = [...s].map(Number);
+  return Math.max(...ds) - Math.min(...ds);
+}
+function evenCount(s: string): number {
+  let n = 0;
+  for (const ch of s) if (+ch % 2 === 0) n++;
+  return n;
+}
+const PRIMES = new Set([2, 3, 5, 7]);
+function primeCount(s: string): number {
+  let n = 0;
+  for (const ch of s) if (PRIMES.has(+ch)) n++;
+  return n;
+}
+function diceCount(s: string): number {
+  let n = 0;
+  for (const ch of s) {
+    const d = +ch;
+    if (d >= 1 && d <= 6) n++;
+  }
+  return n;
+}
+function digitOverlap(guess: string, target: string): number {
+  const remaining = new Array(10).fill(0);
+  for (const ch of target) remaining[+ch]++;
+  let count = 0;
+  for (const ch of guess) {
+    const d = +ch;
+    if (remaining[d] > 0) {
+      count++;
+      remaining[d]--;
+    }
+  }
+  return count;
+}
+function thermometerTier(diff: number): number {
+  const d = Math.abs(diff);
+  if (d === 0) return 0;
+  if (d <= 2) return 1;
+  if (d <= 4) return 2;
+  return 3;
+}
+function totalDeviation(guess: string, target: string): number {
+  let v = 0;
+  for (let i = 0; i < guess.length; i++) v += Math.abs(+guess[i] - +target[i]);
+  return v;
+}
+
+const DIVISIBLE_BY_DIVISORS = [2, 3, 4, 5, 6, 7, 8, 9];
+
+function targetMatchesResult(
+  target: string,
+  guess: string,
+  result: ClueResult,
+): boolean {
+  switch (result.kind) {
+    case "bullseyes":
+      for (let i = 0; i < target.length; i++) {
+        if ((target[i] === guess[i]) !== result.hits[i]) return false;
+      }
+      return true;
+    case "higherLower":
+      for (let i = 0; i < target.length; i++) {
+        const t = +target[i],
+          g = +guess[i];
+        const c = result.cmp[i];
+        if (c === "eq" && t !== g) return false;
+        if (c === "lt" && !(t < g)) return false;
+        if (c === "gt" && !(t > g)) return false;
+      }
+      return true;
+    case "within2":
+      for (let i = 0; i < target.length; i++) {
+        const diff = Math.abs(+target[i] - +guess[i]);
+        if ((diff <= 2) !== result.mask[i]) return false;
+        if (result.exact && (diff === 0) !== result.exact[i]) return false;
+      }
+      return true;
+    case "parityMask":
+      for (let i = 0; i < target.length; i++) {
+        const tEven = +target[i] % 2 === 0;
+        const gEven = +guess[i] % 2 === 0;
+        if ((tEven === gEven) !== result.matches[i]) return false;
+      }
+      return true;
+    case "oracle":
+      return target[result.slot] === String(result.digit);
+    case "thermometer":
+      for (let i = 0; i < target.length; i++) {
+        if (thermometerTier(+target[i] - +guess[i]) !== result.tier[i]) {
+          return false;
+        }
+      }
+      return true;
+    case "sumDelta":
+      return digitSum(target) - digitSum(guess) === result.delta;
+    case "digitOverlap":
+      return digitOverlap(guess, target) === result.count;
+    case "parityBalance": {
+      const t = evenCount(target);
+      const g = evenCount(guess);
+      if (result.cmp === "eq") return t === g;
+      if (result.cmp === "gt") return t > g;
+      return t < g;
+    }
+    case "primeCount": {
+      const t = primeCount(target);
+      const g = primeCount(guess);
+      if (result.cmp === "eq") return t === g;
+      if (result.cmp === "gt") return t > g;
+      return t < g;
+    }
+    case "rangeCompare": {
+      const t = digitRange(target);
+      const g = digitRange(guess);
+      if (result.cmp === "eq") return t === g;
+      if (result.cmp === "gt") return t > g;
+      return t < g;
+    }
+    case "containsDigit":
+      return target.includes(String(result.digit)) === result.present;
+    case "distinctDigits":
+      return new Set(target).size === result.count;
+    case "median": {
+      const t = medianValue(target);
+      const g = medianValue(guess);
+      if (result.cmp === "eq") return t === g;
+      if (result.cmp === "gt") return t > g;
+      return t < g;
+    }
+    case "divisibleBy":
+      if (result.present && result.divisor !== null) {
+        return Number(target) % result.divisor === 0;
+      }
+      // present === false: target is divisible by NONE of 2..9
+      return DIVISIBLE_BY_DIVISORS.every((d) => Number(target) % d !== 0);
+    case "totalDeviation":
+      return totalDeviation(guess, target) === result.value;
+    case "diceCount": {
+      const t = diceCount(target);
+      const g = diceCount(guess);
+      if (result.cmp === "eq") return t === g;
+      if (result.cmp === "gt") return t > g;
+      return t < g;
+    }
+    case "upsAndDowns": {
+      const t = directionRuns(target);
+      const g = directionRuns(guess);
+      if (result.cmp === "eq") return t === g;
+      if (result.cmp === "gt") return t > g;
+      return t < g;
+    }
+    case "extraLock":
+    case "clueReuse":
+      // No target-info clues — every candidate is consistent.
+      return true;
+  }
+}
+
+function filterCandidates(
+  candidates: readonly string[],
+  guess: string,
+  result: ClueResult,
+): string[] {
+  const out: string[] = [];
+  for (const t of candidates) {
+    if (targetMatchesResult(t, guess, result)) out.push(t);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Greedy solver — picks the offered clue (and any param) that minimizes the
+// expected remaining candidate count.
+// ---------------------------------------------------------------------------
+
+function bucketKey(result: ClueResult): string {
+  // Stringify the result deterministically. We only call this on results
+  // produced by clue.compute (so all fields populated).
+  return JSON.stringify(result);
+}
+
+function expectedRemaining(
+  candidates: readonly string[],
+  guess: string,
+  clue: Clue,
+  context?: ClueComputeContext,
+): number {
+  const buckets = new Map<string, number>();
+  for (const t of candidates) {
+    const r = clue.compute(guess, t, context);
+    const k = bucketKey(r);
+    buckets.set(k, (buckets.get(k) ?? 0) + 1);
+  }
+  let s = 0;
+  for (const v of buckets.values()) s += v * v;
+  return s / candidates.length;
+}
+
+interface PickedClue {
+  clueId: ClueId;
+  result: ClueResult;
+  context: ClueComputeContext;
+}
+
+function bestParamForClue(
+  candidates: readonly string[],
+  guess: string,
+  clue: Clue,
+  knownSlots: readonly number[],
+): ClueComputeContext {
+  if (clue.paramKind === "slot") {
+    let bestSlot = 0;
+    let bestExp = Infinity;
+    const known = new Set(knownSlots);
+    for (let s = 0; s < DIGITS; s++) {
+      if (known.has(s)) continue;
+      const exp = expectedRemaining(candidates, guess, clue, {
+        selectedSlot: s,
+      });
+      if (exp < bestExp) {
+        bestExp = exp;
+        bestSlot = s;
+      }
+    }
+    return { selectedSlot: bestSlot };
+  }
+  if (clue.paramKind === "digit") {
+    let bestDigit = 0;
+    let bestExp = Infinity;
+    for (let d = 0; d < 10; d++) {
+      const exp = expectedRemaining(candidates, guess, clue, {
+        selectedDigit: d,
+      });
+      if (exp < bestExp) {
+        bestExp = exp;
+        bestDigit = d;
+      }
+    }
+    return { selectedDigit: bestDigit };
+  }
+  return {};
+}
+
+function pickBestOffered(
+  candidates: readonly string[],
+  guess: string,
+  options: readonly Clue[],
+  knownSlots: readonly number[],
+): { idx: number; context: ClueComputeContext; expected: number } {
+  let bestIdx = 0;
+  let bestExp = Infinity;
+  let bestCtx: ClueComputeContext = {};
+  for (let i = 0; i < options.length; i++) {
+    const ctx = bestParamForClue(candidates, guess, options[i], knownSlots);
+    const exp = expectedRemaining(candidates, guess, options[i], ctx);
+    if (exp < bestExp) {
+      bestExp = exp;
+      bestIdx = i;
+      bestCtx = ctx;
+    }
+  }
+  return { idx: bestIdx, context: bestCtx, expected: bestExp };
+}
+
+// ---------------------------------------------------------------------------
+// Deck — same shape as the standard deck_1p1c, but excludes special clues
+// (extraLock, clueReuse) since they don't fit the deduction-puzzle model.
+// ---------------------------------------------------------------------------
+
+function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+const DECK_CLUES = CLUES.filter((c) => c.category !== "special");
+const POSITIONAL_IDS = DECK_CLUES.filter((c) => c.category === "positional").map(
+  (c) => c.id,
+);
+const COMP_IDS = DECK_CLUES.filter((c) => c.category === "compositional").map(
+  (c) => c.id,
+);
+
+function buildPuzzleDeck(seed: string): ClueId[] {
+  const rngP = seededRng(`puzP:${seed}`);
+  const shuffledP = fisherYates(POSITIONAL_IDS, rngP);
+  const rngC = seededRng(`puzC:${seed}`);
+  const shuffledC = fisherYates(COMP_IDS, rngC);
+  const rngPair = seededRng(`puzPair:${seed}`);
+  const pair1 = fisherYates([shuffledP[0], shuffledC[0]], rngPair);
+  const rngRest = seededRng(`puzRest:${seed}`);
+  const rest = fisherYates(
+    [...shuffledP.slice(1), ...shuffledC.slice(1)],
+    rngRest,
+  );
+  return [...pair1, ...rest];
+}
+
+// ---------------------------------------------------------------------------
+// Per-slot certainty (mirrors lib/game/certain.ts but local — avoids
+// importing the full lock-aware version).
+// ---------------------------------------------------------------------------
+
+function certainSlots(
+  history: readonly { guess: string; result: ClueResult }[],
+): boolean[] {
+  const out: boolean[] = new Array(DIGITS).fill(false);
+  for (const g of history) {
+    const r = g.result;
+    switch (r.kind) {
+      case "bullseyes":
+        for (let i = 0; i < DIGITS; i++) if (r.hits[i]) out[i] = true;
+        break;
+      case "higherLower":
+        for (let i = 0; i < DIGITS; i++) if (r.cmp[i] === "eq") out[i] = true;
+        break;
+      case "within2":
+        if (r.exact) {
+          for (let i = 0; i < DIGITS; i++) if (r.exact[i]) out[i] = true;
+        }
+        break;
+      case "thermometer":
+        for (let i = 0; i < DIGITS; i++) if (r.tier[i] === 0) out[i] = true;
+        break;
+      case "oracle":
+        if (r.slot >= 0 && r.slot < DIGITS) out[r.slot] = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
+function knownSlotIndices(certain: readonly boolean[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < certain.length; i++) if (certain[i]) out.push(i);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Capture model
+// ---------------------------------------------------------------------------
+
+interface CapturedGuess {
+  guess: string;
+  clueId: ClueId;
+  result: ClueResult;
+}
+
+interface CapturedPuzzle {
+  /** game seed + capture round, e.g. "sim-42@3" (after 3 clues). */
+  id: string;
+  digits: number;
+  target: string;
+  guesses: CapturedGuess[];
+  /** Unknown-slot count at capture time — higher = more digits to deduce. */
+  unknownSlots: number;
+  /** Candidate-pool size BEFORE the final clue was applied. Bigger means
+   *  the final clue had more work to do; smaller means the deduction
+   *  was already mostly converged when the last clue landed. */
+  candidatesBeforeFinal: number;
+  /** Per-clue "leave-one-out" candidate counts. Each entry is the size
+   *  of the candidate pool you'd be left with if that clue's info were
+   *  removed. All entries are > 1 (otherwise the puzzle wouldn't have
+   *  passed the "all clues necessary" filter). */
+  looCandidates: number[];
+  /** Sum-of-products score: more digits to deduce + bigger LOO counts =
+   *  more interesting. Used to sort the captured set. */
+  interest: number;
+}
+
+interface PuzzleEvalResult {
+  /** True iff this prefix passes all three capture criteria. */
+  capture: boolean;
+  unknownSlots: number;
+  looCandidates: number[];
+}
+
+function evalPrefix(
+  target: string,
+  history: readonly CapturedGuess[],
+): PuzzleEvalResult | null {
+  if (history.length < 2) return null;
+  // The player knows their prior guesses were wrong (they didn't win),
+  // so subtract them from the candidate pool before counting.
+  const guessed = new Set(history.map((g) => g.guess));
+
+  // 1. Candidate pool narrowed to exactly 1.
+  let candidates: string[] = ALL.filter((c) => !guessed.has(c));
+  for (const g of history) {
+    candidates = filterCandidates(candidates, g.guess, g.result);
+  }
+  if (candidates.length !== 1) return null;
+  if (candidates[0] !== target) return null; // sanity
+
+  // 2. ≥ 2 unknown slots (otherwise the deduction is reading the answer
+  //    off bullseyes/oracle/etc.).
+  const certain = certainSlots(history);
+  const unknown = certain.filter((c) => !c).length;
+  if (unknown < 2) return null;
+
+  // 3. Every clue is necessary.
+  const looCandidates: number[] = [];
+  for (let skip = 0; skip < history.length; skip++) {
+    let cands: string[] = ALL.filter((c) => !guessed.has(c));
+    for (let i = 0; i < history.length; i++) {
+      if (i === skip) continue;
+      cands = filterCandidates(cands, history[i].guess, history[i].result);
+    }
+    if (cands.length <= 1) {
+      // Skipping clue `skip` still leaves ≤ 1 candidate → that clue was
+      // redundant. Reject the prefix.
+      return { capture: false, unknownSlots: unknown, looCandidates: [] };
+    }
+    looCandidates.push(cands.length);
+  }
+  return { capture: true, unknownSlots: unknown, looCandidates };
+}
+
+// ---------------------------------------------------------------------------
+// playOne — runs one game with greedy strategy, captures every prefix that
+// qualifies as a puzzle template.
+// ---------------------------------------------------------------------------
+
+interface PlayResult {
+  won: boolean;
+  guessCount: number;
+  captures: CapturedPuzzle[];
+}
+
+function playOne(
+  target: string,
+  seed: string,
+  budget: number,
+): PlayResult {
+  const deck = buildPuzzleDeck(seed);
+  let candidates = ALL.slice();
+  const chosen: ClueId[] = [];
+  const history: CapturedGuess[] = [];
+  const out: PlayResult = { won: false, guessCount: 0, captures: [] };
+
+  for (let g = 0; g < budget; g++) {
+    const guess = candidates[0];
+    out.guessCount += 1;
+    if (guess === target) {
+      out.won = true;
+      return out;
+    }
+    if (g + 1 >= budget) return out;
+
+    // Read next pair off the deck. Skip any clue we've already chosen.
+    const base = g * 2;
+    const offered: Clue[] = [];
+    for (let i = base; i < deck.length && offered.length < 2; i++) {
+      const id = deck[i];
+      if (chosen.includes(id)) continue;
+      offered.push(getClueById(id));
+    }
+    if (offered.length < 2) {
+      // Backfill from any unused id (shouldn't happen at budget ≤ 6).
+      for (const id of deck) {
+        if (offered.length === 2) break;
+        if (chosen.includes(id)) continue;
+        if (offered.some((c) => c.id === id)) continue;
+        offered.push(getClueById(id));
+      }
+    }
+
+    const certain = certainSlots(history);
+    const known = knownSlotIndices(certain);
+    const { idx, context } = pickBestOffered(candidates, guess, offered, known);
+    const pick = offered[idx];
+    chosen.push(pick.id);
+
+    const result = pick.compute(guess, target, context);
+    history.push({ guess, clueId: pick.id, result });
+    candidates = filterCandidates(candidates, guess, result);
+    // The just-submitted guess is known wrong (we didn't win above), so
+    // a real player would prune it from their candidate set. Without
+    // this, the next round can re-guess the same number.
+    candidates = candidates.filter((c) => c !== guess);
+
+    // Evaluate the prefix at every step ≥ 2 clues. Cheap enough at the
+    // candidate sizes we see in practice (post-clue-2 the pool is
+    // usually small).
+    if (history.length >= 2) {
+      const evalRes = evalPrefix(target, history);
+      if (evalRes && evalRes.capture) {
+        const looSum = evalRes.looCandidates.reduce(
+          (s, x) => s + Math.log2(x),
+          0,
+        );
+        const interest = evalRes.unknownSlots * 10 + looSum;
+        out.captures.push({
+          id: `${seed}@${history.length}`,
+          digits: DIGITS,
+          target,
+          guesses: history.map((h) => ({ ...h })),
+          unknownSlots: evalRes.unknownSlots,
+          candidatesBeforeFinal: -1, // filled below
+          looCandidates: evalRes.looCandidates,
+          interest,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+// Fill in `candidatesBeforeFinal` for each capture by replaying its history
+// up to the second-to-last guess. Done as a post-step so playOne itself
+// stays linear-ish.
+function annotateCandidatesBeforeFinal(captures: CapturedPuzzle[]): void {
+  for (const c of captures) {
+    const guessedBeforeFinal = new Set(
+      c.guesses.slice(0, -1).map((g) => g.guess),
+    );
+    let cands: string[] = ALL.filter((x) => !guessedBeforeFinal.has(x));
+    for (let i = 0; i < c.guesses.length - 1; i++) {
+      cands = filterCandidates(cands, c.guesses[i].guess, c.guesses[i].result);
+    }
+    c.candidatesBeforeFinal = cands.length;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Render helpers (for stdout preview)
+// ---------------------------------------------------------------------------
+
+function renderResult(result: ClueResult): string {
+  switch (result.kind) {
+    case "bullseyes":
+      return "hits=[" + result.hits.map((h) => (h ? "✓" : "·")).join("") + "]";
+    case "higherLower":
+      return (
+        "cmp=[" +
+        result.cmp
+          .map((c) => (c === "eq" ? "=" : c === "gt" ? "↑" : "↓"))
+          .join("") +
+        "]"
+      );
+    case "within2": {
+      const cells = result.mask.map((m, i) => {
+        const isExact = result.exact?.[i] ?? false;
+        return isExact ? "✓" : m ? "Y" : "·";
+      });
+      return "mask=[" + cells.join("") + "]";
+    }
+    case "parityMask":
+      return (
+        "matches=[" +
+        result.matches.map((m) => (m ? "Y" : "·")).join("") +
+        "]"
+      );
+    case "oracle":
+      return `slot=${result.slot} digit=${result.digit}`;
+    case "thermometer":
+      return "tier=[" + result.tier.join("") + "]";
+    case "sumDelta":
+      return `delta=${result.delta >= 0 ? "+" : ""}${result.delta}`;
+    case "digitOverlap":
+      return `count=${result.count}`;
+    case "parityBalance":
+      return `target ${result.cmp} guess`;
+    case "primeCount":
+      return `target ${result.cmp} guess`;
+    case "rangeCompare":
+      return `target ${result.cmp} guess`;
+    case "containsDigit":
+      return `digit=${result.digit} present=${result.present}`;
+    case "distinctDigits":
+      return `count=${result.count}`;
+    case "median":
+      return `target ${result.cmp} guess`;
+    case "divisibleBy":
+      return result.present
+        ? `divisor=${result.divisor}`
+        : `no divisor 2-9`;
+    case "totalDeviation":
+      return `value=${result.value}`;
+    case "diceCount":
+      return `target ${result.cmp} guess`;
+    case "upsAndDowns":
+      return `target ${result.cmp} guess`;
+    case "extraLock":
+      return "(extraLock)";
+    case "clueReuse":
+      return "(reuse)";
+  }
+}
+
+function renderPuzzle(p: CapturedPuzzle): string {
+  const lines: string[] = [];
+  lines.push(
+    `  [${p.id}] target=${p.target}  unknown=${p.unknownSlots}  beforeFinal=${p.candidatesBeforeFinal}  loo=[${p.looCandidates.join(",")}]  interest=${p.interest.toFixed(1)}`,
+  );
+  for (let i = 0; i < p.guesses.length; i++) {
+    const g = p.guesses[i];
+    lines.push(
+      `      ${i + 1}. guess=${g.guess}  clue=${g.clueId.padEnd(15)}  ${renderResult(g.result)}`,
+    );
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Driver
+// ---------------------------------------------------------------------------
+
+const runSim = process.env.RUN_PUZZLE_SIM === "1";
+
+describe.skipIf(!runSim)("puzzle-mining simulation", () => {
+  it(
+    "captures puzzle states with guaranteed next-guess solutions",
+    { timeout: 1_200_000 },
+    () => {
+      const N = Number(process.env.PUZZLE_SIM_N ?? 2000);
+      const BUDGET = Number(process.env.PUZZLE_SIM_BUDGET ?? 6);
+      const LIMIT = Number(process.env.PUZZLE_SIM_LIMIT ?? 500);
+
+      console.log(
+        `\nMining puzzles: N=${N}  budget=${BUDGET}  output cap=${LIMIT}`,
+      );
+      console.log(
+        `Candidate pool (post-degenerate-filter): ${ALL.length} / 100000`,
+      );
+      console.log(
+        `Deck clues (positional + compositional, no special): ${DECK_CLUES.length}`,
+      );
+
+      const allCaptures: CapturedPuzzle[] = [];
+      let wins = 0;
+      let totalGuesses = 0;
+
+      const t0 = Date.now();
+      for (let i = 0; i < N; i++) {
+        const seed = `puzzle-${i}`;
+        const target = generateDailyTarget(seed, DIGITS);
+        const r = playOne(target, seed, BUDGET);
+        if (r.won) wins++;
+        totalGuesses += r.guessCount;
+        allCaptures.push(...r.captures);
+
+        if ((i + 1) % 100 === 0) {
+          const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+          console.log(
+            `  ${i + 1}/${N}  captures so far: ${allCaptures.length}  (${elapsed}s)`,
+          );
+        }
+      }
+
+      annotateCandidatesBeforeFinal(allCaptures);
+
+      // Sort by: more unknown slots first, then larger candidatesBeforeFinal
+      // (the final clue had more work), then larger LOO sum (more
+      // interdependent clues).
+      allCaptures.sort((a, b) => {
+        if (b.unknownSlots !== a.unknownSlots) {
+          return b.unknownSlots - a.unknownSlots;
+        }
+        if (b.candidatesBeforeFinal !== a.candidatesBeforeFinal) {
+          return b.candidatesBeforeFinal - a.candidatesBeforeFinal;
+        }
+        return b.interest - a.interest;
+      });
+
+      const trimmed = allCaptures.slice(0, LIMIT);
+
+      // Distribution stats.
+      const byUnknown: Record<number, number> = {};
+      const byClueCount: Record<number, number> = {};
+      for (const c of allCaptures) {
+        byUnknown[c.unknownSlots] = (byUnknown[c.unknownSlots] ?? 0) + 1;
+        byClueCount[c.guesses.length] =
+          (byClueCount[c.guesses.length] ?? 0) + 1;
+      }
+
+      console.log(`\n--- summary ---`);
+      console.log(`games:                ${N}`);
+      console.log(
+        `wins:                 ${wins} (${((wins / N) * 100).toFixed(1)}%)`,
+      );
+      console.log(
+        `mean guesses/game:    ${(totalGuesses / N).toFixed(2)}`,
+      );
+      console.log(`captured puzzles:     ${allCaptures.length}`);
+      console.log(
+        `captures per game:    ${(allCaptures.length / N).toFixed(2)}`,
+      );
+      console.log(`written to JSON:      ${trimmed.length}`);
+      console.log(`\nunknown-slot distribution:`);
+      for (const k of Object.keys(byUnknown).sort()) {
+        const n = byUnknown[Number(k)];
+        const bar = "█".repeat(Math.round((n / allCaptures.length) * 40));
+        console.log(`  ${k} unknown: ${String(n).padStart(5)} ${bar}`);
+      }
+      console.log(`\nclue-count distribution:`);
+      for (const k of Object.keys(byClueCount).sort()) {
+        const n = byClueCount[Number(k)];
+        const bar = "█".repeat(Math.round((n / allCaptures.length) * 40));
+        console.log(`  ${k} clues:   ${String(n).padStart(5)} ${bar}`);
+      }
+
+      console.log(
+        `\n--- top ${Math.min(15, trimmed.length)} captured puzzles ---`,
+      );
+      for (let i = 0; i < Math.min(15, trimmed.length); i++) {
+        console.log(renderPuzzle(trimmed[i]));
+      }
+
+      // Write output JSON.
+      const outDir = path.dirname(__filename);
+      const outPath = path.join(outDir, "captured-puzzles.json");
+      const payload = {
+        generatedAt: new Date().toISOString(),
+        config: { N, budget: BUDGET, digits: DIGITS, limit: LIMIT },
+        criteria: {
+          uniqueCandidate: true,
+          minUnknownSlots: 2,
+          allCluesNecessary: true,
+        },
+        totals: {
+          captured: allCaptures.length,
+          wins,
+          games: N,
+        },
+        puzzles: trimmed,
+      };
+      fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
+      console.log(`\nWrote ${trimmed.length} puzzles to ${outPath}`);
+
+      // Smoke assertions: the sim should be producing both some wins and
+      // some captures. If either is zero, something is broken upstream.
+      expect(wins).toBeGreaterThan(0);
+      expect(allCaptures.length).toBeGreaterThan(0);
+    },
+  );
+});
