@@ -42,6 +42,15 @@ interface GuessRowProps {
    *  state, mirroring how a literal correct guess renders. Requires
    *  `certainDigits` to carry the full target. */
   winRow?: boolean;
+  /** Preselected-clues mode: the clue assigned to this row (visible
+   *  before the player guesses). Renders the clue's name in the label
+   *  slot. The tap-to-explain popover is suppressed until the row
+   *  resolves so the player can't peek at the clue's behavior in
+   *  advance. */
+  upcomingClue?: Clue | null;
+  /** Marks this row as the next one to be filled in preselected mode.
+   *  Adds a subtle highlight so the player can find their place. */
+  nextUp?: boolean;
 }
 
 /** Per-slot color state derived from the clue result. */
@@ -324,6 +333,8 @@ export function GuessRow({
   onTapCell,
   compact = false,
   winRow = false,
+  upcomingClue,
+  nextUp,
 }: GuessRowProps) {
   // ---------------------------------------------------------------
   // Project a per-cell view for each render mode:
@@ -445,6 +456,25 @@ export function GuessRow({
       : null;
 
   const labelSlot = (() => {
+    // Preselected-clues mode: when an upcomingClue is pinned to this
+    // row but it hasn't resolved yet, show just the clue NAME (no
+    // result subtext, no popover button — the player isn't supposed
+    // to peek at behavior before triggering it).
+    if (!result && upcomingClue) {
+      return (
+        <div className="flex flex-col justify-center text-left min-w-0 h-full">
+          <span
+            className={`text-[12px] sm:text-[13px] truncate leading-tight ${
+              nextUp
+                ? "font-bold text-accent"
+                : "font-semibold text-muted"
+            }`}
+          >
+            {upcomingClue.name}
+          </span>
+        </div>
+      );
+    }
     if (pending && !result)
       return (
         <div className="flex h-full items-center justify-start">

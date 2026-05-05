@@ -9,7 +9,7 @@ import {
   initGameState,
   reduce,
 } from "@/lib/game/stateMachine";
-import type { ClueParam } from "@/lib/game/clues/types";
+import type { ClueId, ClueParam } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { validateGuess } from "@/lib/game/validator";
 import {
@@ -48,6 +48,9 @@ export interface UseGameConfig {
   /** "Advanced" rules: cap positional clues at 2 per game. Captured on
    *  game start; mid-game flips don't affect the in-progress reducer. */
   advancedMode?: boolean;
+  /** "Preselected Clues" mode: the deck is dealt up-front; no chooser,
+   *  no redraw. Captured on game start; mid-game flips don't apply. */
+  preselectedClues?: boolean;
 }
 
 export interface UseGameResult {
@@ -86,6 +89,11 @@ export interface UseGameResult {
   } | null;
   /** Whether the game is being played under advanced rules. */
   advancedMode: boolean;
+  /** True when "Preselected Clues" mode is active for this game. */
+  preselectedMode: boolean;
+  /** The pre-dealt clue ids (one per non-final guess) or null when
+   *  preselected mode is off. Stable across the game once set. */
+  preselectedDeck: readonly ClueId[] | null;
   /** Effective positional uses so far (direct + Clue-Reuse-of-positional).
    *  Always populated; UI can decide whether to surface it based on
    *  `advancedMode`. */
@@ -142,6 +150,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       digits: config.digits,
       maxGuesses: config.maxGuesses ?? DEFAULT_MAX_GUESSES,
       advancedMode: config.advancedMode,
+      preselectedClues: config.preselectedClues,
     }),
   );
 
@@ -589,12 +598,29 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setPendingClueParam(null);
   }, []);
 
+  // Preselected mode: when SUBMIT_GUESS lands on a paramKind clue
+  // (oracle / containsDigit), the reducer parks pendingGuess and the
+  // chooser UI is suppressed. This effect routes the player straight
+  // into the param picker so they don't see a stuck "pending" row.
+  useEffect(() => {
+    if (!state.preselectedDeck) return;
+    if (!state.pendingGuess) return;
+    if (pendingClueParam) return;
+    const clue = state.pendingGuess.options[0];
+    if (clue.paramKind) {
+      setPendingClueParam({ clueId: clue.id, paramKind: clue.paramKind });
+    }
+  }, [state.preselectedDeck, state.pendingGuess, pendingClueParam]);
+
   // Redraw: burn a lock to discard the current pair and advance the
   // deck. locksAvailableCount above already subtracts this turn's
   // pending locks and prior redraws when a guess is pending, so a
   // positive budget is sufficient to afford one more redraw.
   const canRedraw =
-    !!state.pendingGuess && !pendingClueParam && locksAvailableCount > 0;
+    !!state.pendingGuess &&
+    !pendingClueParam &&
+    locksAvailableCount > 0 &&
+    !state.preselectedDeck;
 
   const redraw = useCallback(() => {
     if (!canRedraw) return;
@@ -612,11 +638,18 @@ export function useGame(config: UseGameConfig): UseGameResult {
         digits: config.digits,
         maxGuesses: config.maxGuesses,
         advancedMode: config.advancedMode,
+        preselectedClues: config.preselectedClues,
       });
       setInput("");
       setError(null);
     },
-    [config.storageKey, config.digits, config.maxGuesses, config.advancedMode],
+    [
+      config.storageKey,
+      config.digits,
+      config.maxGuesses,
+      config.advancedMode,
+      config.preselectedClues,
+    ],
   );
 
   return {
@@ -635,6 +668,8 @@ export function useGame(config: UseGameConfig): UseGameResult {
     unlockMode,
     pendingClueParam,
     advancedMode: state.advancedMode,
+    preselectedMode: state.preselectedDeck !== null,
+    preselectedDeck: state.preselectedDeck,
     effectivePositionalCount,
     advancedPositionalCap: ADVANCED_POSITIONAL_CAP,
     usedPositionalClueIds,

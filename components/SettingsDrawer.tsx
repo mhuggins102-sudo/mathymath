@@ -46,6 +46,12 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
             onChange={(v) => setSetting("advancedMode", v)}
           />
           <Toggle
+            label="Preselected Clues"
+            description="Show all 6 clues in advance, one per upcoming guess — no chooser. Locks are only used to pin a digit (no redraw, no Clue Reuse). With Advanced off, turn 1 is positional and the rest are random non-special. With Advanced on, the deck follows advanced rules: ≤ 2 positional anywhere in the 6, no positional guarantee on turn 1."
+            value={settings.preselectedClues}
+            onChange={(v) => setSetting("preselectedClues", v)}
+          />
+          <Toggle
             label="Colorblind palette"
             description="Use blue/orange instead of red/green so positional clue colors are distinguishable with common forms of color vision deficiency."
             value={settings.colorblind}

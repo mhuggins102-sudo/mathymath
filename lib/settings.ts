@@ -11,6 +11,13 @@ const settingsSchema = z.object({
    *  non-positional clues. Daily play is unaffected — the daily puzzle
    *  always uses the standard ruleset so leaderboards stay comparable. */
   advancedMode: z.boolean().default(false),
+  /** Unlimited-mode "Preselected Clues" mode: the game deals 6 clues
+   *  up-front, one per guess. The clue chooser, redraw, and Clue Reuse
+   *  are disabled; locks are only used to pin a digit. When advancedMode
+   *  is also on, the deck follows advanced rules (≤ 2 positional, no
+   *  positional guarantee on turn 1). When off, the deck guarantees a
+   *  positional clue on turn 1 and the rest are random non-special. */
+  preselectedClues: z.boolean().default(false),
   colorblind: z.boolean().default(false),
 });
 
@@ -19,7 +26,12 @@ export type Settings = z.infer<typeof settingsSchema>;
 const KEY = "mathymath:settings";
 
 export function defaultSettings(): Settings {
-  return { version: 1, advancedMode: false, colorblind: false };
+  return {
+    version: 1,
+    advancedMode: false,
+    preselectedClues: false,
+    colorblind: false,
+  };
 }
 
 export function loadSettings(): Settings {

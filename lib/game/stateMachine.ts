@@ -2,6 +2,7 @@ import type { Clue, ClueId, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
 import {
   advancedPositionalCapReached,
+  buildPreselectedDeck,
   pickTwoClues,
 } from "./clueSelector";
 import { deriveCertainDigits, knownSlotsFromHistory } from "./certain";
@@ -74,9 +75,17 @@ export interface GameState {
    *  during a game don't affect the in-progress reducer — only the next
    *  RESET picks up the new flag. Daily mode never enables this. */
   advancedMode: boolean;
+  /** Pre-dealt clue deck for "Preselected Clues" mode. When non-null,
+   *  guess N consumes deck[N] — no chooser, no redraw. Length is
+   *  maxGuesses-1 (the final guess gets no clue). null in normal mode. */
+  preselectedDeck: ClueId[] | null;
   /** Current pending guess waiting for the player to choose a clue.
    *  `locks` travels with the pending guess so the chosen clue handler
-   *  can append them to the resolved history alongside the clue result. */
+   *  can append them to the resolved history alongside the clue result.
+   *  In preselected mode, this is only set when the pre-assigned clue
+   *  has a paramKind (oracle / containsDigit) — `options` is then
+   *  `[clue, clue]` (the same clue twice) so existing consumers work
+   *  unchanged; the chooser UI is suppressed. */
   pendingGuess: {
     guess: string;
     options: [Clue, Clue];
@@ -97,6 +106,7 @@ export type GameAction =
       digits?: number;
       maxGuesses?: number;
       advancedMode?: boolean;
+      preselectedClues?: boolean;
     };
 
 export function initGameState(params: {
@@ -105,16 +115,27 @@ export function initGameState(params: {
   digits?: number;
   maxGuesses?: number;
   advancedMode?: boolean;
+  preselectedClues?: boolean;
 }): GameState {
+  const maxGuesses = params.maxGuesses ?? DEFAULT_MAX_GUESSES;
+  const preselectedDeck = params.preselectedClues
+    ? buildPreselectedDeck(
+        params.seed,
+        // One clue per guess except the final one, which never gets a clue.
+        Math.max(0, maxGuesses - 1),
+        params.advancedMode ?? false,
+      )
+    : null;
   return {
     target: params.target,
     seed: params.seed,
     digits: params.digits ?? params.target.length,
-    maxGuesses: params.maxGuesses ?? DEFAULT_MAX_GUESSES,
+    maxGuesses,
     guesses: [],
     deckOffset: 0,
     offeredClueIds: [],
     advancedMode: params.advancedMode ?? false,
+    preselectedDeck,
     pendingGuess: null,
     status: "playing",
   };
@@ -129,6 +150,7 @@ export function reduce(state: GameState, action: GameAction): GameState {
         digits: action.digits,
         maxGuesses: action.maxGuesses,
         advancedMode: action.advancedMode,
+        preselectedClues: action.preselectedClues,
       });
 
     case "SUBMIT_GUESS": {
@@ -175,6 +197,55 @@ export function reduce(state: GameState, action: GameAction): GameState {
         };
       }
 
+      // Preselected-clues mode: consume the next clue from the pre-
+      // dealt deck. No chooser. If the clue has paramKind, we set
+      // pendingGuess (with options=[clue,clue] so existing consumers
+      // see a 2-element tuple) and let the param picker run; otherwise
+      // resolve immediately and append the row.
+      if (state.preselectedDeck) {
+        const clueId = state.preselectedDeck[state.guesses.length];
+        const clue = getClueById(clueId);
+        if (clue.paramKind) {
+          return {
+            ...state,
+            offeredClueIds: appendOfferedIds(state.offeredClueIds, [clue]),
+            pendingGuess: {
+              guess: action.guess,
+              // Duplicate the clue so the [Clue, Clue] tuple shape stays
+              // valid. The chooser UI is suppressed in preselected mode
+              // so this is never actually rendered to the player.
+              options: [clue, clue],
+              redraws: 0,
+              ...(resolvedLocks.length > 0 ? { locks: resolvedLocks } : {}),
+            },
+          };
+        }
+        const knownSlots = knownSlotsFromHistory(state.guesses, state.digits);
+        const priorResults = state.guesses
+          .map((g) => g.result)
+          .filter((r): r is NonNullable<typeof r> => r !== undefined);
+        const result = clue.compute(action.guess, state.target, {
+          knownSlots,
+          priorResults,
+        });
+        const guesses = [
+          ...state.guesses,
+          {
+            guess: action.guess,
+            clueId: clue.id,
+            result,
+            ...locksField,
+          },
+        ];
+        const lost = guesses.length >= state.maxGuesses;
+        return {
+          ...state,
+          offeredClueIds: appendOfferedIds(state.offeredClueIds, [clue]),
+          guesses,
+          status: lost ? "lost" : "playing",
+        };
+      }
+
       const usedClueIds = state.guesses
         .map((g) => g.clueId)
         .filter((id): id is ClueId => id !== undefined);
@@ -205,6 +276,8 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
     case "REDRAW": {
       if (!state.pendingGuess) return state;
+      // Preselected mode has no chooser, so redraw is meaningless.
+      if (state.preselectedDeck) return state;
       // Lock budget check is the caller's responsibility (the hook
       // gates the redraw button). The reducer just advances the deck.
       const newOffset = state.deckOffset + 1;

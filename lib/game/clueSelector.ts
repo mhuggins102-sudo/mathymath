@@ -267,3 +267,63 @@ export function pickTwoClues(
 }
 
 const EMPTY_ID_SET: ReadonlySet<ClueId> = new Set();
+
+/**
+ * Pre-deals N distinct info clues for "Preselected Clues" mode (one
+ * clue per guess except the final one). Special clues — extraLock and
+ * clueReuse — are excluded from the pool: clueReuse can't function
+ * without a chooser, and extraLock would burn an info slot on a
+ * deduction-focused mode.
+ *
+ * Standard mode (advancedMode=false):
+ *   deck[0] is guaranteed positional; deck[1..N-1] are random non-special.
+ *
+ * Advanced mode (advancedMode=true):
+ *   Up to 2 positional anywhere in the deck; the remaining slots are
+ *   compositional. Final positions are shuffled so positional cards
+ *   may land at any index, including 0.
+ *
+ * Determinism: same seed produces the same deck so daily-style fairness
+ * holds within a game session.
+ */
+export function buildPreselectedDeck(
+  seed: string,
+  count: number,
+  advancedMode: boolean,
+): ClueId[] {
+  const positional = CLUES.filter((c) => c.category === "positional").map(
+    (c) => c.id,
+  );
+  const compositional = CLUES.filter((c) => c.category === "compositional").map(
+    (c) => c.id,
+  );
+
+  if (advancedMode) {
+    // Walk a shuffled deck of all info clues, taking the first `count`
+    // with at most ADVANCED_POSITIONAL_CAP positional. Then re-shuffle
+    // so positional cards aren't always front-loaded.
+    const allInfo = [...positional, ...compositional];
+    const walk = fisherYates(allInfo, seededRng(`pre:adv:walk:${seed}`));
+    const out: ClueId[] = [];
+    let posUsed = 0;
+    for (const id of walk) {
+      if (out.length === count) break;
+      const isP = POSITIONAL_CLUE_IDS.has(id);
+      if (isP) {
+        if (posUsed >= ADVANCED_POSITIONAL_CAP) continue;
+        posUsed++;
+      }
+      out.push(id);
+    }
+    return fisherYates(out, seededRng(`pre:adv:order:${seed}`));
+  }
+
+  // Standard: slot 0 positional, slots 1..N-1 random non-special.
+  const shuffledP = fisherYates(positional, seededRng(`pre:std:p:${seed}`));
+  const slot0 = shuffledP[0];
+  const rest = fisherYates(
+    [...shuffledP.slice(1), ...compositional],
+    seededRng(`pre:std:rest:${seed}`),
+  );
+  return [slot0, ...rest.slice(0, Math.max(0, count - 1))];
+}
