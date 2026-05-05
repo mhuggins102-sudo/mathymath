@@ -32,6 +32,8 @@ interface Session {
    *  effect on the in-progress game — only the next "New puzzle" picks
    *  up the new flag. */
   advancedMode: boolean;
+  /** Same capture-at-start treatment for the Preselected Clues toggle. */
+  preselectedClues: boolean;
 }
 
 /** Resolves the chosen mode to a concrete digit count for the next
@@ -53,6 +55,7 @@ function newSession(mode: UnlimitedMode): Session {
     seed: uuidv4(),
     digits,
     advancedMode: settings.advancedMode,
+    preselectedClues: settings.preselectedClues,
   };
 }
 
@@ -159,6 +162,8 @@ function UnlimitedGame({
     advancedPositionalCap,
     positionalCapReached,
     advancedReusePoolEmpty,
+    preselectedMode,
+    preselectedDeck,
   } = useGame({
     target: session.target,
     seed: session.seed,
@@ -166,6 +171,7 @@ function UnlimitedGame({
     maxGuesses,
     trackStats: true,
     advancedMode: session.advancedMode,
+    preselectedClues: session.preselectedClues,
   });
 
   const keypadDisabled = state.status !== "playing" || !!state.pendingGuess;
@@ -239,13 +245,14 @@ function UnlimitedGame({
 
       <div className="flex-1 flex flex-col">
         <GuessGrid
-          state={state}
+          state={{ ...state, maxGuesses }}
           currentInput={input}
           certainDigits={certainDigits}
           lockedSlots={lockedSlots}
           pendingLockSlot={pendingLockSlot}
           onTapCell={tapCell}
           compact={session.digits === 6}
+          preselectedDeck={preselectedDeck}
         />
 
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
@@ -282,7 +289,7 @@ function UnlimitedGame({
               }
               onCancel={cancelClueParam}
             />
-          ) : state.pendingGuess ? (
+          ) : state.pendingGuess && !preselectedMode ? (
             <>
               {/* Unlimited renders the Redraw control inside the
                   ResourceBalance row below (so it sits on the same
@@ -332,7 +339,12 @@ function UnlimitedGame({
               />
               <ResourceBalance
                 lockBalance={hintLocks}
-                advancedMode={advancedMode}
+                // Preselected mode hides the "positional X/2" indicator
+                // since the player isn't picking clues — the cap is
+                // already enforced inside the pre-dealt deck. Pass
+                // advancedMode=false to suppress that section even
+                // when advanced rules are otherwise active.
+                advancedMode={advancedMode && !preselectedMode}
                 positionalRemaining={Math.max(
                   0,
                   advancedPositionalCap - effectivePositionalCount,

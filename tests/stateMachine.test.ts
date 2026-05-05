@@ -137,6 +137,7 @@ describe("stateMachine", () => {
       deckOffset: 0,
       offeredClueIds: [],
       advancedMode: false,
+      preselectedDeck: null,
       status: "playing",
       guesses: [
         { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 } },
@@ -171,6 +172,7 @@ describe("stateMachine", () => {
       deckOffset: 0,
       offeredClueIds: [],
       advancedMode: false,
+      preselectedDeck: null,
       status: "playing",
       guesses: [
         { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 15 } },
@@ -392,6 +394,7 @@ describe("stateMachine — Clue Reuse threads priorResults", () => {
       deckOffset: 0,
       offeredClueIds: ["divisibleBy", "sumDelta", "clueReuse", "thermometer"],
       advancedMode: false,
+      preselectedDeck: null,
       status: "playing",
       guesses: [
         {

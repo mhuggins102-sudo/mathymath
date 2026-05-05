@@ -2,6 +2,7 @@
 
 import { GuessRow } from "./GuessRow";
 import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
+import { getClueById } from "@/lib/game/clues/registry";
 
 /**
  * Structural state shape GuessGrid needs — narrower than the full
@@ -12,6 +13,7 @@ import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
 export interface GuessGridState {
   digits: number;
   status: "playing" | "won" | "lost";
+  maxGuesses?: number;
   guesses: Array<{
     guess: string;
     clueId?: ClueId;
@@ -43,6 +45,12 @@ interface GuessGridProps {
   /** Tightens cell sizing so wider rows (6 digits) fit alongside the
    *  clue label on phone-width viewports. */
   compact?: boolean;
+  /** Pre-dealt clue ids (preselected-clues mode). When provided, every
+   *  row from index 0 .. deck.length-1 gets its assigned clue's name
+   *  shown in the label slot from game start, and the grid pre-renders
+   *  ALL rows up to maxGuesses (instead of only resolved + active).
+   *  null/undefined → standard chooser-driven rendering. */
+  preselectedDeck?: readonly ClueId[] | null;
 }
 
 /**
@@ -77,8 +85,18 @@ export function GuessGrid({
   pendingLockSlot,
   onTapCell,
   compact,
+  preselectedDeck,
 }: GuessGridProps) {
   const rows: React.ReactNode[] = [];
+  const preselected = preselectedDeck ?? null;
+  // Resolve clue ids → Clue objects once; lookups in the loop below
+  // would otherwise re-walk the registry per row.
+  const upcomingClues = preselected
+    ? preselected.map((id) => getClueById(id))
+    : null;
+  // Index of the next row the player will fill (resolved count, plus
+  // the pending row if one is already submitted-but-unresolved).
+  const nextUpIndex = state.guesses.length + (state.pendingGuess ? 1 : 0);
 
   for (let i = 0; i < state.guesses.length; i++) {
     const g = state.guesses[i];
@@ -103,6 +121,7 @@ export function GuessGrid({
     // been assembled by the reducer on submit. The pendingGuess.locks
     // drive the locked-pending badges; certainDigits paints certain
     // slots even before the clue is picked.
+    const pendingIdx = state.guesses.length;
     rows.push(
       <GuessRow
         key="pending"
@@ -113,6 +132,8 @@ export function GuessGrid({
         certainDigits={certainDigits}
         lockedSlots={state.pendingGuess.locks}
         compact={compact}
+        upcomingClue={upcomingClues?.[pendingIdx] ?? null}
+        nextUp={!!preselected}
       />,
     );
   } else if (state.status === "playing") {
@@ -129,8 +150,29 @@ export function GuessGrid({
         pendingLockSlot={pendingLockSlot}
         onTapCell={onTapCell}
         compact={compact}
+        upcomingClue={upcomingClues?.[state.guesses.length] ?? null}
+        nextUp={!!preselected}
       />,
     );
+  }
+
+  // Preselected mode: pre-render every row of the budget so the player
+  // can see all six upcoming clues from the start. Rows past the active
+  // one render as empty cells with their assigned clue's name visible.
+  if (preselected && state.status === "playing" && state.maxGuesses) {
+    const renderedSoFar = rows.length;
+    for (let i = renderedSoFar; i < state.maxGuesses; i++) {
+      rows.push(
+        <GuessRow
+          key={`upcoming-${i}`}
+          guess=""
+          digits={state.digits}
+          compact={compact}
+          upcomingClue={upcomingClues?.[i] ?? null}
+          nextUp={i === nextUpIndex}
+        />,
+      );
+    }
   }
 
   return <div className="w-full flex flex-col gap-1">{rows}</div>;
