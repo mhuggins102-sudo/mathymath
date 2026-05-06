@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   ADVANCED_POSITIONAL_CAP,
-  ROUND1_EXCLUDE_IDS,
   advancedPositionalCapReached,
   countEffectivePositionalUses,
   effectiveUsedPositionalIds,
@@ -61,21 +60,13 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
   it("clue appearance spreads across the roster over many seeds", () => {
     // Over 10k seeds, every clue should appear at least some of the time.
     // The deck_1p1c scheme drops weights, so we just sanity-check that
-    // no clue is starved. We walk the first three rounds so that ids
-    // gated out of round 1 by ROUND1_EXCLUDE_IDS still get a chance to
-    // surface. 10k seeds × 6 cards drawn = 60k slots; with 20 clues,
-    // uniform would give ~3000 per clue. Set a conservative floor of
-    // 200 so CI noise can't flake this.
+    // no clue is starved. 10k seeds × 2 cards drawn in pair 1 = 20k
+    // slots; with 17 clues, uniform would give ~1176 per clue. Set a
+    // conservative floor of 200 so CI noise can't flake this.
     const counts = new Map<ClueId, number>();
     for (let i = 0; i < 10_000; i++) {
-      const seed = `bench-${i}`;
-      const chosen: ClueId[] = [];
-      for (let round = 0; round < 3; round++) {
-        const pair = pickTwoClues(seed, chosen);
-        for (const c of pair) {
-          counts.set(c.id, (counts.get(c.id) ?? 0) + 1);
-        }
-        chosen.push(pair[0].id);
+      for (const c of pickTwoClues(`bench-${i}`, [])) {
+        counts.set(c.id, (counts.get(c.id) ?? 0) + 1);
       }
     }
     for (const [, n] of counts) expect(n).toBeGreaterThan(200);
@@ -348,50 +339,6 @@ describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
       }
     }
     expect(seenAfterRound1).toBe(true);
-  });
-
-  it("never offers ROUND1_EXCLUDE_IDS clues on round 1, even after redraws (standard mode)", () => {
-    // Mirrors the round-1 Clue Reuse exclusion: Thermometer and
-    // Higher/Lower are too strong as opening-pair picks, so they're
-    // gated out of round 1 in both modes regardless of redraw depth.
-    for (let s = 0; s < 200; s++) {
-      const seed = `r1-exclude-std-${s}`;
-      for (let off = 0; off < 6; off++) {
-        const [a, b] = pickTwoClues(seed, [], off, false, false);
-        expect(ROUND1_EXCLUDE_IDS.has(a.id)).toBe(false);
-        expect(ROUND1_EXCLUDE_IDS.has(b.id)).toBe(false);
-      }
-    }
-  });
-
-  it("never offers ROUND1_EXCLUDE_IDS clues on round 1, even after redraws (advanced mode)", () => {
-    for (let s = 0; s < 200; s++) {
-      const seed = `r1-exclude-adv-${s}`;
-      for (let off = 0; off < 6; off++) {
-        const [a, b] = pickTwoClues(seed, [], off, false, true);
-        expect(ROUND1_EXCLUDE_IDS.has(a.id)).toBe(false);
-        expect(ROUND1_EXCLUDE_IDS.has(b.id)).toBe(false);
-      }
-    }
-  });
-
-  it("CAN offer ROUND1_EXCLUDE_IDS clues from round 2 onward", () => {
-    // Sanity guard: the round-1 exclusion shouldn't bleed into later
-    // rounds. Across enough seeds, every excluded id should be
-    // reachable in round 2+ pairs.
-    const seenAfterRound1 = new Set<ClueId>();
-    for (let s = 0; s < 1000; s++) {
-      if (seenAfterRound1.size === ROUND1_EXCLUDE_IDS.size) break;
-      const seed = `r2-exclude-reach-${s}`;
-      for (let off = 0; off < 5; off++) {
-        const [a, b] = pickTwoClues(seed, ["sumDelta"], off, false, false);
-        if (ROUND1_EXCLUDE_IDS.has(a.id)) seenAfterRound1.add(a.id);
-        if (ROUND1_EXCLUDE_IDS.has(b.id)) seenAfterRound1.add(b.id);
-      }
-    }
-    for (const id of ROUND1_EXCLUDE_IDS) {
-      expect(seenAfterRound1.has(id)).toBe(true);
-    }
   });
 
   it("standard and advanced modes produce different decks at the same seed", () => {

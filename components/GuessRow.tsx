@@ -273,7 +273,7 @@ export function subLabelFor(
     case "digitOverlap":
       return { text: `${result.count} shared`, className: "text-accent" };
     case "parityMask":
-      return { text: `${result.count} same parity`, className: "text-accent" };
+      return { text: `${result.count} slots match`, className: "text-accent" };
     case "distinctDigits":
       return { text: `${result.count} unique`, className: "text-accent" };
     case "totalDeviation":
