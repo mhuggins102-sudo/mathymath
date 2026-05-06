@@ -275,7 +275,7 @@ export function subLabelFor(
     case "parityMask":
       return { text: `${result.count} slots match`, className: "text-accent" };
     case "distinctDigits":
-      return { text: `${result.count} unique`, className: "text-accent" };
+      return { text: `${result.count} common`, className: "text-accent" };
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit":

@@ -192,17 +192,17 @@ export function validateDailyHistory(
       .filter((r): r is ClueResult => r !== undefined);
     // For clues with paramKind (Oracle, Contains Digit): the player's
     // selection is encoded in the result itself. Oracle stores slot,
-    // Contains Digit stores digit. Extract and pass so compute
-    // reproduces the same result as the client claimed.
-    // For Clue Reuse: result.kind IS the reused clue's id.
+    // Oracle stores slot. For Clue Reuse: result.kind IS the reused
+    // clue's id. Contains Digit's digit is now derived from
+    // (guess, priorResults) inside its compute, so the validator
+    // doesn't need to feed it back in — re-running compute reproduces
+    // the same digit, and any client-supplied digit that differs will
+    // surface via resultsMatch.
     const clueParam: Record<string, unknown> = {};
     if (g.result && typeof g.result === "object") {
       const r = g.result as Record<string, unknown>;
       if (r.kind === "oracle" && typeof r.slot === "number") {
         clueParam.selectedSlot = r.slot;
-      }
-      if (r.kind === "containsDigit" && typeof r.digit === "number") {
-        clueParam.selectedDigit = r.digit;
       }
       // Clue Reuse: the result carries the re-used clue's kind, which
       // we pass back as reusedClueId so compute delegates correctly.

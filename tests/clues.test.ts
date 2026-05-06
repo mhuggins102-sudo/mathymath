@@ -201,25 +201,50 @@ describe("Prime Count", () => {
 });
 
 describe("Contains Digit", () => {
-  it("deterministic per (guess, target)", () => {
+  it("auto-picks the first guess digit and reports presence in target", () => {
+    // Guess starts with 1 → ask about 1 → not in target "67890"
+    const r = containsDigitClue.compute("12345", "67890");
+    expect(r.digit).toBe(1);
+    expect(r.present).toBe(false);
+    // Guess "67890" → first digit 6 → in target → yes
+    const r2 = containsDigitClue.compute("67890", "67890");
+    expect(r2.digit).toBe(6);
+    expect(r2.present).toBe(true);
+  });
+  it("skips digits already asked about in priorResults", () => {
+    // First guess asks about 1 (first digit). Second guess starts with
+    // 1 again, but we've already asked 1 — should walk to 2.
+    const r = containsDigitClue.compute("12345", "55555", {
+      priorResults: [{ kind: "containsDigit", digit: 1, present: false }],
+    });
+    expect(r.digit).toBe(2);
+    expect(r.present).toBe(false);
+  });
+  it("falls back to walking 0-9 when every guess digit has been asked", () => {
+    // Guess is "11111", and we've already asked 1. Fall back to walking
+    // 0-9; first un-asked is 0.
+    const r = containsDigitClue.compute("11111", "55555", {
+      priorResults: [{ kind: "containsDigit", digit: 1, present: false }],
+    });
+    expect(r.digit).toBe(0);
+  });
+  it("is pure on (guess, priorResults) — same inputs give same digit", () => {
     const a = containsDigitClue.compute("12345", "67890");
     const b = containsDigitClue.compute("12345", "67890");
     expect(a).toEqual(b);
-    expect(a.digit).toBeGreaterThanOrEqual(0);
-    expect(a.digit).toBeLessThan(10);
-  });
-  it("present=true when the seeded digit appears in target", () => {
-    // Use a target where ALL digits are the same so any seeded digit lookup is trivial.
-    const r = containsDigitClue.compute("12345", "77777");
-    expect(r.present).toBe(r.digit === 7);
   });
 });
 
-describe("Distinct Digits", () => {
-  it("counts unique digits", () => {
-    expect(distinctDigitsClue.compute("00000", "77727").count).toBe(2);
-    expect(distinctDigitsClue.compute("00000", "12345").count).toBe(5);
-    expect(distinctDigitsClue.compute("00000", "11111").count).toBe(1);
+describe("Distinct Overlap", () => {
+  it("counts distinct digit values that appear in BOTH guess and target", () => {
+    // Guess "12345" distinct = {1,2,3,4,5}; target "11223" distinct = {1,2,3}; overlap = 3.
+    expect(distinctDigitsClue.compute("12345", "11223").count).toBe(3);
+    // Guess "00000" → {0}; target "12345" → {1,2,3,4,5}; overlap = 0.
+    expect(distinctDigitsClue.compute("00000", "12345").count).toBe(0);
+    // Identical sets → full overlap.
+    expect(distinctDigitsClue.compute("12345", "54321").count).toBe(5);
+    // Subset.
+    expect(distinctDigitsClue.compute("12345", "11111").count).toBe(1);
   });
 });
 
@@ -426,9 +451,13 @@ describe("6-digit length sanity", () => {
     // Six 2s against target with two 2s → overlap = 2.
     expect(digitOverlapClue.compute("222222", target6).count).toBe(2);
   });
-  it("Distinct Digits: counts up to puzzle length", () => {
-    expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(6);
-    expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(2);
+  it("Distinct Overlap: counts up to puzzle length", () => {
+    // guess6 = "555555" → distinct {5}; target "012345" → distinct {0..5}; overlap = 1.
+    expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(1);
+    // guess6 = "555555"; target "111222" → distinct {1,2}; overlap = 0.
+    expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(0);
+    // Identical guess and target → full distinct overlap.
+    expect(distinctDigitsClue.compute("123456", "654321").count).toBe(6);
   });
   it("Range / parity / prime / dice / total deviation: scale with length", () => {
     // Range: target 247628 → max 8 - min 2 = 6; guess 555555 → 0. target ↑.
@@ -442,13 +471,13 @@ describe("6-digit length sanity", () => {
     // Total deviation max: 9*6 = 54.
     expect(totalDeviationClue.compute("000000", "999999").value).toBe(54);
   });
-  it("Contains Digit: present check works at length 6", () => {
-    expect(
-      containsDigitClue.compute(guess6, target6, { selectedDigit: 7 }).present,
-    ).toBe(true);
-    expect(
-      containsDigitClue.compute(guess6, target6, { selectedDigit: 5 }).present,
-    ).toBe(false);
+  it("Contains Digit: auto-pick + present check work at length 6", () => {
+    // guess6 = "555555" → first digit 5 → present in target "247628"? No.
+    expect(containsDigitClue.compute(guess6, target6).digit).toBe(5);
+    expect(containsDigitClue.compute(guess6, target6).present).toBe(false);
+    // Guess "777777" → first digit 7 → present in "247628"? Yes.
+    expect(containsDigitClue.compute("777777", target6).digit).toBe(7);
+    expect(containsDigitClue.compute("777777", target6).present).toBe(true);
   });
   it("Divisible By: 6-digit numeric value divisibility", () => {
     // 247628 / 2 = 123814 → divisible by 2.
