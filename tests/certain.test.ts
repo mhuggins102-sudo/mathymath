@@ -40,7 +40,7 @@ describe("deriveCertainDigits", () => {
     ).toEqual([null, "8", null, "6", null]);
   });
 
-  it("captures Thermometer tier=0 slots", () => {
+  it("does NOT promote Thermometer tier=0 slots to certain (tier 0 means within 1, not exact)", () => {
     const r: ClueResult = {
       kind: "thermometer",
       tier: [0, 2, 3, 0, 4],
@@ -50,7 +50,21 @@ describe("deriveCertainDigits", () => {
         [{ guess: "13579", clueId: "thermometer", result: r }],
         DIGITS,
       ),
-    ).toEqual(["1", null, null, "7", null]);
+    ).toEqual([null, null, null, null, null]);
+  });
+
+  it("does NOT promote Within-2 exact slots to certain (clue intentionally weakened)", () => {
+    const r: ClueResult = {
+      kind: "within2",
+      mask: [true, true, true, false, false],
+      exact: [true, false, true, false, false],
+    };
+    expect(
+      deriveCertainDigits(
+        [{ guess: "13579", clueId: "within2", result: r }],
+        DIGITS,
+      ),
+    ).toEqual([null, null, null, null, null]);
   });
 
   it("captures Oracle reveal (digit can differ from what player guessed)", () => {

@@ -3,19 +3,21 @@ import type { LockRecord } from "./locks";
 
 /**
  * "Certain" digits: slots whose target value the player can know with
- * certainty. Five sources reveal per-slot certainty:
+ * certainty. Four sources reveal per-slot certainty:
  *
  *   - Bullseyes: every slot where hits[i] === true (the player's
  *     guess[i] is literally the target digit at that slot).
  *   - Higher or Lower: slots where cmp[i] === "eq" (same mechanism).
- *   - Thermometer: slots where tier[i] === 0 (exact).
  *   - Oracle: the revealed slot, with its digit.
  *   - Correctly-resolved locks from past guesses: if the player locked
  *     `digit` at `slot` and it resolved correct, target[slot] = digit.
  *
- * Other positional clues (Within 2, Parity Mask) only narrow a range
- * and do not reveal the digit. Compositional clues never reveal a
- * specific slot.
+ * Other positional clues (Thermometer, Within 2, Parity Mask) only
+ * narrow a range and do not reveal the digit on their own — even when
+ * Within-2's `exact` flag or Thermometer's tier 0 indicates a precise
+ * match, those reveals are intentionally NOT promoted to certainty so
+ * neither clue effectively bundles a free Bullseye. Compositional
+ * clues never reveal a specific slot.
  *
  * The returned array has length `digits`; entries are the known digit
  * (single char "0".."9") or null for slots that remain uncertain.
@@ -43,19 +45,6 @@ export function deriveCertainDigits(
         case "higherLower":
           for (let i = 0; i < digits; i++) {
             if (r.cmp[i] === "eq") out[i] = g.guess[i] ?? null;
-          }
-          break;
-        case "within2":
-        // `exact` was added later; old saved-game data may omit it.
-        if (r.exact) {
-          for (let i = 0; i < digits; i++) {
-            if (r.exact[i]) out[i] = g.guess[i] ?? null;
-          }
-        }
-        break;
-      case "thermometer":
-          for (let i = 0; i < digits; i++) {
-            if (r.tier[i] === 0) out[i] = g.guess[i] ?? null;
           }
           break;
         case "oracle":
