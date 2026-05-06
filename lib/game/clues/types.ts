@@ -41,6 +41,7 @@ export type ClueResult =
   | { kind: "totalDeviation"; value: number }
   | { kind: "diceCount"; cmp: Cmp }
   | { kind: "upsAndDowns"; cmp: Cmp }
+  | { kind: "bullseyeTrend"; cmp: Cmp }
   // Special — meta-action cards that don't reveal target info but
   // change game resources. extraLock grants +1 lock (see locks.ts).
   | { kind: "extraLock" }
@@ -70,6 +71,9 @@ export interface ClueComputeContext {
    *  available). Null entries (from the final lost-guess row) are not
    *  included. */
   priorResults?: readonly ClueResult[];
+  /** Player's prior guesses, in order — needed by clues that compare
+   *  the current guess to an earlier one (e.g. Bullseye Trend). */
+  priorGuesses?: readonly string[];
 }
 
 /** The parameter the player chose when a clue requires paramKind.

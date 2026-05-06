@@ -293,35 +293,35 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     // correct lock; the pending guess locks slot 3 and picks Oracle on
     // slot 4, completing all 5 certain slots → server should signal
     // `won`.
-    const D = "2026-04-17";
+    const D = "2026-04-13";
     const T = generateDailyTarget(D, 5);
-    expect(T).toBe("65097");
+    expect(T).toBe("01966");
 
     // Use guess "33333" so within2 / median etc. don't accidentally reveal
-    // any slots (no exact matches against 65097).
+    // any slots (no exact matches against 01966).
     const probe = "33333";
     const r1Clue = getClueById("within2");
-    const r2Clue = getClueById("median");
-    const r3Clue = getClueById("parityBalance");
+    const r2Clue = getClueById("sumDelta");
+    const r3Clue = getClueById("median");
 
     const history = [
       {
         guess: probe,
         clueId: "within2",
         result: r1Clue.compute(probe, T),
-        locks: [{ slot: 0, digit: "6", correct: true }],
+        locks: [{ slot: 0, digit: "0", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "sumDelta",
+        result: r2Clue.compute(probe, T),
+        locks: [{ slot: 1, digit: "1", correct: true }],
       },
       {
         guess: probe,
         clueId: "median",
-        result: r2Clue.compute(probe, T),
-        locks: [{ slot: 1, digit: "5", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "parityBalance",
         result: r3Clue.compute(probe, T),
-        locks: [{ slot: 2, digit: "0", correct: true }],
+        locks: [{ slot: 2, digit: "9", correct: true }],
       },
     ];
 
@@ -331,7 +331,7 @@ describe("POST /api/daily/[date]/choose-clue", () => {
         pendingGuess: probe,
         clueId: "oracle",
         clueParam: { selectedSlot: 4 },
-        pendingLocks: [{ slot: 3, digit: "9", correct: true }],
+        pendingLocks: [{ slot: 3, digit: "6", correct: true }],
       }),
       { params: paramsP(D) },
     );
@@ -339,7 +339,7 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     const body = await res.json();
     expect(body.kind).toBe("won");
     expect(body.target).toBe(T);
-    expect(body.result).toEqual({ kind: "oracle", slot: 4, digit: 7 });
+    expect(body.result).toEqual({ kind: "oracle", slot: 4, digit: 6 });
   });
 
   it("returns continue (not won) when pendingLocks are missing on Oracle reveal", async () => {
@@ -348,7 +348,7 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     // so certainty is incomplete and the response must be `continue`,
     // NOT `won`. (Pre-fix this was the only path — and it caused the
     // "next guess line + game freezes on submit" bug the user reported.)
-    const D = "2026-04-17";
+    const D = "2026-04-13";
     const T = generateDailyTarget(D, 5);
     const probe = "33333";
     const history = [
@@ -356,19 +356,19 @@ describe("POST /api/daily/[date]/choose-clue", () => {
         guess: probe,
         clueId: "within2",
         result: getClueById("within2").compute(probe, T),
-        locks: [{ slot: 0, digit: "6", correct: true }],
+        locks: [{ slot: 0, digit: "0", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "sumDelta",
+        result: getClueById("sumDelta").compute(probe, T),
+        locks: [{ slot: 1, digit: "1", correct: true }],
       },
       {
         guess: probe,
         clueId: "median",
         result: getClueById("median").compute(probe, T),
-        locks: [{ slot: 1, digit: "5", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "parityBalance",
-        result: getClueById("parityBalance").compute(probe, T),
-        locks: [{ slot: 2, digit: "0", correct: true }],
+        locks: [{ slot: 2, digit: "9", correct: true }],
       },
     ];
     const res = await chooseClue(
@@ -391,7 +391,7 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     // win. The server must re-resolve correctness against the real
     // target — a wrong lock contributes nothing to certain digits, so
     // the response is `continue` even if the client claimed `correct`.
-    const D = "2026-04-17";
+    const D = "2026-04-13";
     const T = generateDailyTarget(D, 5);
     const probe = "33333";
     const history = [
@@ -399,19 +399,19 @@ describe("POST /api/daily/[date]/choose-clue", () => {
         guess: probe,
         clueId: "within2",
         result: getClueById("within2").compute(probe, T),
-        locks: [{ slot: 0, digit: "6", correct: true }],
+        locks: [{ slot: 0, digit: "0", correct: true }],
+      },
+      {
+        guess: probe,
+        clueId: "sumDelta",
+        result: getClueById("sumDelta").compute(probe, T),
+        locks: [{ slot: 1, digit: "1", correct: true }],
       },
       {
         guess: probe,
         clueId: "median",
         result: getClueById("median").compute(probe, T),
-        locks: [{ slot: 1, digit: "5", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "parityBalance",
-        result: getClueById("parityBalance").compute(probe, T),
-        locks: [{ slot: 2, digit: "0", correct: true }],
+        locks: [{ slot: 2, digit: "9", correct: true }],
       },
     ];
     const res = await chooseClue(
@@ -420,7 +420,7 @@ describe("POST /api/daily/[date]/choose-clue", () => {
         pendingGuess: probe,
         clueId: "oracle",
         clueParam: { selectedSlot: 4 },
-        // target[3] is "9", not "1" — claim true anyway.
+        // target[3] is "6", not "1" — claim true anyway.
         pendingLocks: [{ slot: 3, digit: "1", correct: true }],
       }),
       { params: paramsP(D) },

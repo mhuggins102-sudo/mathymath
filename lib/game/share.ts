@@ -20,6 +20,7 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   totalDeviation: "📐",
   diceCount: "🎲",
   upsAndDowns: "🌊",
+  bullseyeTrend: "📈",
   extraLock: "🔒",
   clueReuse: "🔄",
 };

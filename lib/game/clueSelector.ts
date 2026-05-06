@@ -104,30 +104,43 @@ export function advancedPositionalCapReached(
  * so toggling Advanced mid-game-prep yields a structurally distinct
  * order rather than a permutation of the standard deck.
  */
+/** Ids that are kept out of pair 1 because they cannot meaningfully
+ *  resolve there. Clue Reuse needs a previously-used clue to re-apply,
+ *  and Bullseye Trend needs a previously-resolved guess to compare
+ *  against — both are impossible on round 1. They go into the rest
+ *  deck so they surface from round 2 onward. */
+const ROUND1_INELIGIBLE_BY_DESIGN: ReadonlySet<ClueId> = new Set<ClueId>([
+  "clueReuse",
+  "bullseyeTrend",
+]);
+
 function buildDeck(seed: string, advancedMode: boolean = false): ClueId[] {
-  const clueReuseId = CLUES.find((c) => c.id === "clueReuse")?.id;
+  const ineligibleIds = CLUES
+    .map((c) => c.id)
+    .filter((id) => ROUND1_INELIGIBLE_BY_DESIGN.has(id));
 
   if (advancedMode) {
-    const allExceptReuse = CLUES.filter((c) => c.id !== "clueReuse").map(
-      (c) => c.id,
-    );
+    const allEligible = CLUES.filter(
+      (c) => !ROUND1_INELIGIBLE_BY_DESIGN.has(c.id),
+    ).map((c) => c.id);
     const rngTop = seededRng(`deckFullShuffle:top:${seed}`);
-    const shuffled = fisherYates(allExceptReuse, rngTop);
+    const shuffled = fisherYates(allEligible, rngTop);
     const pair1 = shuffled.slice(0, 2);
     const rngRest = seededRng(`deckFullShuffle:rest:${seed}`);
     const rest = fisherYates(
-      [...shuffled.slice(2), ...(clueReuseId ? [clueReuseId] : [])],
+      [...shuffled.slice(2), ...ineligibleIds],
       rngRest,
     );
     return [...pair1, ...rest];
   }
 
   const positional = CLUES.filter((c) => c.category === "positional");
-  // Clue Reuse is excluded from the top pair (pair 1) because there
-  // are no previously-used clues to reuse on round 1. It's pushed
-  // into the "rest" section so it can appear from round 2 onward.
+  // Pair-1 compositional pool excludes the by-design-ineligible ids
+  // (Clue Reuse, Bullseye Trend). They're pushed into the rest
+  // section so they can appear from round 2 onward.
   const otherForPair1 = CLUES.filter(
-    (c) => c.category !== "positional" && c.id !== "clueReuse",
+    (c) =>
+      c.category !== "positional" && !ROUND1_INELIGIBLE_BY_DESIGN.has(c.id),
   );
 
   const rngP = seededRng(`deck1p1cP:${seed}`);
@@ -149,7 +162,7 @@ function buildDeck(seed: string, advancedMode: boolean = false): ClueId[] {
     [
       ...shuffledP.slice(1),
       ...shuffledC.slice(1),
-      ...(clueReuseId ? [clueReuseId] : []),
+      ...ineligibleIds,
     ],
     rngRest,
   );
@@ -216,6 +229,9 @@ export function pickTwoClues(
   const isEligible = (id: ClueId): boolean => {
     if (excludePositional && isPositionalClueId(id)) return false;
     if (isRound1 && id === "clueReuse") return false;
+    // Bullseye Trend compares the current guess to the previous guess,
+    // so it makes no sense on round 1 where there's no prior guess.
+    if (isRound1 && id === "bullseyeTrend") return false;
     return true;
   };
   const isFresh = (id: ClueId): boolean =>
@@ -315,7 +331,19 @@ export function buildPreselectedDeck(
       }
       out.push(id);
     }
-    return fisherYates(out, seededRng(`pre:adv:order:${seed}`));
+    const shuffled = fisherYates(out, seededRng(`pre:adv:order:${seed}`));
+    // Bullseye Trend can't resolve on round 1 (no prior guess to
+    // compare against). If the final shuffle dropped it at slot 0,
+    // swap with the first later slot whose id is round-1-eligible.
+    if (shuffled.length > 0 && ROUND1_INELIGIBLE_BY_DESIGN.has(shuffled[0])) {
+      for (let i = 1; i < shuffled.length; i++) {
+        if (!ROUND1_INELIGIBLE_BY_DESIGN.has(shuffled[i])) {
+          [shuffled[0], shuffled[i]] = [shuffled[i], shuffled[0]];
+          break;
+        }
+      }
+    }
+    return shuffled;
   }
 
   // Standard: slot 0 positional, slots 1..N-1 random non-special.
