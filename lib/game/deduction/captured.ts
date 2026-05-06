@@ -21,6 +21,85 @@ interface RawPuzzle {
   difficulty?: number;
 }
 
+/** Several clue result shapes were rewritten in the late-2026 balance
+ *  pass. Captured puzzles in scripts/captured-puzzles*.json predate
+ *  those changes; load-time migration keeps them parseable by the
+ *  current explain() / cellStates() functions instead of forcing a
+ *  full re-capture. */
+function migrateResult(target: string, g: RawGuess): RawGuess {
+  const r = g.result as unknown as Record<string, unknown>;
+  if (g.clueId === "containsDigit") {
+    if (Array.isArray((r as { picks?: unknown }).picks)) return g;
+    if ("digit" in r && "present" in r) {
+      return {
+        ...g,
+        result: {
+          kind: "containsDigit",
+          picks: [
+            { digit: r.digit as number, present: r.present as boolean },
+          ],
+        } as ClueResult,
+      };
+    }
+  }
+  if (g.clueId === "divisibleBy") {
+    if (Array.isArray((r as { divisors?: unknown }).divisors)) return g;
+    if ("present" in r) {
+      const present = r.present as boolean;
+      const divisor = r.divisor as number | null | undefined;
+      return {
+        ...g,
+        result: {
+          kind: "divisibleBy",
+          divisors:
+            present && typeof divisor === "number" ? [divisor] : [],
+          targetHasAny: present,
+        } as ClueResult,
+      };
+    }
+  }
+  if (g.clueId === "distinctDigits") {
+    if (Array.isArray((r as { sharedRepeated?: unknown }).sharedRepeated))
+      return g;
+    if (typeof (r as { count?: unknown }).count === "number") {
+      const guessCounts = new Map<string, number>();
+      for (const ch of g.guess)
+        guessCounts.set(ch, (guessCounts.get(ch) ?? 0) + 1);
+      const targetCounts = new Map<string, number>();
+      for (const ch of target)
+        targetCounts.set(ch, (targetCounts.get(ch) ?? 0) + 1);
+      const sharedRepeated = [...g.guess].map(
+        (ch) =>
+          (guessCounts.get(ch) ?? 0) >= 2 &&
+          (targetCounts.get(ch) ?? 0) >= 2,
+      );
+      return {
+        ...g,
+        result: {
+          kind: "distinctDigits",
+          count: r.count as number,
+          sharedRepeated,
+        } as ClueResult,
+      };
+    }
+  }
+  if (g.clueId === "parityMask") {
+    if (typeof (r as { count?: unknown }).count === "number" && !Array.isArray((r as { matches?: unknown }).matches))
+      return g;
+    if (Array.isArray((r as { matches?: unknown }).matches)) {
+      const matches = r.matches as boolean[];
+      return {
+        ...g,
+        result: {
+          kind: "parityMask",
+          count: matches.filter(Boolean).length,
+        } as ClueResult,
+      };
+    }
+  }
+  return g;
+}
+
 interface RawFile {
   puzzles: RawPuzzle[];
 }
@@ -48,11 +127,14 @@ function toDeductionPuzzle(p: RawPuzzle): DeductionPuzzle {
     id: p.id,
     digits: p.digits,
     target: p.target,
-    guesses: p.guesses.map((g) => ({
-      guess: g.guess,
-      clueId: g.clueId,
-      result: g.result,
-    })),
+    guesses: p.guesses.map((g) => {
+      const migrated = migrateResult(p.target, g);
+      return {
+        guess: migrated.guess,
+        clueId: migrated.clueId,
+        result: migrated.result,
+      };
+    }),
     difficulty: p.difficulty ?? computeDifficulty(p),
   };
 }
