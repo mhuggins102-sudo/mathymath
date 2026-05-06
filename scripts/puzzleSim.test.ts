@@ -112,10 +112,9 @@ function digitOverlap(guess: string, target: string): number {
 }
 function thermometerTier(diff: number): number {
   const d = Math.abs(diff);
-  if (d === 0) return 0;
-  if (d <= 2) return 1;
-  if (d <= 4) return 2;
-  return 3;
+  if (d <= 1) return 0;
+  if (d <= 3) return 1;
+  return 2;
 }
 function totalDeviation(guess: string, target: string): number {
   let v = 0;
@@ -153,13 +152,13 @@ function targetMatchesResult(
         if (result.exact && (diff === 0) !== result.exact[i]) return false;
       }
       return true;
-    case "parityMask":
+    case "parityMask": {
+      let count = 0;
       for (let i = 0; i < target.length; i++) {
-        const tEven = +target[i] % 2 === 0;
-        const gEven = +guess[i] % 2 === 0;
-        if ((tEven === gEven) !== result.matches[i]) return false;
+        if (+target[i] % 2 === +guess[i] % 2) count++;
       }
-      return true;
+      return count === result.count;
+    }
     case "oracle":
       return target[result.slot] === String(result.digit);
     case "thermometer":
@@ -671,11 +670,7 @@ function renderResult(result: ClueResult): string {
       return "mask=[" + cells.join("") + "]";
     }
     case "parityMask":
-      return (
-        "matches=[" +
-        result.matches.map((m) => (m ? "Y" : "·")).join("") +
-        "]"
-      );
+      return `count=${result.count}`;
     case "oracle":
       return `slot=${result.slot} digit=${result.digit}`;
     case "thermometer":

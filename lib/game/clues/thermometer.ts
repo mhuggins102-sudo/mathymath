@@ -1,34 +1,31 @@
 import type { Clue } from "./types";
 
 function tier(diff: number): number {
-  // Tier 0 covers |diff| ≤ 1, NOT just exact matches: thermometer no
-  // longer turns slots into certainty on its own (Bullseyes is the
-  // canonical "this slot is exact" clue). Buckets are 0:≤1, 1:2-3,
-  // 2:4-5, 3:≥6 — same 4-tier shape as before so saved-game JSON is
-  // unchanged, but the meaning of tier 0 shifted.
+  // 3 tiers: tier 0 means |diff| ≤ 1, NOT just exact matches.
+  // Bullseyes is the canonical "this slot is exact" clue; thermometer
+  // no longer hands the player free certainty. Buckets are 0:0-1,
+  // 1:2-3, 2:≥4.
   const d = Math.abs(diff);
   if (d <= 1) return 0;
   if (d <= 3) return 1;
-  if (d <= 5) return 2;
-  return 3;
+  return 2;
 }
 
-const TIER_LABEL = ["within 1", "2-3 off", "4-5 off", "6+ off"];
+const TIER_LABEL = ["0-1 off", "2-3 off", "4+ off"];
 
 export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
   id: "thermometer",
   name: "Thermometer",
   category: "positional",
   description:
-    "A heat scale per slot showing how close your digit is to the target's digit. The closest tier means within 1, NOT exact.",
-  // 4 tiers × N slots. Weight matches higherLower so the two strongest
+    "A heat scale per slot showing how close your digit is to the target's digit. The closest tier means within 1 — slots are not revealed as exact.",
+  // 3 tiers × N slots. Weight matches higherLower so the two strongest
   // positional clues stay among the rarest draws.
   weight: 0.4,
   legend: [
-    { state: "close", label: "within 1" },
-    { state: "hint", label: "2-3 off" },
-    { state: "warm", label: "4-5 off" },
-    { state: "cold", label: "6+ off" },
+    { state: "close", label: "0-1 off" },
+    { state: "warm", label: "2-3 off" },
+    { state: "cold", label: "4+ off" },
   ],
   compute(guess, target) {
     const tiers = [...guess].map((ch, i) => tier(Number(ch) - Number(target[i])));
