@@ -286,6 +286,25 @@ describe("Distinct Digits", () => {
     expect(distinctDigitsClue.compute("00000", "12345").count).toBe(5);
     expect(distinctDigitsClue.compute("00000", "11111").count).toBe(1);
   });
+  it("highlights guess slots whose digit is repeated in BOTH guess and target", () => {
+    // Target 22445 — repeats {2, 4}. Guess 35422 — repeats {2}. Both
+    // sets contain only 2, so the two 2-slots in the guess (slots 3 and 4)
+    // are the only highlights.
+    const r = distinctDigitsClue.compute("35422", "22445");
+    expect(r.count).toBe(3);
+    expect(r.sharedRepeated).toEqual([false, false, false, true, true]);
+  });
+  it("does not highlight if a digit is repeated in only one of guess/target", () => {
+    // Target 22345 repeats {2}; guess 11234 repeats {1}. No overlap.
+    const r = distinctDigitsClue.compute("11234", "22345");
+    expect(r.sharedRepeated).toEqual([false, false, false, false, false]);
+  });
+  it("highlights every slot when both guess and target are uniform", () => {
+    // Guess 33333, target 33333: both repeat 3 (target distinct = {3}).
+    const r = distinctDigitsClue.compute("33333", "33333");
+    expect(r.count).toBe(1);
+    expect(r.sharedRepeated).toEqual([true, true, true, true, true]);
+  });
 });
 
 describe("Echo", () => {
@@ -368,64 +387,39 @@ describe("Median", () => {
 });
 
 describe("Divisible By", () => {
-  it("picks a divisor in 2-9 that divides the target", () => {
-    // 12345 is divisible by 3 and 5 and 15. Valid divisors 2-9: 3, 5.
-    const r = divisibleByClue.compute("00000", "12345");
-    expect(r.present).toBe(true);
-    expect([3, 5]).toContain(r.divisor);
+  it("intersects target's 2-9 divisors with the guess's 2-9 divisors", () => {
+    // Target 12348 (= 2² × 3 × 7² × 21) → divisors 2-9: {2, 3, 4, 6, 7, 9}.
+    //   Verify: 12348/2=6174 ✓, /3=4116 ✓, /4=3087 ✓, /6=2058 ✓, /7=1764 ✓,
+    //   /9=1372 ✓; /5,/8 no.
+    // Guess 24630 (= 2 × 3 × 5 × 821) → divisors 2-9: {2, 3, 5, 6}.
+    // Intersection (preserved in target order): {2, 3, 6}.
+    const r = divisibleByClue.compute("24630", "12348");
+    expect(r.divisors).toEqual([2, 3, 6]);
+    expect(r.targetHasAny).toBe(true);
   });
-  it("reports 'no' when no value 2-9 divides", () => {
-    // 11 is prime, only divisor 2-9 divides nothing. But target needs to be 5 digits.
-    // 10007 is prime. 10007 % 2-9: none divide (it's prime).
-    const r = divisibleByClue.compute("00000", "10007");
-    expect(r.present).toBe(false);
-    expect(r.divisor).toBe(null);
+  it("reports targetHasAny=true with empty divisors when target has 2-9 divisors but none match guess", () => {
+    // Target 12345 → divisors 2-9: {3, 5}.
+    // Guess 22228 → divisors 2-9: {2, 4}. Intersection: {}.
+    const r = divisibleByClue.compute("22228", "12345");
+    expect(r.divisors).toEqual([]);
+    expect(r.targetHasAny).toBe(true);
   });
-  it("is deterministic per (guess, target)", () => {
+  it("reports targetHasAny=false when target has no 2-9 divisors at all", () => {
+    // 10007 is prime → divisors 2-9: {}.
+    const r = divisibleByClue.compute("12345", "10007");
+    expect(r.divisors).toEqual([]);
+    expect(r.targetHasAny).toBe(false);
+  });
+  it("preserves divisor order from the target's divisor list", () => {
+    // Target 12348 divisors in 2-9 order: [2, 3, 4, 6, 7, 9].
+    // Guess that matches all of them: 12348 itself.
+    const r = divisibleByClue.compute("12348", "12348");
+    expect(r.divisors).toEqual([2, 3, 4, 6, 7, 9]);
+  });
+  it("is deterministic and pure on (guess, target)", () => {
     const a = divisibleByClue.compute("12345", "67890");
     const b = divisibleByClue.compute("12345", "67890");
     expect(a).toEqual(b);
-  });
-  it("avoids a previously-revealed divisor when re-applied (Clue Reuse)", () => {
-    // Target 12345 has valid divisors {3, 5}. If 3 was already
-    // revealed, a re-application must pick 5 to provide new info.
-    const r = divisibleByClue.compute("99999", "12345", {
-      priorResults: [{ kind: "divisibleBy", divisor: 3, present: true }],
-    });
-    expect(r.present).toBe(true);
-    expect(r.divisor).toBe(5);
-  });
-  it("falls back to repeating the only valid divisor when no fresh option exists", () => {
-    // Target 100007 is technically prime-ish; pick a target with a
-    // single divisor in 2-9 to force the fallback. 10003 % 7 === 4
-    // (so 7 doesn't divide), but 10001 = 73 × 137 — none of 2..9 divide.
-    // Use 10009 which is prime. Need a single-divisor target instead.
-    // 10004 = 2^2 × 41 × 61: divisors 2-9 = {2, 4}. Choose target with
-    // exactly one divisor in 2-9 → 12343 = 12343/7? 12343/7 = 1763.28…
-    // Use 12121 = 11 × 1102 + r; check explicitly.
-    // Simpler: 11111 = 41 × 271 → none of 2-9 divide. Not helpful.
-    // 22229 = prime-ish? Skip the manual hunt: use a synthetic
-    // approach where we KNOW only one divisor matches.
-    // Target 10003: 10003 % 2..9: 10003 odd, not 3 (1+0+0+0+3=4), not
-    // 4..6 (odd / not %3), 10003/7 = 1429 exact → 7 divides. Check 8
-    // (no, odd). 9 (1+0+0+0+3=4, no). So only 7. ✓
-    const r = divisibleByClue.compute("99999", "10003", {
-      priorResults: [{ kind: "divisibleBy", divisor: 7, present: true }],
-    });
-    expect(r.present).toBe(true);
-    expect(r.divisor).toBe(7);
-  });
-  it("ignores priorResults from other clue kinds", () => {
-    // Other-kind results in priorResults should not affect the divisor
-    // chosen — only prior divisibleBy reveals do.
-    const r = divisibleByClue.compute("00000", "12345", {
-      priorResults: [
-        { kind: "sumDelta", delta: 9 },
-        { kind: "containsDigit", digit: 3, present: true },
-      ],
-    });
-    expect(r.present).toBe(true);
-    expect([3, 5]).toContain(r.divisor);
   });
 });
 
@@ -562,12 +556,13 @@ describe("6-digit length sanity", () => {
     expect(containsDigitClue.compute("777777", target6).present).toBe(true);
   });
   it("Divisible By: 6-digit numeric value divisibility", () => {
-    // 247628 / 2 = 123814 → divisible by 2.
+    // Target 247628 divisors 2-9: {2, 4} (247628/2=123814, /4=61907; not /3,
+    // /5, /6, /7, /8, /9). Guess 555555 divisors 2-9: {3, 5} (5+5+5+5+5+5=30
+    // divides by 3, ends in 5 so divides by 5; not by 2/4/6/8 since odd, not
+    // /7, not /9 since 30/9 isn't integer). Intersection: {}.
     const r = divisibleByClue.compute(guess6, "247628");
-    expect(r.present).toBe(true);
-    // 247628 % 2 === 0; the seeded pick may choose any valid divisor.
-    expect(r.divisor).not.toBeNull();
-    expect(247628 % r.divisor!).toBe(0);
+    expect(r.targetHasAny).toBe(true);
+    expect(r.divisors).toEqual([]);
   });
   it("Oracle: reveals a slot inside the 6-digit range", () => {
     const r = oracleClue.compute(guess6, target6, { selectedSlot: 5 });

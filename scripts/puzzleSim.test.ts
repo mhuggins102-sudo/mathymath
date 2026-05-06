@@ -204,12 +204,25 @@ function targetMatchesResult(
       if (result.cmp === "gt") return t > g;
       return t < g;
     }
-    case "divisibleBy":
-      if (result.present && result.divisor !== null) {
-        return Number(target) % result.divisor === 0;
+    case "divisibleBy": {
+      // Recompute the intersection of (target ÷ d, guess ÷ d) for d in 2-9.
+      const targetDivisors = DIVISIBLE_BY_DIVISORS.filter(
+        (d) => Number(target) % d === 0,
+      );
+      const guessDivisorSet = new Set(
+        DIVISIBLE_BY_DIVISORS.filter((d) => Number(guess) % d === 0),
+      );
+      const expectedShared = targetDivisors.filter((d) =>
+        guessDivisorSet.has(d),
+      );
+      const expectedHasAny = targetDivisors.length > 0;
+      if (expectedHasAny !== result.targetHasAny) return false;
+      if (expectedShared.length !== result.divisors.length) return false;
+      for (let i = 0; i < expectedShared.length; i++) {
+        if (expectedShared[i] !== result.divisors[i]) return false;
       }
-      // present === false: target is divisible by NONE of 2..9
-      return DIVISIBLE_BY_DIVISORS.every((d) => Number(target) % d !== 0);
+      return true;
+    }
     case "totalDeviation":
       return totalDeviation(guess, target) === result.value;
     case "diceCount": {
@@ -706,9 +719,8 @@ function renderResult(result: ClueResult): string {
     case "median":
       return `target ${result.cmp} guess`;
     case "divisibleBy":
-      return result.present
-        ? `divisor=${result.divisor}`
-        : `no divisor 2-9`;
+      if (result.divisors.length > 0) return `shared=${result.divisors.join(",")}`;
+      return result.targetHasAny ? "no shared divisor" : "no divisor 2-9";
     case "totalDeviation":
       return `value=${result.value}`;
     case "diceCount":

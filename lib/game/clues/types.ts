@@ -35,9 +35,9 @@ export type ClueResult =
   | { kind: "primeCount"; cmp: Cmp }
   | { kind: "rangeCompare"; cmp: Cmp }
   | { kind: "containsDigit"; digit: number; present: boolean }
-  | { kind: "distinctDigits"; count: number }
+  | { kind: "distinctDigits"; count: number; sharedRepeated: boolean[] }
   | { kind: "median"; cmp: Cmp }
-  | { kind: "divisibleBy"; divisor: number | null; present: boolean }
+  | { kind: "divisibleBy"; divisors: number[]; targetHasAny: boolean }
   | { kind: "totalDeviation"; value: number }
   | { kind: "diceCount"; cmp: Cmp }
   | { kind: "upsAndDowns"; cmp: Cmp }

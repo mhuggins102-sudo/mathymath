@@ -377,13 +377,11 @@ describe("maxGuessesForDigits", () => {
   });
 });
 
-describe("stateMachine — Clue Reuse threads priorResults", () => {
-  it("Clue Reuse on Divisible By avoids re-revealing a known divisor", () => {
-    // Target 12345 has divisors {3, 5} in 2-9. Plant a prior
-    // divisibleBy result that revealed 3, then re-apply via Clue
-    // Reuse and assert the result is the OTHER divisor.
+describe("stateMachine — Clue Reuse on Divisible By", () => {
+  it("re-applies Divisible By to the new guess, producing the (target ÷, guess ÷) intersection", () => {
+    // Target 12345 → 2-9 divisors {3, 5}. New guess 24630 → 2-9
+    // divisors {2, 3, 5, 6}. Intersection: {3, 5}.
     const target = "12345";
-    const divisibleBy = getClueById("divisibleBy");
     const clueReuse = getClueById("clueReuse");
     const sumDelta = getClueById("sumDelta");
     const state: GameState = {
@@ -400,12 +398,13 @@ describe("stateMachine — Clue Reuse threads priorResults", () => {
         {
           guess: "11111",
           clueId: "divisibleBy",
-          // The fixed divisor here is what the player has already seen.
-          result: { kind: "divisibleBy", divisor: 3, present: true },
+          // Prior result against guess 11111 (divisors 2-9: {}); no
+          // overlap with target's {3, 5}.
+          result: { kind: "divisibleBy", divisors: [], targetHasAny: true },
         },
       ],
       pendingGuess: {
-        guess: "22222",
+        guess: "24630",
         options: [clueReuse, sumDelta] as [typeof clueReuse, typeof sumDelta],
         redraws: 0,
       },
@@ -418,16 +417,8 @@ describe("stateMachine — Clue Reuse threads priorResults", () => {
     const resolved = next.guesses[next.guesses.length - 1];
     expect(resolved.result?.kind).toBe("divisibleBy");
     if (resolved.result?.kind === "divisibleBy") {
-      expect(resolved.result.present).toBe(true);
-      expect(resolved.result.divisor).toBe(5);
-    }
-    // Sanity: divisibleBy on its own (no prior reveals) for the same
-    // target genuinely has both 3 and 5 in the candidate pool, so the
-    // post-reuse pick is a real exclusion of 3 rather than the RNG
-    // happening to land on 5 in both cases.
-    const fresh = divisibleBy.compute("22222", target);
-    if (fresh.kind === "divisibleBy") {
-      expect([3, 5]).toContain(fresh.divisor);
+      expect(resolved.result.divisors).toEqual([3, 5]);
+      expect(resolved.result.targetHasAny).toBe(true);
     }
   });
 });

@@ -74,7 +74,7 @@ describe("explainWrongGuess", () => {
         {
           guess: "00000",
           clueId: "distinctDigits",
-          result: { kind: "distinctDigits", count: 5 },
+          result: { kind: "distinctDigits", count: 5, sharedRepeated: [false, false, false, false, false] },
         },
       ],
     };

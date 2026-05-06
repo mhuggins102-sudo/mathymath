@@ -164,7 +164,7 @@ function resultKey(r: ClueResult): string {
     case "median":
       return `M:${r.cmp}`;
     case "divisibleBy":
-      return `DB:${r.divisor ?? "n"}:${r.present ? 1 : 0}`;
+      return `DB:${r.divisors.join(",")}:${r.targetHasAny ? 1 : 0}`;
     case "totalDeviation":
       return `TD:${r.value}`;
     case "diceCount":
