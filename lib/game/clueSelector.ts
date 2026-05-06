@@ -18,17 +18,6 @@ export function isPositionalClueId(id: string | undefined): boolean {
  *  for the rest of the game. */
 export const ADVANCED_POSITIONAL_CAP = 2;
 
-/** Clue ids that are never offered on round 1 (in either standard or
- *  advanced mode), regardless of redraws. Same precedent as the
- *  long-standing round-1 ban on Clue Reuse: these clues are too strong
- *  in the opening pair, where the player has no prior info to filter
- *  through. Excluding them up front leaves room for clues that benefit
- *  from a fresh guess (Bullseyes, Within-2, compositional clues). */
-export const ROUND1_EXCLUDE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
-  "thermometer",
-  "higherLower",
-]);
-
 interface PositionalAccountingGuess {
   clueId?: string;
   result?: { kind?: string } | unknown;
@@ -108,9 +97,6 @@ export function advancedPositionalCapReached(
  *   - Clue Reuse is still excluded from pair 1 (no previously-used
  *     clues to reuse on round 1) and slotted into the post-pair-1 deck
  *     before that section is shuffled.
- *   - Clues in `ROUND1_EXCLUDE_IDS` are likewise kept out of pair 1
- *     and pushed into the rest deck so they only surface from round 2
- *     onward.
  *
  * Both schemes share the "discard offered-but-unpicked" rule: a pair is
  * read at positions k*2 / k*2+1 and never returned to the pool. The
@@ -122,49 +108,31 @@ function buildDeck(seed: string, advancedMode: boolean = false): ClueId[] {
   const clueReuseId = CLUES.find((c) => c.id === "clueReuse")?.id;
 
   if (advancedMode) {
-    // Pair 1 is drawn from clues that are eligible on round 1: every
-    // info clue except the round-1-excluded ids (Clue Reuse + any id
-    // in ROUND1_EXCLUDE_IDS). Excluded ids still join the rest of the
-    // deck so they appear from round 2 onward.
     const allExceptReuse = CLUES.filter((c) => c.id !== "clueReuse").map(
       (c) => c.id,
     );
-    const eligibleForPair1 = allExceptReuse.filter(
-      (id) => !ROUND1_EXCLUDE_IDS.has(id),
-    );
-    const ineligibleForPair1 = allExceptReuse.filter((id) =>
-      ROUND1_EXCLUDE_IDS.has(id),
-    );
     const rngTop = seededRng(`deckFullShuffle:top:${seed}`);
-    const shuffled = fisherYates(eligibleForPair1, rngTop);
+    const shuffled = fisherYates(allExceptReuse, rngTop);
     const pair1 = shuffled.slice(0, 2);
     const rngRest = seededRng(`deckFullShuffle:rest:${seed}`);
     const rest = fisherYates(
-      [
-        ...shuffled.slice(2),
-        ...ineligibleForPair1,
-        ...(clueReuseId ? [clueReuseId] : []),
-      ],
+      [...shuffled.slice(2), ...(clueReuseId ? [clueReuseId] : [])],
       rngRest,
     );
     return [...pair1, ...rest];
   }
 
   const positional = CLUES.filter((c) => c.category === "positional");
-  // Round-1-excluded positionals (currently Thermometer + Higher/Lower)
-  // are kept out of the pair-1 positional candidate pool but included
-  // in the rest deck so they can still surface from round 2 onward.
-  // Same pattern as Clue Reuse: never on pair 1, always reachable later.
-  const positionalForPair1 = positional.filter(
-    (c) => !ROUND1_EXCLUDE_IDS.has(c.id),
-  );
+  // Clue Reuse is excluded from the top pair (pair 1) because there
+  // are no previously-used clues to reuse on round 1. It's pushed
+  // into the "rest" section so it can appear from round 2 onward.
   const otherForPair1 = CLUES.filter(
     (c) => c.category !== "positional" && c.id !== "clueReuse",
   );
 
   const rngP = seededRng(`deck1p1cP:${seed}`);
   const shuffledP = fisherYates(
-    positionalForPair1.map((c) => c.id),
+    positional.map((c) => c.id),
     rngP,
   );
   const rngC = seededRng(`deck1p1cC:${seed}`);
@@ -176,16 +144,10 @@ function buildDeck(seed: string, advancedMode: boolean = false): ClueId[] {
   const rngPair = seededRng(`deck1p1cPair:${seed}`);
   const pair1 = fisherYates([shuffledP[0], shuffledC[0]], rngPair);
 
-  // The rest deck includes every positional NOT chosen for pair 1 —
-  // including the ROUND1_EXCLUDE_IDS positionals, which were never
-  // candidates for pair 1 in the first place.
-  const restPositionals = positional
-    .map((c) => c.id)
-    .filter((id) => id !== shuffledP[0]);
   const rngRest = seededRng(`deck1p1cRest:${seed}`);
   const rest = fisherYates(
     [
-      ...restPositionals,
+      ...shuffledP.slice(1),
       ...shuffledC.slice(1),
       ...(clueReuseId ? [clueReuseId] : []),
     ],
@@ -218,11 +180,10 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * rounds.
  *
  * Eligibility filter: cards that fail `isEligible` (locked-out
- * positional after the cap; Clue Reuse and any id in
- * `ROUND1_EXCLUDE_IDS` on round 1) are skipped past — the deck pointer
- * leapfrogs them. The skipped cards are effectively discarded for the
- * rest of the game, but downstream offsets remain the same, so
- * subsequent rounds are deterministic from the seed.
+ * positional after the cap; Clue Reuse on round 1) are skipped past —
+ * the deck pointer leapfrogs them. The skipped cards are effectively
+ * discarded for the rest of the game, but downstream offsets remain
+ * the same, so subsequent rounds are deterministic from the seed.
  *
  * Round-1 Clue Reuse exclusion: pair 1 of the standard deck already
  * lacks Clue Reuse (the buildDeck "rest" section is where it lives),
@@ -255,7 +216,6 @@ export function pickTwoClues(
   const isEligible = (id: ClueId): boolean => {
     if (excludePositional && isPositionalClueId(id)) return false;
     if (isRound1 && id === "clueReuse") return false;
-    if (isRound1 && ROUND1_EXCLUDE_IDS.has(id)) return false;
     return true;
   };
   const isFresh = (id: ClueId): boolean =>
@@ -323,10 +283,6 @@ const EMPTY_ID_SET: ReadonlySet<ClueId> = new Set();
  *   compositional. Final positions are shuffled so positional cards
  *   may land at any index, including 0.
  *
- * Both modes also honor `ROUND1_EXCLUDE_IDS`: the slot-0 clue (the one
- * the player faces on round 1) is never an excluded id. Excluded ids
- * can still appear in slots 1..N-1.
- *
  * Determinism: same seed produces the same deck so daily-style fairness
  * holds within a game session.
  */
@@ -359,41 +315,15 @@ export function buildPreselectedDeck(
       }
       out.push(id);
     }
-    const shuffled = fisherYates(out, seededRng(`pre:adv:order:${seed}`));
-    return enforceRound1ExclusionAtSlot0(shuffled);
+    return fisherYates(out, seededRng(`pre:adv:order:${seed}`));
   }
 
-  // Standard: slot 0 positional (excluding ROUND1_EXCLUDE_IDS — those
-  // are too strong as the round-1 clue), slots 1..N-1 random
-  // non-special. Excluded positionals are still reachable from slot 1
-  // onward via the rest pool.
-  const slot0Pool = positional.filter((id) => !ROUND1_EXCLUDE_IDS.has(id));
-  const slot0 = fisherYates(slot0Pool, seededRng(`pre:std:p:${seed}`))[0];
+  // Standard: slot 0 positional, slots 1..N-1 random non-special.
+  const shuffledP = fisherYates(positional, seededRng(`pre:std:p:${seed}`));
+  const slot0 = shuffledP[0];
   const rest = fisherYates(
-    [
-      ...positional.filter((id) => id !== slot0),
-      ...compositional,
-    ],
+    [...shuffledP.slice(1), ...compositional],
     seededRng(`pre:std:rest:${seed}`),
   );
   return [slot0, ...rest.slice(0, Math.max(0, count - 1))];
-}
-
-/** If `deck[0]` is a ROUND1_EXCLUDE_IDS id, swap it with the first
- *  later slot whose id isn't excluded. Used by the advanced
- *  preselected branch where slot 0 is determined by a final shuffle
- *  rather than by construction. */
-function enforceRound1ExclusionAtSlot0(deck: ClueId[]): ClueId[] {
-  if (deck.length === 0 || !ROUND1_EXCLUDE_IDS.has(deck[0])) return deck;
-  const out = deck.slice();
-  for (let i = 1; i < out.length; i++) {
-    if (!ROUND1_EXCLUDE_IDS.has(out[i])) {
-      [out[0], out[i]] = [out[i], out[0]];
-      return out;
-    }
-  }
-  // No non-excluded id found — leave deck as-is. In practice this
-  // can't happen unless every drawn clue is in ROUND1_EXCLUDE_IDS,
-  // and that set is small.
-  return out;
 }

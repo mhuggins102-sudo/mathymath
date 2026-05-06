@@ -83,7 +83,7 @@ export interface GameState {
    *  `locks` travels with the pending guess so the chosen clue handler
    *  can append them to the resolved history alongside the clue result.
    *  In preselected mode, this is only set when the pre-assigned clue
-   *  has a paramKind (oracle / containsDigit) — `options` is then
+   *  has a paramKind (currently only oracle) — `options` is then
    *  `[clue, clue]` (the same clue twice) so existing consumers work
    *  unchanged; the chooser UI is suppressed. */
   pendingGuess: {
