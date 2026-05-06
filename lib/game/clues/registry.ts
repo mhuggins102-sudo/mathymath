@@ -18,6 +18,8 @@ import { totalDeviationClue } from "./totalDeviation";
 import { diceCountClue } from "./diceCount";
 import { upsAndDownsClue } from "./upsAndDowns";
 import { bullseyeTrendClue } from "./bullseyeTrend";
+import { echoClue } from "./echo";
+import { eliminationClue } from "./elimination";
 import { extraLockClue } from "./extraLock";
 import { clueReuseClue } from "./clueReuse";
 
@@ -49,6 +51,8 @@ export const CLUES: readonly Clue[] = [
   diceCountClue,
   upsAndDownsClue,
   bullseyeTrendClue,
+  echoClue,
+  eliminationClue,
   extraLockClue,
   clueReuseClue,
 ] as const;

@@ -21,6 +21,8 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   diceCount: "🎲",
   upsAndDowns: "🌊",
   bullseyeTrend: "📈",
+  echo: "💬",
+  elimination: "🚫",
   extraLock: "🔒",
   clueReuse: "🔄",
 };
@@ -50,6 +52,10 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
       const map = ["🟨", "🟧", "🟥"];
       return result.tier.map((t) => map[t] ?? "⬛").join("");
     }
+    case "echo":
+      return result.mask.map((m) => (m ? "🟨" : "⬛")).join("");
+    case "elimination":
+      return result.mask.map((m) => (m ? "🟥" : "⬛")).join("");
     default: {
       // Compositional clue — single emoji, padded.
       return `${CLUE_EMOJI[result.kind]} `.repeat(digits).trim();

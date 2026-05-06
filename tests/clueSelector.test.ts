@@ -107,6 +107,8 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       "diceCount",
       "upsAndDowns",
       "bullseyeTrend",
+      "echo",
+      "elimination",
       "extraLock",
       "clueReuse",
     ] as ClueId[]) {

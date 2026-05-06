@@ -169,6 +169,16 @@ function resultKey(r: ClueResult): string {
       return `TD:${r.value}`;
     case "diceCount":
       return `DC:${r.cmp}`;
+    case "upsAndDowns":
+      return `UD:${r.cmp}`;
+    case "bullseyeTrend":
+      return `BT:${r.cmp}`;
+    case "echo":
+      return "E:" + r.mask.map((m) => (m ? "1" : "0")).join("");
+    case "elimination":
+      return "EL:" + r.mask.map((m) => (m ? "1" : "0")).join("");
+    case "extraLock":
+      return "EXTRA";
     case "clueReuse":
       return "REUSE";
   }
