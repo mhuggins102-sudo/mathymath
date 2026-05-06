@@ -73,20 +73,21 @@ function cellStates(
       // deriveCertainDigits no longer promoting Within-2 exacts.
       return result.mask.map((m) => (m ? "warm" : "idle"));
     case "parityMask":
-      return result.matches.map((m) => (m ? "match" : "idle"));
+      // Count-only after the bandwidth nerf — no per-slot coloring.
+      // The matching count surfaces in the sub-label instead.
+      return new Array(digits).fill("idle");
     case "oracle":
       return Array.from({ length: digits }, (_, i) =>
         i === result.slot ? "match" : "idle",
       );
     case "thermometer":
-      // 4 visual tiers without `match` (green): green is reserved for
+      // 3 visual tiers without `match` (green): green is reserved for
       // clues that turn a slot into certainty, and thermometer no
-      // longer does. close → hint → warm → cold gives a 4-step heat
-      // ramp where `hint` is a faded warn between close and warm.
+      // longer does. close → warm → cold reads as a clean cooling
+      // ramp matching the 3 numerical tiers.
       return result.tier.map((t) => {
         if (t === 0) return "close";
-        if (t === 1) return "hint";
-        if (t === 2) return "warm";
+        if (t === 1) return "warm";
         return "cold";
       });
     default:
@@ -271,6 +272,8 @@ export function subLabelFor(
     }
     case "digitOverlap":
       return { text: `${result.count} shared`, className: "text-accent" };
+    case "parityMask":
+      return { text: `${result.count} same parity`, className: "text-accent" };
     case "distinctDigits":
       return { text: `${result.count} unique`, className: "text-accent" };
     case "totalDeviation":

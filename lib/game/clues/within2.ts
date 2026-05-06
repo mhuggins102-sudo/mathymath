@@ -11,7 +11,7 @@ export const within2Clue: Clue<{
   description:
     "Marks each slot where your digit is within 2 of the target digit (direction unknown). Exact matches are not singled out — the clue tells you the digit is close, not which one.",
   weight: 0.8,
-  legend: [{ state: "warm", label: "within ±2" }],
+  legend: [{ state: "warm", label: "0-2 off" }],
   compute(guess, target) {
     const mask: boolean[] = [];
     const exact: boolean[] = [];

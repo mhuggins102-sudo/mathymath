@@ -55,10 +55,9 @@ function totalDeviation(a: string, b: string): number {
 }
 function thermometerTier(diff: number): number {
   const d = Math.abs(diff);
-  if (d === 0) return 0;
-  if (d <= 2) return 1;
-  if (d <= 4) return 2;
-  return 3;
+  if (d <= 1) return 0;
+  if (d <= 3) return 1;
+  return 2;
 }
 
 const CMP_LABEL: Record<"lt" | "eq" | "gt", string> = {
@@ -131,17 +130,14 @@ function explainViolation(
       return null;
     }
     case "parityMask": {
+      // Count-only after the bandwidth nerf: compare totals rather
+      // than pinpointing slots.
+      let count = 0;
       for (let i = 0; i < wrongGuess.length; i++) {
-        const tEven = +wrongGuess[i] % 2 === 0;
-        const gEven = +historyGuess[i] % 2 === 0;
-        const ok = tEven === gEven;
-        if (ok !== result.matches[i]) {
-          const wantWord =
-            (gEven && result.matches[i]) || (!gEven && !result.matches[i])
-              ? "even"
-              : "odd";
-          return `${name} said position ${i + 1} should be ${wantWord} — your guess has ${wrongGuess[i]}.`;
-        }
+        if (+wrongGuess[i] % 2 === +historyGuess[i] % 2) count++;
+      }
+      if (count !== result.count) {
+        return `${name} said ${result.count} slots should share parity with ${historyGuess} — your guess matches ${count}.`;
       }
       return null;
     }
@@ -153,7 +149,7 @@ function explainViolation(
       for (let i = 0; i < wrongGuess.length; i++) {
         const tier = thermometerTier(+wrongGuess[i] - +historyGuess[i]);
         if (tier !== result.tier[i]) {
-          const labels = ["exact", "1–2 off", "3–4 off", "5+ off"];
+          const labels = ["0-1 off", "2-3 off", "4+ off"];
           return `${name} said position ${i + 1} should be ${labels[result.tier[i]]} from ${historyGuess[i]} — your ${wrongGuess[i]} is ${labels[tier]}.`;
         }
       }

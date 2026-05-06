@@ -67,15 +67,13 @@ describe("Within 2", () => {
 });
 
 describe("Parity Mask", () => {
-  it("matches per-slot parity", () => {
-    // guess 13579 vs target 02468: each slot odd-vs-even -> all mismatched
-    expect(parityMaskClue.compute("13579", "02468").matches).toEqual([
-      false, false, false, false, false,
-    ]);
-    // guess 13579 vs target 97531: all odd-odd -> all matched
-    expect(parityMaskClue.compute("13579", "97531").matches).toEqual([
-      true, true, true, true, true,
-    ]);
+  it("counts slots whose parity matches the target's", () => {
+    // guess 13579 vs target 02468: each slot odd-vs-even -> 0 matches
+    expect(parityMaskClue.compute("13579", "02468").count).toBe(0);
+    // guess 13579 vs target 97531: all odd-odd -> 5 matches
+    expect(parityMaskClue.compute("13579", "97531").count).toBe(5);
+    // guess 13579 vs target 12468: only slot 0 matches (1 vs 1, both odd)
+    expect(parityMaskClue.compute("13579", "12468").count).toBe(1);
   });
 });
 
@@ -130,14 +128,14 @@ describe("Oracle", () => {
 });
 
 describe("Thermometer", () => {
-  it("tiers distances into 4 buckets (within 1 / 2-3 / 4-5 / 6+)", () => {
-    // |1-1|=0 -> 0 (within 1)
+  it("tiers distances into 3 buckets (0-1 / 2-3 / 4+)", () => {
+    // |1-1|=0 -> 0 (0-1 off)
     // |3-6|=3 -> 1 (2-3 off)
     // |5-8|=3 -> 1 (2-3 off)
-    // |7-2|=5 -> 2 (4-5 off)
-    // |9-0|=9 -> 3 (6+ off)
+    // |7-2|=5 -> 2 (4+ off)
+    // |9-0|=9 -> 2 (4+ off)
     expect(thermometerClue.compute("13579", "16820").tier).toEqual([
-      0, 1, 1, 2, 3,
+      0, 1, 1, 2, 2,
     ]);
   });
   it("groups |diff| 0 and 1 into the closest tier (0)", () => {
@@ -405,10 +403,14 @@ describe("6-digit length sanity", () => {
     // target[2]=7 > guess 5 → gt
     expect(r.cmp[2]).toBe("gt");
   });
-  it("Within 2 / parity mask: arrays of length 6", () => {
+  it("Within 2: arrays of length 6", () => {
     expect(within2Clue.compute(guess6, target6).mask).toHaveLength(6);
     expect(within2Clue.compute(guess6, target6).exact).toHaveLength(6);
-    expect(parityMaskClue.compute(guess6, target6).matches).toHaveLength(6);
+  });
+  it("Parity Mask: count is bounded by digit length", () => {
+    const c = parityMaskClue.compute(guess6, target6).count;
+    expect(c).toBeGreaterThanOrEqual(0);
+    expect(c).toBeLessThanOrEqual(6);
   });
   it("Thermometer: tier array of length 6", () => {
     expect(thermometerClue.compute(guess6, target6).tier).toHaveLength(6);

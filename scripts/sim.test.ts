@@ -142,7 +142,7 @@ function resultKey(r: ClueResult): string {
     case "within2":
       return "W:" + r.mask.map((m) => (m ? "1" : "0")).join("");
     case "parityMask":
-      return "P:" + r.matches.map((m) => (m ? "1" : "0")).join("");
+      return `P:${r.count}`;
     case "oracle":
       return `O:${r.slot}:${r.digit}`;
     case "thermometer":

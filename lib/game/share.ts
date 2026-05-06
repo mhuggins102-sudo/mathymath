@@ -37,8 +37,6 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
       return result.mask
         .map((m, i) => (result.exact[i] ? "🟩" : m ? "🟨" : "⬛"))
         .join("");
-    case "parityMask":
-      return result.matches.map((m) => (m ? "🟨" : "⬛")).join("");
     case "oracle": {
       const cells = Array.from({ length: digits }, (_, i) =>
         i === result.slot ? "🟩" : "⬛",
@@ -46,9 +44,9 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
       return cells.join("");
     }
     case "thermometer": {
-      // 4 tiers: exact / 1-2 off / 3-4 off / 5+ off. Emoji order tracks
-      // the on-screen heat ramp (green → blue → yellow → red).
-      const map = ["🟩", "🟦", "🟨", "🟥"];
+      // 3 tiers: 0-1 off / 2-3 off / 4+ off. Emoji order tracks the
+      // on-screen heat ramp (close yellow → warn orange → bad red).
+      const map = ["🟨", "🟧", "🟥"];
       return result.tier.map((t) => map[t] ?? "⬛").join("");
     }
     default: {
