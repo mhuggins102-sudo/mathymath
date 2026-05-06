@@ -104,13 +104,29 @@ describe("subLabelFor — other clues unchanged", () => {
       className: "text-accent",
     });
   });
-  it("Contains Digit (yes/no)", () => {
+  it("Contains Digit (multi-pick sequence)", () => {
     expect(
-      subLabelFor("11111", { kind: "containsDigit", digit: 7, present: true }),
-    ).toEqual({ text: "7? yes", className: "text-good" });
+      subLabelFor("11111", {
+        kind: "containsDigit",
+        picks: [{ digit: 7, present: true }],
+      }),
+    ).toEqual({ text: "7✓", className: "text-good" });
     expect(
-      subLabelFor("11111", { kind: "containsDigit", digit: 7, present: false }),
-    ).toEqual({ text: "7? no", className: "text-bad" });
+      subLabelFor("11111", {
+        kind: "containsDigit",
+        picks: [{ digit: 7, present: false }],
+      }),
+    ).toEqual({ text: "7✗", className: "text-bad" });
+    expect(
+      subLabelFor("11111", {
+        kind: "containsDigit",
+        picks: [
+          { digit: 4, present: true },
+          { digit: 4, present: true },
+          { digit: 6, present: false },
+        ],
+      }),
+    ).toEqual({ text: "4✓ 4✓ 6✗", className: "text-bad" });
   });
 });
 

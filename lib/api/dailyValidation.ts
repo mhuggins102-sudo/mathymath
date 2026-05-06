@@ -205,6 +205,11 @@ export function validateDailyHistory(
       if (r.kind === "oracle" && typeof r.slot === "number") {
         clueParam.selectedSlot = r.slot;
       }
+      if (r.kind === "containsDigit" && Array.isArray(r.picks)) {
+        clueParam.picks = (r.picks as Array<{ digit: number }>).map(
+          (p) => p.digit,
+        );
+      }
       // Clue Reuse: the result carries the re-used clue's kind, which
       // we pass back as reusedClueId so compute delegates correctly.
       if (g.clueId === "clueReuse" && typeof r.kind === "string") {

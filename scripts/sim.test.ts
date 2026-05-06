@@ -158,13 +158,13 @@ function resultKey(r: ClueResult): string {
     case "rangeCompare":
       return `RC:${r.cmp}`;
     case "containsDigit":
-      return `CD:${r.digit}:${r.present ? 1 : 0}`;
+      return `CD:${r.picks.map((p) => `${p.digit}${p.present ? "y" : "n"}`).join(",")}`;
     case "distinctDigits":
       return `DD:${r.count}`;
     case "median":
       return `M:${r.cmp}`;
     case "divisibleBy":
-      return `DB:${r.divisor ?? "n"}:${r.present ? 1 : 0}`;
+      return `DB:${r.divisors.join(",")}:${r.targetHasAny ? 1 : 0}`;
     case "totalDeviation":
       return `TD:${r.value}`;
     case "diceCount":

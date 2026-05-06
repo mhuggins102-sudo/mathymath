@@ -191,11 +191,25 @@ function explainViolation(
       return `${name} said the target's digit range (max−min) is ${CMP_LABEL[result.cmp]} ${g} — your guess has range ${t}.`;
     }
     case "containsDigit": {
-      const has = wrongGuess.includes(String(result.digit));
-      if (has === result.present) return null;
-      return result.present
-        ? `${name} said the target contains a ${result.digit} — your guess has none.`
-        : `${name} said the target does NOT contain ${result.digit} — your guess has one.`;
+      // Multi-pick: each pick is a multiset-aware "is this digit in
+      // the target?" question. For each pick, count how many copies
+      // of the digit appear in the hypothesized target (wrongGuess)
+      // and compare to the recorded present flag — the recorded flag
+      // is yes iff the n-th pick of that digit is the n-th-or-fewer
+      // copy in the target.
+      const usedSoFar = new Map<number, number>();
+      for (const p of result.picks) {
+        const used = usedSoFar.get(p.digit) ?? 0;
+        const inWrong = (wrongGuess.match(new RegExp(String(p.digit), "g")) ?? []).length;
+        const expected = inWrong > used;
+        if (expected !== p.present) {
+          return p.present
+            ? `${name} said the target has at least ${used + 1} of ${p.digit} — your guess has only ${inWrong}.`
+            : `${name} said the target has fewer than ${used + 1} of ${p.digit} — your guess has at least ${used + 1}.`;
+        }
+        usedSoFar.set(p.digit, used + 1);
+      }
+      return null;
     }
     case "distinctDigits": {
       const got = new Set(wrongGuess).size;
@@ -211,15 +225,26 @@ function explainViolation(
       return `${name} said the target's median digit is ${CMP_LABEL[result.cmp]} ${g} — your guess has median ${t}.`;
     }
     case "divisibleBy": {
-      if (result.present && result.divisor !== null) {
-        if (Number(wrongGuess) % result.divisor === 0) return null;
-        return `${name} said the target is divisible by ${result.divisor} — your guess is not.`;
+      // Recompute target's 2-9 divisors against the hypothesized
+      // wrongGuess and intersect with historyGuess's divisors. The
+      // shared list and "any divisor" flag should both match.
+      const divs = [2, 3, 4, 5, 6, 7, 8, 9];
+      const wrongTargetDivisors = divs.filter(
+        (d) => Number(wrongGuess) % d === 0,
+      );
+      const historyGuessDivisors = new Set(
+        divs.filter((d) => Number(historyGuess) % d === 0),
+      );
+      const expectedShared = wrongTargetDivisors.filter((d) =>
+        historyGuessDivisors.has(d),
+      );
+      if (
+        expectedShared.length === result.divisors.length &&
+        expectedShared.every((d, i) => d === result.divisors[i])
+      ) {
+        return null;
       }
-      // No divisor 2-9 splits the target evenly.
-      const divisors = [2, 3, 4, 5, 6, 7, 8, 9];
-      const matches = divisors.filter((d) => Number(wrongGuess) % d === 0);
-      if (matches.length === 0) return null;
-      return `${name} said no value 2–9 divides the target — your guess is divisible by ${matches.join(", ")}.`;
+      return `${name} said the shared 2-9 divisors are ${result.divisors.length > 0 ? result.divisors.join(", ") : "(none)"} — your guess gives ${expectedShared.length > 0 ? expectedShared.join(", ") : "(none)"}.`;
     }
     case "totalDeviation": {
       const got = totalDeviation(historyGuess, wrongGuess);

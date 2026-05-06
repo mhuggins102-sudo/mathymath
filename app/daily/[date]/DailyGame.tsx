@@ -10,6 +10,7 @@ import { GearIcon } from "@/components/GearIcon";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
 import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
+import { containsDigitAvailable } from "@/lib/game/clues/containsDigit";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
@@ -94,6 +95,7 @@ export function DailyGame({
     pendingClueParam,
     confirmClueParam,
     cancelClueParam,
+    pickContainsDigit,
     redraw,
     canRedraw,
     tapCell,
@@ -353,12 +355,16 @@ export function DailyGame({
                 }
                 onCancel={cancelClueParam}
               />
-            ) : pendingClueParam?.paramKind === "digit" ? (
+            ) : pendingClueParam?.paramKind === "digit" && state.pendingGuess ? (
               <DigitPicker
-                onSelect={(digit) =>
-                  confirmClueParam({ selectedDigit: digit })
-                }
+                picks={pendingClueParam.picks ?? []}
+                availableDigits={containsDigitAvailable(
+                  state.pendingGuess.guess,
+                  (pendingClueParam.picks ?? []).map((p) => p.digit),
+                )}
+                onPick={pickContainsDigit}
                 onCancel={cancelClueParam}
+                busy={loading}
               />
             ) : state.pendingGuess ? (
               <>

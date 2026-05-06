@@ -76,6 +76,12 @@ function cellStates(
       // Count-only after the bandwidth nerf — no per-slot coloring.
       // The matching count surfaces in the sub-label instead.
       return new Array(digits).fill("idle");
+    case "distinctDigits":
+      // Sub-label still shows the count of distinct digits in target.
+      // Per-slot warm highlights guess digits that are repeated in
+      // BOTH guess and target — a small guess-dependent kicker on
+      // top of the guess-independent count.
+      return result.sharedRepeated.map((m) => (m ? "warm" : "idle"));
     case "echo":
       // Wordle-yellow: warm for digits that appear somewhere in the
       // target (not necessarily at this slot). No certainty implied.
@@ -297,15 +303,30 @@ export function subLabelFor(
       return { text: `${result.count} unique`, className: "text-accent" };
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
-    case "containsDigit":
+    case "containsDigit": {
+      // Show every pick the player made, with ✓ for in-target and
+      // ✗ for the wrong one (always the last, by construction).
+      if (result.picks.length === 0)
+        return { text: "no picks", className: "text-muted" };
+      const text = result.picks
+        .map((p) => `${p.digit}${p.present ? "✓" : "✗"}`)
+        .join(" ");
+      const lastWrong =
+        result.picks[result.picks.length - 1].present === false;
       return {
-        text: `${result.digit}? ${result.present ? "yes" : "no"}`,
-        className: result.present ? "text-good" : "text-bad",
+        text,
+        className: lastWrong ? "text-bad" : "text-good",
       };
+    }
     case "divisibleBy":
-      if (result.present && result.divisor !== null)
-        return { text: `${result.divisor}? yes`, className: "text-good" };
-      return { text: "divisible? no", className: "text-bad" };
+      if (result.divisors.length > 0)
+        return {
+          text: `÷ ${result.divisors.join(" ")}`,
+          className: "text-good",
+        };
+      if (result.targetHasAny)
+        return { text: "no shared divisor", className: "text-bad" };
+      return { text: "no 2-9 divisor", className: "text-bad" };
     case "oracle":
       return { text: `slot ${result.slot + 1}`, className: "text-muted" };
     case "extraLock":
