@@ -130,20 +130,20 @@ describe("Oracle", () => {
 });
 
 describe("Thermometer", () => {
-  it("tiers distances into 4 buckets (exact / 1-2 / 3-4 / 5+)", () => {
-    // |1-1|=0 -> 0 (exact)
-    // |3-6|=3 -> 2 (3-4 off)
-    // |5-8|=3 -> 2 (3-4 off)
-    // |7-2|=5 -> 3 (5+ off)
-    // |9-0|=9 -> 3 (5+ off)
+  it("tiers distances into 4 buckets (within 1 / 2-3 / 4-5 / 6+)", () => {
+    // |1-1|=0 -> 0 (within 1)
+    // |3-6|=3 -> 1 (2-3 off)
+    // |5-8|=3 -> 1 (2-3 off)
+    // |7-2|=5 -> 2 (4-5 off)
+    // |9-0|=9 -> 3 (6+ off)
     expect(thermometerClue.compute("13579", "16820").tier).toEqual([
-      0, 2, 2, 3, 3,
+      0, 1, 1, 2, 3,
     ]);
   });
-  it("groups 1 and 2 into the close tier (1)", () => {
-    // |1-2|=1 -> 1; |2-4|=2 -> 1; |3-3|=0 -> 0
+  it("groups |diff| 0 and 1 into the closest tier (0)", () => {
+    // |1-2|=1 -> 0; |2-4|=2 -> 1; |3-3|=0 -> 0
     expect(thermometerClue.compute("12300", "24300").tier).toEqual([
-      1, 1, 0, 0, 0,
+      0, 1, 0, 0, 0,
     ]);
   });
 });

@@ -77,12 +77,14 @@ function cellStates(
         i === result.slot ? "match" : "idle",
       );
     case "thermometer":
-      // 4 tiers (was 5): exact / 1-2 / 3-4 / 5+. Skips the orange "cool"
-      // band — the two-state heat ramp now goes match → close → warm →
-      // cold so the gradient still reads as cooling off.
+      // 4 tiers numerically (within 1 / 2-3 / 4-5 / 6+) but only 3
+      // visual buckets: tier 0 and tier 1 share `close` so no slot
+      // ever paints `match` (green) for thermometer — green is
+      // reserved for clues that turn a slot into certainty, and
+      // thermometer no longer does. The full per-tier breakdown still
+      // surfaces in the explain popover.
       return result.tier.map((t) => {
-        if (t === 0) return "match";
-        if (t === 1) return "close";
+        if (t <= 1) return "close";
         if (t === 2) return "warm";
         return "cold";
       });
