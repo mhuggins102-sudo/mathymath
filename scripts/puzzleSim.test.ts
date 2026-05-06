@@ -226,6 +226,20 @@ function targetMatchesResult(
       if (result.cmp === "gt") return t > g;
       return t < g;
     }
+    case "echo":
+      for (let i = 0; i < guess.length; i++) {
+        if (target.includes(guess[i]) !== result.mask[i]) return false;
+      }
+      return true;
+    case "elimination":
+      for (let i = 0; i < guess.length; i++) {
+        if (!target.includes(guess[i]) !== result.mask[i]) return false;
+      }
+      return true;
+    case "bullseyeTrend":
+      // Trend depends on a prior guess that isn't part of this
+      // signature; treat as un-violatable for sim purposes.
+      return true;
     case "extraLock":
     case "clueReuse":
       // No target-info clues — every candidate is consistent.
@@ -701,6 +715,12 @@ function renderResult(result: ClueResult): string {
       return `target ${result.cmp} guess`;
     case "upsAndDowns":
       return `target ${result.cmp} guess`;
+    case "bullseyeTrend":
+      return `trend=${result.cmp}`;
+    case "echo":
+      return "echo=[" + result.mask.map((m) => (m ? "Y" : "·")).join("") + "]";
+    case "elimination":
+      return "elim=[" + result.mask.map((m) => (m ? "X" : "·")).join("") + "]";
     case "extraLock":
       return "(extraLock)";
     case "clueReuse":

@@ -21,6 +21,8 @@ import {
   upsAndDownsClue,
 } from "@/lib/game/clues/upsAndDowns";
 import { bullseyeTrendClue } from "@/lib/game/clues/bullseyeTrend";
+import { echoClue } from "@/lib/game/clues/echo";
+import { eliminationClue } from "@/lib/game/clues/elimination";
 import { extraLockClue } from "@/lib/game/clues/extraLock";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 
@@ -278,16 +280,57 @@ describe("Contains Digit", () => {
   });
 });
 
-describe("Distinct Overlap", () => {
-  it("counts distinct digit values that appear in BOTH guess and target", () => {
-    // Guess "12345" distinct = {1,2,3,4,5}; target "11223" distinct = {1,2,3}; overlap = 3.
-    expect(distinctDigitsClue.compute("12345", "11223").count).toBe(3);
-    // Guess "00000" → {0}; target "12345" → {1,2,3,4,5}; overlap = 0.
-    expect(distinctDigitsClue.compute("00000", "12345").count).toBe(0);
-    // Identical sets → full overlap.
-    expect(distinctDigitsClue.compute("12345", "54321").count).toBe(5);
-    // Subset.
-    expect(distinctDigitsClue.compute("12345", "11111").count).toBe(1);
+describe("Distinct Digits", () => {
+  it("counts unique digits in the target", () => {
+    expect(distinctDigitsClue.compute("00000", "77727").count).toBe(2);
+    expect(distinctDigitsClue.compute("00000", "12345").count).toBe(5);
+    expect(distinctDigitsClue.compute("00000", "11111").count).toBe(1);
+  });
+});
+
+describe("Echo", () => {
+  it("marks slots whose digit appears anywhere in the target", () => {
+    // target "12345"; guess "13579":
+    //   slot 0 '1' in "12345" ✓
+    //   slot 1 '3' ✓
+    //   slot 2 '5' ✓
+    //   slot 3 '7' ✗
+    //   slot 4 '9' ✗
+    expect(echoClue.compute("13579", "12345").mask).toEqual([
+      true, true, true, false, false,
+    ]);
+  });
+  it("all-true when every guess digit is in target", () => {
+    expect(echoClue.compute("11111", "12345").mask).toEqual([
+      true, true, true, true, true,
+    ]);
+  });
+  it("all-false when no guess digit is in target", () => {
+    expect(echoClue.compute("66666", "12345").mask).toEqual([
+      false, false, false, false, false,
+    ]);
+  });
+});
+
+describe("Elimination", () => {
+  it("marks slots whose digit is ABSENT from the target", () => {
+    // Inverse of the Echo case above.
+    expect(eliminationClue.compute("13579", "12345").mask).toEqual([
+      false, false, false, true, true,
+    ]);
+  });
+  it("is the exact inverse of Echo", () => {
+    const cases: [string, string][] = [
+      ["13579", "12345"],
+      ["00000", "12345"],
+      ["12345", "12345"],
+      ["66666", "12345"],
+    ];
+    for (const [g, t] of cases) {
+      const echo = echoClue.compute(g, t).mask;
+      const elim = eliminationClue.compute(g, t).mask;
+      expect(elim).toEqual(echo.map((m) => !m));
+    }
   });
 });
 
@@ -494,13 +537,9 @@ describe("6-digit length sanity", () => {
     // Six 2s against target with two 2s → overlap = 2.
     expect(digitOverlapClue.compute("222222", target6).count).toBe(2);
   });
-  it("Distinct Overlap: counts up to puzzle length", () => {
-    // guess6 = "555555" → distinct {5}; target "012345" → distinct {0..5}; overlap = 1.
-    expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(1);
-    // guess6 = "555555"; target "111222" → distinct {1,2}; overlap = 0.
-    expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(0);
-    // Identical guess and target → full distinct overlap.
-    expect(distinctDigitsClue.compute("123456", "654321").count).toBe(6);
+  it("Distinct Digits: counts up to puzzle length", () => {
+    expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(6);
+    expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(2);
   });
   it("Range / parity / prime / dice / total deviation: scale with length", () => {
     // Range: target 247628 → max 8 - min 2 = 6; guess 555555 → 0. target ↑.
@@ -539,9 +578,9 @@ describe("6-digit length sanity", () => {
 
 describe("Registry", () => {
   it("has 21 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(21);
+    expect(CLUES).toHaveLength(23);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(21);
+    expect(ids.size).toBe(23);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

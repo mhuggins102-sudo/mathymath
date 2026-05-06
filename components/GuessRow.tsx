@@ -76,6 +76,14 @@ function cellStates(
       // Count-only after the bandwidth nerf — no per-slot coloring.
       // The matching count surfaces in the sub-label instead.
       return new Array(digits).fill("idle");
+    case "echo":
+      // Wordle-yellow: warm for digits that appear somewhere in the
+      // target (not necessarily at this slot). No certainty implied.
+      return result.mask.map((m) => (m ? "warm" : "idle"));
+    case "elimination":
+      // Inverse of Echo: cold for digits that are ABSENT from the
+      // target entirely.
+      return result.mask.map((m) => (m ? "cold" : "idle"));
     case "oracle":
       return Array.from({ length: digits }, (_, i) =>
         i === result.slot ? "match" : "idle",
@@ -286,7 +294,7 @@ export function subLabelFor(
       return { text: "= same matches", className: "text-muted" };
     }
     case "distinctDigits":
-      return { text: `${result.count} common`, className: "text-accent" };
+      return { text: `${result.count} unique`, className: "text-accent" };
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit":

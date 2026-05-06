@@ -249,6 +249,36 @@ function explainViolation(
       // as un-violatable. Captured deduction puzzles predate this
       // clue and won't carry bullseyeTrend results anyway.
       return null;
+    case "echo": {
+      // Echo says historyGuess[i] is in target ⇔ result.mask[i].
+      // If wrongGuess were the target, then historyGuess[i] should be
+      // present in wrongGuess iff the recorded mask says so.
+      for (let i = 0; i < historyGuess.length; i++) {
+        const wantPresent = result.mask[i];
+        const actuallyPresent = wrongGuess.includes(historyGuess[i]);
+        if (wantPresent !== actuallyPresent) {
+          return wantPresent
+            ? `${name} said ${historyGuess[i]} appears somewhere in the target — your guess has no ${historyGuess[i]}.`
+            : `${name} said ${historyGuess[i]} does NOT appear in the target — your guess has at least one ${historyGuess[i]}.`;
+        }
+      }
+      return null;
+    }
+    case "elimination": {
+      // Inverse of Echo. mask[i]=true means historyGuess[i] is NOT in
+      // target. So if wrongGuess were the target, historyGuess[i]
+      // should be absent iff the recorded mask says so.
+      for (let i = 0; i < historyGuess.length; i++) {
+        const wantAbsent = result.mask[i];
+        const actuallyAbsent = !wrongGuess.includes(historyGuess[i]);
+        if (wantAbsent !== actuallyAbsent) {
+          return wantAbsent
+            ? `${name} said ${historyGuess[i]} is NOT in the target — your guess has at least one ${historyGuess[i]}.`
+            : `${name} said ${historyGuess[i]} appears somewhere in the target — your guess has no ${historyGuess[i]}.`;
+        }
+      }
+      return null;
+    }
     case "extraLock":
     case "clueReuse":
       // Special clues don't reveal target info, so they can't be violated.

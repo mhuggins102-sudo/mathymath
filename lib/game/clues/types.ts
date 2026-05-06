@@ -42,6 +42,8 @@ export type ClueResult =
   | { kind: "diceCount"; cmp: Cmp }
   | { kind: "upsAndDowns"; cmp: Cmp }
   | { kind: "bullseyeTrend"; cmp: Cmp }
+  | { kind: "echo"; mask: boolean[] }
+  | { kind: "elimination"; mask: boolean[] }
   // Special — meta-action cards that don't reveal target info but
   // change game resources. extraLock grants +1 lock (see locks.ts).
   | { kind: "extraLock" }
