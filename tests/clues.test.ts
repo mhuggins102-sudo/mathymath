@@ -84,41 +84,41 @@ describe("Bullseye Trend", () => {
   // Helper: target "12345" lets us craft prior + current pairs with
   // controlled match counts.
   const target = "12345";
-  it("reports gt when current guess has more exact matches than prior", () => {
-    // prior "00000" has 0 matches; current "12000" has 2 matches.
+  it("reports a positive delta when current guess has more exact matches than prior", () => {
+    // prior "00000" has 0 matches; current "12000" has 2 matches → +2.
     const r = bullseyeTrendClue.compute("12000", target, {
       priorGuesses: ["00000"],
     });
-    expect(r.cmp).toBe("gt");
+    expect(r.delta).toBe(2);
   });
-  it("reports lt when current guess has fewer exact matches than prior", () => {
-    // prior "12345" has 5 matches; current "00000" has 0.
+  it("reports a negative delta when current guess has fewer exact matches than prior", () => {
+    // prior "12345" has 5 matches; current "00000" has 0 → −5.
     const r = bullseyeTrendClue.compute("00000", target, {
       priorGuesses: ["12345"],
     });
-    expect(r.cmp).toBe("lt");
+    expect(r.delta).toBe(-5);
   });
-  it("reports eq when current guess has the same exact-match count", () => {
+  it("reports delta=0 when current guess has the same exact-match count", () => {
     // prior "10000" has 1 match (slot 0=1); current "02000" has 1 match (slot 1=2).
     const r = bullseyeTrendClue.compute("02000", target, {
       priorGuesses: ["10000"],
     });
-    expect(r.cmp).toBe("eq");
+    expect(r.delta).toBe(0);
   });
   it("uses the most recent prior guess when multiple are present", () => {
     // earliest "12345" (5 matches), then "00000" (0 matches).
     // Current "10000" has 1 match. Compare against most recent ("00000",
-    // 0 matches) → gt.
+    // 0 matches) → +1.
     const r = bullseyeTrendClue.compute("10000", target, {
       priorGuesses: ["12345", "00000"],
     });
-    expect(r.cmp).toBe("gt");
+    expect(r.delta).toBe(1);
   });
-  it("defaults to eq when no prior guesses are given (defensive)", () => {
+  it("defaults to delta=0 when no prior guesses are given (defensive)", () => {
     // Round-1 ineligibility means this branch shouldn't fire in
     // practice, but the defensive default keeps the result shape valid.
     const r = bullseyeTrendClue.compute("12345", target);
-    expect(r.cmp).toBe("eq");
+    expect(r.delta).toBe(0);
   });
 });
 

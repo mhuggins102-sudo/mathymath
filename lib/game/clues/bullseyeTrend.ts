@@ -8,27 +8,23 @@ function exactMatchCount(guess: string, target: string): number {
   return n;
 }
 
-function trend(
+function bullseyeDelta(
   guess: string,
   target: string,
   context: ClueComputeContext | undefined,
-): "lt" | "eq" | "gt" {
+): number {
   const priorGuess = context?.priorGuesses?.at(-1);
   if (priorGuess === undefined) {
     // Defensive default for round 1; in practice the clue is gated
     // out of round 1 in pickTwoClues so this should never fire.
-    return "eq";
+    return 0;
   }
-  const cur = exactMatchCount(guess, target);
-  const prior = exactMatchCount(priorGuess, target);
-  if (cur > prior) return "gt";
-  if (cur < prior) return "lt";
-  return "eq";
+  return exactMatchCount(guess, target) - exactMatchCount(priorGuess, target);
 }
 
 export const bullseyeTrendClue: Clue<{
   kind: "bullseyeTrend";
-  cmp: "lt" | "eq" | "gt";
+  delta: number;
 }> = {
   id: "bullseyeTrend",
   name: "Bullseye Trend",
@@ -45,22 +41,27 @@ export const bullseyeTrendClue: Clue<{
     { state: "cold", label: "fewer matches" },
   ],
   compute(guess, target, context) {
-    return { kind: "bullseyeTrend", cmp: trend(guess, target, context) };
+    return {
+      kind: "bullseyeTrend",
+      delta: bullseyeDelta(guess, target, context),
+    };
   },
   example(target) {
     // Synthesize a prior guess (all zeros — likely 0 bullseye matches
     // against the help-card target) and a current guess with a couple
-    // of exact slots so the example reads "↑ more matches".
+    // of exact slots so the example reads "+2 more".
     const prior = "0".repeat(target.length);
     const guess =
       target.slice(0, 2) + "0".repeat(Math.max(0, target.length - 2));
     return { guess, result: this.compute(guess, target, { priorGuesses: [prior] }) };
   },
   explain(_guess, result) {
-    if (result.cmp === "gt")
-      return "Your guess has MORE exact-slot matches than your previous guess.";
-    if (result.cmp === "lt")
-      return "Your guess has FEWER exact-slot matches than your previous guess.";
+    if (result.delta > 0)
+      return `Your guess has ${result.delta} MORE exact-slot match${result.delta === 1 ? "" : "es"} than your previous guess.`;
+    if (result.delta < 0) {
+      const n = Math.abs(result.delta);
+      return `Your guess has ${n} FEWER exact-slot match${n === 1 ? "" : "es"} than your previous guess.`;
+    }
     return "Your guess has the SAME number of exact-slot matches as your previous guess.";
   },
 };

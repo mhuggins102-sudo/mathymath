@@ -748,7 +748,7 @@ function renderResult(result: ClueResult): string {
     case "upsAndDowns":
       return `target ${result.cmp} guess`;
     case "bullseyeTrend":
-      return `trend=${result.cmp}`;
+      return `trend=${result.delta >= 0 ? "+" : ""}${result.delta}`;
     case "echo":
       return "echo=[" + result.mask.map((m) => (m ? "Y" : "·")).join("") + "]";
     case "elimination":

@@ -172,7 +172,7 @@ function resultKey(r: ClueResult): string {
     case "upsAndDowns":
       return `UD:${r.cmp}`;
     case "bullseyeTrend":
-      return `BT:${r.cmp}`;
+      return `BT:${r.delta}`;
     case "echo":
       return "E:" + r.mask.map((m) => (m ? "1" : "0")).join("");
     case "elimination":
