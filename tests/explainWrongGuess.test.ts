@@ -55,13 +55,16 @@ describe("explainWrongGuess", () => {
         {
           guess: "00000",
           clueId: "containsDigit",
-          result: { kind: "containsDigit", digit: 7, present: false },
+          result: {
+            kind: "containsDigit",
+            picks: [{ digit: 7, present: false }],
+          },
         },
       ],
     };
     const failures = explainWrongGuess(puzzle, "12347");
     expect(failures.length).toBe(1);
-    expect(failures[0]).toContain("does NOT contain 7");
+    expect(failures[0]).toContain("fewer than 1 of 7");
   });
 
   it("explains a distinctDigits violation", () => {

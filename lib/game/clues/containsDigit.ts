@@ -1,63 +1,118 @@
-import type { Clue, ClueComputeContext } from "./types";
+import type { Clue } from "./types";
 
 /**
- * Asks whether a specific digit appears in the target. The digit is
- * picked automatically from the player's guess: the first guess digit
- * that hasn't been asked about in a previous Contains Digit pick. If
- * every guess digit has already been asked, fall back to walking
- * 0-9 and picking the first un-asked one.
- *
- * Pure on (guess, priorResults) — the target is never consulted to
- * pick the digit, so the client and the daily validator agree on
- * which digit was queried.
+ * Contains Digit — interactive multi-pick. The player picks digits
+ * from their current guess, one at a time. Each pick is YES if the
+ * target contains at least as many copies of that digit as the player
+ * has asked about so far (multiset-aware). The round continues as
+ * long as picks are correct and the player still has guess digits
+ * left to spend; it ends on the first wrong pick or when the player
+ * exhausts their guess multiset.
  */
-function pickDigit(guess: string, context: ClueComputeContext | undefined): number {
-  const askedAbout = new Set<number>();
-  for (const r of context?.priorResults ?? []) {
-    if (r.kind === "containsDigit") askedAbout.add(r.digit);
-  }
-  for (const ch of guess) {
+
+function digitCounts(s: string): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const ch of s) {
     const d = Number(ch);
-    if (!askedAbout.has(d)) return d;
+    out.set(d, (out.get(d) ?? 0) + 1);
   }
-  for (let d = 0; d < 10; d++) {
-    if (!askedAbout.has(d)) return d;
+  return out;
+}
+
+/** Resolve a sequence of digit picks against the target into per-pick
+ *  yes/no flags. Used by both compute (full pass) and the per-pick
+ *  callers in the hook / API endpoint. */
+export function resolveContainsDigitPicks(
+  target: string,
+  picks: readonly number[],
+): { digit: number; present: boolean }[] {
+  const targetCounts = digitCounts(target);
+  const used = new Map<number, number>();
+  const out: { digit: number; present: boolean }[] = [];
+  for (const digit of picks) {
+    const usedSoFar = used.get(digit) ?? 0;
+    const inTarget = targetCounts.get(digit) ?? 0;
+    out.push({ digit, present: inTarget > usedSoFar });
+    used.set(digit, usedSoFar + 1);
   }
-  // Every digit 0-9 already asked — only reachable past 10 picks,
-  // which a 7-guess game can't do. Defensive default.
-  return 0;
+  return out;
+}
+
+/** Digits still available to pick given the player's guess and the
+ *  picks they've already made. Returns distinct digits sorted
+ *  ascending — the picker UI uses this list to enable buttons. */
+export function containsDigitAvailable(
+  guess: string,
+  picks: readonly number[],
+): number[] {
+  const guessCounts = digitCounts(guess);
+  const used = new Map<number, number>();
+  for (const d of picks) used.set(d, (used.get(d) ?? 0) + 1);
+  const available: number[] = [];
+  for (const [digit, count] of guessCounts) {
+    if ((used.get(digit) ?? 0) < count) available.push(digit);
+  }
+  available.sort((a, b) => a - b);
+  return available;
+}
+
+/** Round-complete check: the round ends after a wrong pick, or after
+ *  every digit in the player's guess has been asked about. */
+export function containsDigitRoundComplete(
+  guess: string,
+  picks: readonly { digit: number; present: boolean }[],
+): boolean {
+  if (picks.length === 0) return false;
+  if (!picks[picks.length - 1].present) return true;
+  const digitsOnly = picks.map((p) => p.digit);
+  return containsDigitAvailable(guess, digitsOnly).length === 0;
 }
 
 export const containsDigitClue: Clue<{
   kind: "containsDigit";
-  digit: number;
-  present: boolean;
+  picks: { digit: number; present: boolean }[];
 }> = {
   id: "containsDigit",
   name: "Contains Digit",
   category: "compositional",
   description:
-    "Picks a digit FROM your guess and tells you whether it appears anywhere in the target. The picked digit is the first one in your guess that hasn't been asked about before.",
-  // Single-bit yes/no clue. Weight kept above neutral so it shows up in
-  // the chooser regularly (it's often the finisher late-game), but pulled
-  // back from the top after simulations showed it dominating picks.
+    "Pick a digit from your guess and find out if it's in the target. As long as you keep picking correctly (and have digits left in your guess), you keep going. Each correct pick is multiset-aware: asking about a digit you've already picked checks for one MORE of it in the target.",
+  // Multi-pick rounds yield more information per turn than a single
+  // yes/no, so weight stays moderate to keep them showing up.
   weight: 1.2,
+  paramKind: "digit",
   legend: [
     { state: "match", label: "digit present" },
     { state: "cold", label: "digit absent" },
   ],
   compute(guess, target, context) {
-    const digit = pickDigit(guess, context);
-    const present = target.includes(String(digit));
-    return { kind: "containsDigit", digit, present };
+    const picks = context?.picks ?? [];
+    return {
+      kind: "containsDigit",
+      picks: resolveContainsDigitPicks(target, picks),
+    };
   },
   example(target) {
+    // Pick the first two distinct digits from the target so the example
+    // shows two correct picks. With target "47628" the picks become 4
+    // and 7 — both present.
+    const distinct: number[] = [];
+    for (const ch of target) {
+      const d = Number(ch);
+      if (!distinct.includes(d)) distinct.push(d);
+      if (distinct.length === 2) break;
+    }
     const guess = "98765".slice(0, target.length).padEnd(target.length, "9");
-    return { guess, result: this.compute(guess, target) };
+    return {
+      guess,
+      result: this.compute(guess, target, { picks: distinct }),
+    };
   },
   explain(_guess, result) {
-    return result.present
-      ? `The target contains at least one ${result.digit}.`
-      : `The target does NOT contain the digit ${result.digit}.`;
+    if (result.picks.length === 0) return "No picks yet.";
+    const lines = result.picks.map(
+      (p) => `${p.digit}: ${p.present ? "yes" : "no"}`,
+    );
+    return lines.join(" · ");
   },
 };

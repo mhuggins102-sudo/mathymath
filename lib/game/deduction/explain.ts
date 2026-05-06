@@ -191,11 +191,25 @@ function explainViolation(
       return `${name} said the target's digit range (max−min) is ${CMP_LABEL[result.cmp]} ${g} — your guess has range ${t}.`;
     }
     case "containsDigit": {
-      const has = wrongGuess.includes(String(result.digit));
-      if (has === result.present) return null;
-      return result.present
-        ? `${name} said the target contains a ${result.digit} — your guess has none.`
-        : `${name} said the target does NOT contain ${result.digit} — your guess has one.`;
+      // Multi-pick: each pick is a multiset-aware "is this digit in
+      // the target?" question. For each pick, count how many copies
+      // of the digit appear in the hypothesized target (wrongGuess)
+      // and compare to the recorded present flag — the recorded flag
+      // is yes iff the n-th pick of that digit is the n-th-or-fewer
+      // copy in the target.
+      const usedSoFar = new Map<number, number>();
+      for (const p of result.picks) {
+        const used = usedSoFar.get(p.digit) ?? 0;
+        const inWrong = (wrongGuess.match(new RegExp(String(p.digit), "g")) ?? []).length;
+        const expected = inWrong > used;
+        if (expected !== p.present) {
+          return p.present
+            ? `${name} said the target has at least ${used + 1} of ${p.digit} — your guess has only ${inWrong}.`
+            : `${name} said the target has fewer than ${used + 1} of ${p.digit} — your guess has at least ${used + 1}.`;
+        }
+        usedSoFar.set(p.digit, used + 1);
+      }
+      return null;
     }
     case "distinctDigits": {
       const got = new Set(wrongGuess).size;

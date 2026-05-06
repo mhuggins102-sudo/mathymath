@@ -1,4 +1,4 @@
-import type { Clue, ClueId, ClueResult } from "./clues/types";
+import type { Clue, ClueId, ClueParam, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
 import {
   advancedPositionalCapReached,
@@ -97,7 +97,7 @@ export interface GameState {
 
 export type GameAction =
   | { type: "SUBMIT_GUESS"; guess: string; locks?: readonly LockAttempt[] }
-  | { type: "CHOOSE_CLUE"; clueId: ClueId; param?: { selectedSlot?: number; selectedDigit?: number } }
+  | { type: "CHOOSE_CLUE"; clueId: ClueId; param?: ClueParam }
   | { type: "REDRAW" }
   | {
       type: "RESET";

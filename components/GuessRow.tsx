@@ -303,11 +303,21 @@ export function subLabelFor(
       return { text: `${result.count} unique`, className: "text-accent" };
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
-    case "containsDigit":
+    case "containsDigit": {
+      // Show every pick the player made, with ✓ for in-target and
+      // ✗ for the wrong one (always the last, by construction).
+      if (result.picks.length === 0)
+        return { text: "no picks", className: "text-muted" };
+      const text = result.picks
+        .map((p) => `${p.digit}${p.present ? "✓" : "✗"}`)
+        .join(" ");
+      const lastWrong =
+        result.picks[result.picks.length - 1].present === false;
       return {
-        text: `${result.digit}? ${result.present ? "yes" : "no"}`,
-        className: result.present ? "text-good" : "text-bad",
+        text,
+        className: lastWrong ? "text-bad" : "text-good",
       };
+    }
     case "divisibleBy":
       if (result.divisors.length > 0)
         return {

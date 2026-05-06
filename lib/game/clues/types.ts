@@ -34,7 +34,7 @@ export type ClueResult =
   | { kind: "parityBalance"; cmp: Cmp }
   | { kind: "primeCount"; cmp: Cmp }
   | { kind: "rangeCompare"; cmp: Cmp }
-  | { kind: "containsDigit"; digit: number; present: boolean }
+  | { kind: "containsDigit"; picks: { digit: number; present: boolean }[] }
   | { kind: "distinctDigits"; count: number; sharedRepeated: boolean[] }
   | { kind: "median"; cmp: Cmp }
   | { kind: "divisibleBy"; divisors: number[]; targetHasAny: boolean }
@@ -62,9 +62,17 @@ export interface ClueComputeContext {
   knownSlots?: readonly number[];
   /** Player-chosen slot for clues with paramKind "slot" (Oracle). */
   selectedSlot?: number;
-  /** Player-chosen digit for clues with paramKind "digit"
-   *  (Contains Digit). */
+  /** Player-chosen digit for clues with paramKind "digit". (Currently
+   *  unused — Contains Digit moved to a multi-pick model and uses
+   *  `picks` instead. Field retained for future single-digit clues
+   *  and to keep the ClueParam union forward-compatible.) */
   selectedDigit?: number;
+  /** Player-chosen sequence of digits, in order, for Contains Digit's
+   *  multi-pick interactive flow. Each digit must be present in the
+   *  current guess (with multiset accounting); the round resolves when
+   *  the player picks a digit that's not in the target with sufficient
+   *  multiplicity, or when every guess digit has been asked about. */
+  picks?: number[];
   /** Player-chosen previously-used clue to reuse (Clue Reuse special). */
   reusedClueId?: string;
   /** Resolved results from prior guesses, in order. Used by clues that
@@ -84,6 +92,7 @@ export interface ClueComputeContext {
 export interface ClueParam {
   selectedSlot?: number;
   selectedDigit?: number;
+  picks?: number[];
   reusedClueId?: string;
 }
 

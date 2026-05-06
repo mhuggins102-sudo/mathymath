@@ -40,6 +40,7 @@ const clueParamSchema = z
   .object({
     selectedSlot: z.number().int().min(0).max(DIGITS - 1).optional(),
     selectedDigit: z.number().int().min(0).max(9).optional(),
+    picks: z.array(z.number().int().min(0).max(9)).max(20).optional(),
     reusedClueId: z.string().min(1).optional(),
   })
   .optional();
@@ -187,6 +188,29 @@ export async function POST(
     priorGuesses,
     ...clueParam,
   });
+
+  // Contains Digit interactive: if the player's pick sequence isn't
+  // yet complete (no wrong pick AND guess multiset not exhausted),
+  // return a "needs-pick" response so the client can collect another
+  // pick. The round is finalized only when the player gets one wrong
+  // or runs out of guess digits.
+  if (result.kind === "containsDigit") {
+    const { containsDigitRoundComplete, containsDigitAvailable } = await import(
+      "@/lib/game/clues/containsDigit"
+    );
+    const complete = containsDigitRoundComplete(pendingGuess, result.picks);
+    if (!complete) {
+      const available = containsDigitAvailable(
+        pendingGuess,
+        result.picks.map((p) => p.digit),
+      );
+      return NextResponse.json({
+        kind: "needs-pick",
+        partialPicks: result.picks,
+        availableDigits: available,
+      });
+    }
+  }
 
   // Oracle-induced win: if this Oracle reveal (possibly via Clue Reuse)
   // completes the certain set, the player wins immediately. Pending

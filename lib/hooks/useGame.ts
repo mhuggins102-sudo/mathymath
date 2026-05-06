@@ -11,6 +11,7 @@ import {
 } from "@/lib/game/stateMachine";
 import type { ClueId, ClueParam } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
+import { containsDigitRoundComplete } from "@/lib/game/clues/containsDigit";
 import { validateGuess } from "@/lib/game/validator";
 import {
   buildGuessFromInput,
@@ -82,10 +83,14 @@ export interface UseGameResult {
   unlockMode: boolean;
   /** When a clue with `paramKind` is chosen, this holds the clue id
    *  and the required parameter kind until the player makes their
-   *  selection. null when no parameter is pending. */
+   *  selection. null when no parameter is pending. For Contains
+   *  Digit, `picks` accumulates the round's per-pick resolutions
+   *  across the multi-pick UI. */
   pendingClueParam: {
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
+    paramKind: "slot" | "digit" | "reuse";
+    reusedClueId?: string;
+    picks?: { digit: number; present: boolean }[];
   } | null;
   /** Whether the game is being played under advanced rules. */
   advancedMode: boolean;
@@ -118,12 +123,20 @@ export interface UseGameResult {
    *  call `confirmClueParam` once the player has selected. */
   chooseClue: (id: string) => void;
   /** Resolves a pending paramKind clue with the player's selection.
-   *  For Oracle: `{ selectedSlot: N }`. For Contains Digit:
-   *  `{ selectedDigit: N }`. No-op if no param is pending. */
+   *  For Oracle: `{ selectedSlot: N }`. No-op if no param is pending.
+   *  Contains Digit uses `pickContainsDigit` instead — its multi-pick
+   *  flow accumulates picks before resolving the round. */
   confirmClueParam: (param: ClueParam) => void;
   /** Cancels the pending clue param selection, returning to the
    *  chooser so the player can pick a different clue. */
   cancelClueParam: () => void;
+  /** Contains Digit interactive: append one digit pick to the
+   *  current Contains Digit round. Computes the new pick's
+   *  yes/no flag locally (target is in state). If the pick is
+   *  wrong or the player's guess multiset is now exhausted, the
+   *  round resolves and the row is appended to history; otherwise
+   *  the picker stays open with updated available digits. */
+  pickContainsDigit: (digit: number) => void;
   /** Burns one lock to discard the current clue pair and draw the
    *  next from the deck. Only available when pendingGuess is set
    *  and the player has at least one lock remaining. */
@@ -508,7 +521,9 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // confirms → hook dispatches CHOOSE_CLUE with the param attached.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
+    paramKind: "slot" | "digit" | "reuse";
+    reusedClueId?: string;
+    picks?: { digit: number; present: boolean }[];
   } | null>(null);
 
   // Clue-Reuse gating in advanced mode: once the positional cap is
@@ -598,6 +613,40 @@ export function useGame(config: UseGameConfig): UseGameResult {
     setPendingClueParam(null);
   }, []);
 
+  const pickContainsDigit = useCallback(
+    (digit: number) => {
+      if (!pendingClueParam) return;
+      if (pendingClueParam.paramKind !== "digit") return;
+      const guess = state.pendingGuess?.guess;
+      if (!guess) return;
+      const priorDigits = (pendingClueParam.picks ?? []).map((p) => p.digit);
+      const newDigits = [...priorDigits, digit];
+      // Compute against the actual target — unlimited mode has it in
+      // state.target. Use the containsDigit clue directly so the
+      // resolved picks (with present flags) come back.
+      const containsDigit = getClueById("containsDigit");
+      const result = containsDigit.compute(guess, state.target, {
+        picks: newDigits,
+      });
+      if (result.kind !== "containsDigit") return;
+      const complete = containsDigitRoundComplete(guess, result.picks);
+      if (complete) {
+        const param = pendingClueParam.reusedClueId
+          ? { picks: newDigits, reusedClueId: pendingClueParam.reusedClueId }
+          : { picks: newDigits };
+        dispatch({
+          type: "CHOOSE_CLUE",
+          clueId: pendingClueParam.clueId as never,
+          param,
+        });
+        setPendingClueParam(null);
+        return;
+      }
+      setPendingClueParam({ ...pendingClueParam, picks: result.picks });
+    },
+    [pendingClueParam, state.pendingGuess, state.target],
+  );
+
   // Preselected mode: when SUBMIT_GUESS lands on a paramKind clue
   // (oracle / containsDigit), the reducer parks pendingGuess and the
   // chooser UI is suppressed. This effect routes the player straight
@@ -681,6 +730,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
     chooseClue,
     confirmClueParam,
     cancelClueParam,
+    pickContainsDigit,
     redraw,
     canRedraw,
     tapCell,

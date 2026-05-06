@@ -246,37 +246,91 @@ describe("Prime Count", () => {
 });
 
 describe("Contains Digit", () => {
-  it("auto-picks the first guess digit and reports presence in target", () => {
-    // Guess starts with 1 → ask about 1 → not in target "67890"
+  it("returns empty picks when no picks are provided", () => {
     const r = containsDigitClue.compute("12345", "67890");
-    expect(r.digit).toBe(1);
-    expect(r.present).toBe(false);
-    // Guess "67890" → first digit 6 → in target → yes
-    const r2 = containsDigitClue.compute("67890", "67890");
-    expect(r2.digit).toBe(6);
-    expect(r2.present).toBe(true);
+    expect(r.picks).toEqual([]);
   });
-  it("skips digits already asked about in priorResults", () => {
-    // First guess asks about 1 (first digit). Second guess starts with
-    // 1 again, but we've already asked 1 — should walk to 2.
-    const r = containsDigitClue.compute("12345", "55555", {
-      priorResults: [{ kind: "containsDigit", digit: 1, present: false }],
+  it("resolves a single pick: yes when target contains the digit", () => {
+    const r = containsDigitClue.compute("12345", "67890", {
+      picks: [6],
     });
-    expect(r.digit).toBe(2);
-    expect(r.present).toBe(false);
+    expect(r.picks).toEqual([{ digit: 6, present: true }]);
   });
-  it("falls back to walking 0-9 when every guess digit has been asked", () => {
-    // Guess is "11111", and we've already asked 1. Fall back to walking
-    // 0-9; first un-asked is 0.
-    const r = containsDigitClue.compute("11111", "55555", {
-      priorResults: [{ kind: "containsDigit", digit: 1, present: false }],
+  it("resolves a single pick: no when target lacks the digit", () => {
+    const r = containsDigitClue.compute("12345", "67890", {
+      picks: [1],
     });
-    expect(r.digit).toBe(0);
+    expect(r.picks).toEqual([{ digit: 1, present: false }]);
   });
-  it("is pure on (guess, priorResults) — same inputs give same digit", () => {
-    const a = containsDigitClue.compute("12345", "67890");
-    const b = containsDigitClue.compute("12345", "67890");
+  it("is multiset-aware on repeated picks", () => {
+    // target "23445" has two 4s; user picks 4 three times.
+    const r = containsDigitClue.compute("63442", "23445", {
+      picks: [4, 4, 4],
+    });
+    expect(r.picks).toEqual([
+      { digit: 4, present: true },
+      { digit: 4, present: true },
+      { digit: 4, present: false },
+    ]);
+  });
+  it("walks the user-described example: target 23445, picks 4-4-3-2-6", () => {
+    // User's example, all the way through. The last 6 is wrong (target
+    // has no 6); the rest are correct.
+    const r = containsDigitClue.compute("63442", "23445", {
+      picks: [4, 4, 3, 2, 6],
+    });
+    expect(r.picks).toEqual([
+      { digit: 4, present: true },
+      { digit: 4, present: true },
+      { digit: 3, present: true },
+      { digit: 2, present: true },
+      { digit: 6, present: false },
+    ]);
+  });
+  it("is pure on (guess, target, picks)", () => {
+    const a = containsDigitClue.compute("12345", "67890", { picks: [3] });
+    const b = containsDigitClue.compute("12345", "67890", { picks: [3] });
     expect(a).toEqual(b);
+  });
+});
+
+describe("containsDigitAvailable / containsDigitRoundComplete", () => {
+  it("availableDigits subtracts prior picks from the guess multiset", async () => {
+    const { containsDigitAvailable } = await import(
+      "@/lib/game/clues/containsDigit"
+    );
+    // guess "63442" → multiset {2, 3, 4×2, 6}; after picking 4, the
+    // remaining multiset is {2, 3, 4, 6}. distinct digits sorted.
+    expect(containsDigitAvailable("63442", [])).toEqual([2, 3, 4, 6]);
+    expect(containsDigitAvailable("63442", [4])).toEqual([2, 3, 4, 6]);
+    expect(containsDigitAvailable("63442", [4, 4])).toEqual([2, 3, 6]);
+    expect(containsDigitAvailable("63442", [4, 4, 3, 2, 6])).toEqual([]);
+  });
+  it("roundComplete returns true on wrong pick or exhausted multiset", async () => {
+    const { containsDigitRoundComplete } = await import(
+      "@/lib/game/clues/containsDigit"
+    );
+    expect(containsDigitRoundComplete("63442", [])).toBe(false);
+    expect(
+      containsDigitRoundComplete("63442", [{ digit: 4, present: true }]),
+    ).toBe(false);
+    // Wrong pick → done.
+    expect(
+      containsDigitRoundComplete("63442", [
+        { digit: 4, present: true },
+        { digit: 6, present: false },
+      ]),
+    ).toBe(true);
+    // Exhausted → done (all 5 guess digits picked, all correct).
+    expect(
+      containsDigitRoundComplete("63442", [
+        { digit: 4, present: true },
+        { digit: 4, present: true },
+        { digit: 3, present: true },
+        { digit: 2, present: true },
+        { digit: 6, present: true },
+      ]),
+    ).toBe(true);
   });
 });
 
@@ -547,13 +601,13 @@ describe("6-digit length sanity", () => {
     // Total deviation max: 9*6 = 54.
     expect(totalDeviationClue.compute("000000", "999999").value).toBe(54);
   });
-  it("Contains Digit: auto-pick + present check work at length 6", () => {
-    // guess6 = "555555" → first digit 5 → present in target "247628"? No.
-    expect(containsDigitClue.compute(guess6, target6).digit).toBe(5);
-    expect(containsDigitClue.compute(guess6, target6).present).toBe(false);
-    // Guess "777777" → first digit 7 → present in "247628"? Yes.
-    expect(containsDigitClue.compute("777777", target6).digit).toBe(7);
-    expect(containsDigitClue.compute("777777", target6).present).toBe(true);
+  it("Contains Digit: per-pick check works at length 6", () => {
+    // target6 = "247628"; ask about 5 (not in target) → no.
+    const r5 = containsDigitClue.compute(guess6, target6, { picks: [5] });
+    expect(r5.picks).toEqual([{ digit: 5, present: false }]);
+    // Ask about 7 (in target) → yes.
+    const r7 = containsDigitClue.compute(guess6, target6, { picks: [7] });
+    expect(r7.picks).toEqual([{ digit: 7, present: true }]);
   });
   it("Divisible By: 6-digit numeric value divisibility", () => {
     // Target 247628 divisors 2-9: {2, 4} (247628/2=123814, /4=61907; not /3,

@@ -158,7 +158,7 @@ function resultKey(r: ClueResult): string {
     case "rangeCompare":
       return `RC:${r.cmp}`;
     case "containsDigit":
-      return `CD:${r.digit}:${r.present ? 1 : 0}`;
+      return `CD:${r.picks.map((p) => `${p.digit}${p.present ? "y" : "n"}`).join(",")}`;
     case "distinctDigits":
       return `DD:${r.count}`;
     case "median":

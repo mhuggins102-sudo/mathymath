@@ -89,7 +89,12 @@ export interface UseDailyGameResult {
   canStartLock: boolean;
   canCommitPendingLock: boolean;
   unlockMode: boolean;
-  pendingClueParam: { clueId: string; paramKind: "slot" | "digit" | "reuse" } | null;
+  pendingClueParam: {
+    clueId: string;
+    paramKind: "slot" | "digit" | "reuse";
+    reusedClueId?: string;
+    picks?: { digit: number; present: boolean }[];
+  } | null;
   redraw: () => void;
   canRedraw: boolean;
   appendDigit: (d: string) => void;
@@ -98,6 +103,7 @@ export interface UseDailyGameResult {
   chooseClue: (id: ClueId) => void;
   confirmClueParam: (param: ClueParam) => void;
   cancelClueParam: () => void;
+  pickContainsDigit: (digit: number) => void;
   tapCell: (slot: number) => void;
   commitLock: () => void;
 }
@@ -558,9 +564,16 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   }, [input, state, certain, lockedSlots, pendingLockSlot]);
 
   // --- Clue-parameter selection (Oracle slot / Contains Digit digit) ---
+  // For Contains Digit specifically, `picks` accumulates the round's
+  // per-pick yes/no resolutions across the multi-pick UI. Each pick
+  // is a server round-trip (the client doesn't know the target), so
+  // the partial picks come back from the server's "needs-pick"
+  // response.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse"; reusedClueId?: string;
+    paramKind: "slot" | "digit" | "reuse";
+    reusedClueId?: string;
+    picks?: { digit: number; present: boolean }[];
   } | null>(null);
 
   /** Internal: actually fires the choose-clue server call once we
@@ -600,6 +613,24 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           setError(body.error ?? "server_error");
           return;
         }
+        if (body.kind === "needs-pick") {
+          // Contains Digit interactive: the round isn't done yet.
+          // Update the picker's local state with the partial picks
+          // returned by the server, and leave pendingGuess intact so
+          // the player can pick another digit.
+          setPendingClueParam((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  picks: (body.partialPicks ?? []) as {
+                    digit: number;
+                    present: boolean;
+                  }[],
+                }
+              : null,
+          );
+          return;
+        }
         if (body.kind === "continue" || body.kind === "won") {
           const pendingLocks = pending.locks;
           const pendingRedrawCount = pending.redraws ?? 0;
@@ -625,6 +656,9 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
               ? { status: "won" as const, revealedTarget: body.target }
               : {}),
           }));
+          // Clear pending param state on successful resolution so the
+          // chooser/digit-picker UI doesn't linger past the round.
+          setPendingClueParam(null);
         } else {
           setError("unexpected_response");
         }
@@ -693,6 +727,19 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     setPendingClueParam(null);
   }, []);
 
+  const pickContainsDigit = useCallback(
+    (digit: number) => {
+      if (!pendingClueParam || pendingClueParam.paramKind !== "digit") return;
+      const priorDigits = (pendingClueParam.picks ?? []).map((p) => p.digit);
+      const newDigits = [...priorDigits, digit];
+      const param = pendingClueParam.reusedClueId
+        ? { picks: newDigits, reusedClueId: pendingClueParam.reusedClueId }
+        : { picks: newDigits };
+      void doChooseClue(pendingClueParam.clueId as ClueId, param);
+    },
+    [pendingClueParam, doChooseClue],
+  );
+
   // Redraw: burn a lock to discard the current pair and advance the
   // deck. Computed locally (pickTwoClues is shared lib, seed = date).
   // The server validates the final choice via the redraws count sent
@@ -745,6 +792,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
     chooseClue,
     confirmClueParam,
     cancelClueParam,
+    pickContainsDigit,
     tapCell,
     commitLock,
   };
