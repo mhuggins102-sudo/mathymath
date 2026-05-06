@@ -128,6 +128,42 @@ describe("subLabelFor — other clues unchanged", () => {
       }),
     ).toEqual({ text: "4✓ 4✓ 6✗", className: "text-bad" });
   });
+  it("Echo (lists distinct included digits, in guess order)", () => {
+    // Target 57243, guess 55776 → both 5s and both 7s warm, the 6 idle.
+    // Distinct included digits: 5 then 7 (guess order).
+    expect(
+      subLabelFor("55776", {
+        kind: "echo",
+        mask: [true, true, true, true, false],
+      }),
+    ).toEqual({ text: "Includes 5, 7", className: "text-warn" });
+    // Empty include set → "Includes none" muted.
+    expect(
+      subLabelFor("55776", {
+        kind: "echo",
+        mask: [false, false, false, false, false],
+      }),
+    ).toEqual({ text: "Includes none", className: "text-muted" });
+  });
+  it("Elimination (lists distinct excluded digits, in guess order)", () => {
+    // Target 57243, guess 55776 → only the 6 cold; 5/7 are present in
+    // target so they aren't excluded even though the guess has more
+    // copies than the target.
+    expect(
+      subLabelFor("55776", {
+        kind: "elimination",
+        mask: [false, false, false, false, true],
+      }),
+    ).toEqual({ text: "Excludes 6", className: "text-bad" });
+    // Empty exclude set → "Excludes none" muted (every guess digit
+    // is in the target somewhere).
+    expect(
+      subLabelFor("12345", {
+        kind: "elimination",
+        mask: [false, false, false, false, false],
+      }),
+    ).toEqual({ text: "Excludes none", className: "text-muted" });
+  });
 });
 
 describe("isOracleWinRow", () => {

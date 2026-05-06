@@ -327,6 +327,53 @@ export function subLabelFor(
       if (result.targetHasAny)
         return { text: "no shared divisor", className: "text-bad" };
       return { text: "no 2-9 divisor", className: "text-bad" };
+    case "echo": {
+      // Echo's per-slot warm tile fires for any digit that appears in
+      // the target — repeated guess digits all light up even if the
+      // target only contains that digit once. The sub-label lists
+      // the distinct digits known to be in the target ("at least once")
+      // so the player isn't tempted to read multiplicity into the
+      // duplicated highlights.
+      const seen = new Set<string>();
+      const distinct: string[] = [];
+      result.mask.forEach((m, i) => {
+        if (!m) return;
+        const d = guess[i];
+        if (!seen.has(d)) {
+          seen.add(d);
+          distinct.push(d);
+        }
+      });
+      if (distinct.length === 0)
+        return { text: "Includes none", className: "text-muted" };
+      return {
+        text: `Includes ${distinct.join(", ")}`,
+        className: "text-warn",
+      };
+    }
+    case "elimination": {
+      // Same caveat as Echo, mirrored: a guess digit's slot is cold
+      // only when that digit is COMPLETELY absent from the target.
+      // A digit the target contains once but the guess contains
+      // twice highlights neither slot — list the distinct excluded
+      // digits in the sub-label so it's clear what's been ruled out.
+      const seen = new Set<string>();
+      const distinct: string[] = [];
+      result.mask.forEach((m, i) => {
+        if (!m) return;
+        const d = guess[i];
+        if (!seen.has(d)) {
+          seen.add(d);
+          distinct.push(d);
+        }
+      });
+      if (distinct.length === 0)
+        return { text: "Excludes none", className: "text-muted" };
+      return {
+        text: `Excludes ${distinct.join(", ")}`,
+        className: "text-bad",
+      };
+    }
     case "oracle":
       return { text: `slot ${result.slot + 1}`, className: "text-muted" };
     case "extraLock":
