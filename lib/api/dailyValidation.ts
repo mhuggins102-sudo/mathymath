@@ -190,6 +190,7 @@ export function validateDailyHistory(
       .slice(0, i)
       .map((h) => h.result as ClueResult | undefined)
       .filter((r): r is ClueResult => r !== undefined);
+    const priorGuesses = history.slice(0, i).map((h) => h.guess);
     // For clues with paramKind (Oracle, Contains Digit): the player's
     // selection is encoded in the result itself. Oracle stores slot,
     // Oracle stores slot. For Clue Reuse: result.kind IS the reused
@@ -213,6 +214,7 @@ export function validateDailyHistory(
     const expected = clue.compute(g.guess, target, {
       knownSlots: priorKnownSlots,
       priorResults,
+      priorGuesses,
       ...clueParam,
     });
     if (!resultsMatch(g.result, expected)) {

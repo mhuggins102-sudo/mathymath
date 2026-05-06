@@ -106,6 +106,7 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       "totalDeviation",
       "diceCount",
       "upsAndDowns",
+      "bullseyeTrend",
       "extraLock",
       "clueReuse",
     ] as ClueId[]) {
@@ -316,6 +317,35 @@ describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
         expect(b.id).not.toBe("clueReuse");
       }
     }
+  });
+
+  it("never offers Bullseye Trend on round 1 (no prior guess to compare)", () => {
+    for (let s = 0; s < 200; s++) {
+      const seed = `r1-no-trend-${s}`;
+      for (let off = 0; off < 6; off++) {
+        const stdPair = pickTwoClues(seed, [], off, false, false);
+        expect(stdPair[0].id).not.toBe("bullseyeTrend");
+        expect(stdPair[1].id).not.toBe("bullseyeTrend");
+        const advPair = pickTwoClues(seed, [], off, false, true);
+        expect(advPair[0].id).not.toBe("bullseyeTrend");
+        expect(advPair[1].id).not.toBe("bullseyeTrend");
+      }
+    }
+  });
+
+  it("CAN offer Bullseye Trend from round 2 onward", () => {
+    let seenAfterRound1 = false;
+    for (let s = 0; s < 1000 && !seenAfterRound1; s++) {
+      const seed = `r2-trend-${s}`;
+      for (let off = 0; off < 5; off++) {
+        const [a, b] = pickTwoClues(seed, ["sumDelta"], off, false, false);
+        if (a.id === "bullseyeTrend" || b.id === "bullseyeTrend") {
+          seenAfterRound1 = true;
+          break;
+        }
+      }
+    }
+    expect(seenAfterRound1).toBe(true);
   });
 
   it("CAN offer Clue Reuse from round 2 onward", () => {

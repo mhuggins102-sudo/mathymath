@@ -224,9 +224,11 @@ export function reduce(state: GameState, action: GameAction): GameState {
         const priorResults = state.guesses
           .map((g) => g.result)
           .filter((r): r is NonNullable<typeof r> => r !== undefined);
+        const priorGuesses = state.guesses.map((g) => g.guess);
         const result = clue.compute(action.guess, state.target, {
           knownSlots,
           priorResults,
+          priorGuesses,
         });
         const guesses = [
           ...state.guesses,
@@ -324,9 +326,11 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const priorResults = state.guesses
         .map((g) => g.result)
         .filter((r): r is NonNullable<typeof r> => r !== undefined);
+      const priorGuesses = state.guesses.map((g) => g.guess);
       const result = clue.compute(guess, state.target, {
         knownSlots,
         priorResults,
+        priorGuesses,
         ...action.param,
       });
       const { redraws } = state.pendingGuess;

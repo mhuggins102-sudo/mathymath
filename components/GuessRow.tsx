@@ -274,6 +274,17 @@ export function subLabelFor(
       return { text: `${result.count} shared`, className: "text-accent" };
     case "parityMask":
       return { text: `${result.count} slots match`, className: "text-accent" };
+    case "bullseyeTrend": {
+      // Direction-of-progress clue: ↑ (more matches) is GOOD,
+      // ↓ is BAD. Departs from the cmp-clue convention where
+      // eq=good, gt=warn, lt=bad — that mapping fits "your value vs
+      // target's value" but not "your latest vs your previous."
+      if (result.cmp === "gt")
+        return { text: "↑ more matches", className: "text-good" };
+      if (result.cmp === "lt")
+        return { text: "↓ fewer matches", className: "text-bad" };
+      return { text: "= same matches", className: "text-muted" };
+    }
     case "distinctDigits":
       return { text: `${result.count} common`, className: "text-accent" };
     case "totalDeviation":

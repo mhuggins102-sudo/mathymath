@@ -242,6 +242,13 @@ function explainViolation(
       if (got === result.cmp) return null;
       return `${name} said the target's direction-change count is ${CMP_LABEL[result.cmp]} ${g} — your guess has ${t}.`;
     }
+    case "bullseyeTrend":
+      // Trend clues compare the current guess to a PRIOR guess. The
+      // explainer here only sees a single history guess, not its
+      // predecessor, so we can't check the trend invariant. Treated
+      // as un-violatable. Captured deduction puzzles predate this
+      // clue and won't carry bullseyeTrend results anyway.
+      return null;
     case "extraLock":
     case "clueReuse":
       // Special clues don't reveal target info, so they can't be violated.

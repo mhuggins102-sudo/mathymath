@@ -17,6 +17,7 @@ import { divisibleByClue } from "./divisibleBy";
 import { totalDeviationClue } from "./totalDeviation";
 import { diceCountClue } from "./diceCount";
 import { upsAndDownsClue } from "./upsAndDowns";
+import { bullseyeTrendClue } from "./bullseyeTrend";
 import { extraLockClue } from "./extraLock";
 import { clueReuseClue } from "./clueReuse";
 
@@ -47,6 +48,7 @@ export const CLUES: readonly Clue[] = [
   totalDeviationClue,
   diceCountClue,
   upsAndDownsClue,
+  bullseyeTrendClue,
   extraLockClue,
   clueReuseClue,
 ] as const;
