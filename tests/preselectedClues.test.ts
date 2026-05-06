@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildPreselectedDeck } from "@/lib/game/clueSelector";
+import {
+  buildPreselectedDeck,
+  POSITIONAL_CLUE_IDS,
+  ROUND1_EXCLUDE_IDS,
+} from "@/lib/game/clueSelector";
 import { initGameState, reduce } from "@/lib/game/stateMachine";
 import { getClueById } from "@/lib/game/clues/registry";
-import { POSITIONAL_CLUE_IDS } from "@/lib/game/clueSelector";
 
 describe("buildPreselectedDeck", () => {
   it("standard mode: slot 0 is positional, deck has 6 distinct clues", () => {
@@ -52,6 +55,20 @@ describe("buildPreselectedDeck", () => {
       }
     }
     expect(sawNonPositionalAt0).toBe(true);
+  });
+
+  it("standard mode: slot 0 is never a ROUND1_EXCLUDE_IDS clue", () => {
+    for (let i = 0; i < 200; i++) {
+      const deck = buildPreselectedDeck(`r1-std-${i}`, 6, false);
+      expect(ROUND1_EXCLUDE_IDS.has(deck[0])).toBe(false);
+    }
+  });
+
+  it("advanced mode: slot 0 is never a ROUND1_EXCLUDE_IDS clue", () => {
+    for (let i = 0; i < 200; i++) {
+      const deck = buildPreselectedDeck(`r1-adv-${i}`, 6, true);
+      expect(ROUND1_EXCLUDE_IDS.has(deck[0])).toBe(false);
+    }
   });
 });
 

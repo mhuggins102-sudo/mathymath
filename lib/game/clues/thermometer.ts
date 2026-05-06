@@ -25,7 +25,8 @@ export const thermometerClue: Clue<{ kind: "thermometer"; tier: number[] }> = {
   // positional clues stay among the rarest draws.
   weight: 0.4,
   legend: [
-    { state: "close", label: "within 3" },
+    { state: "close", label: "within 1" },
+    { state: "hint", label: "2-3 off" },
     { state: "warm", label: "4-5 off" },
     { state: "cold", label: "6+ off" },
   ],

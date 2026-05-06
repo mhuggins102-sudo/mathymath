@@ -67,9 +67,11 @@ function cellStates(
         c === "eq" ? "match" : c === "gt" ? "warm" : "cold",
       );
     case "within2":
-      return result.mask.map((m, i) =>
-        result.exact[i] ? "match" : m ? "warm" : "idle",
-      );
+      // Mask-only: exact slots no longer paint green. The clue intent
+      // is "within 2", and singling out exact matches visually would
+      // hand the player a free Bullseye — same rationale as
+      // deriveCertainDigits no longer promoting Within-2 exacts.
+      return result.mask.map((m) => (m ? "warm" : "idle"));
     case "parityMask":
       return result.matches.map((m) => (m ? "match" : "idle"));
     case "oracle":
@@ -77,14 +79,13 @@ function cellStates(
         i === result.slot ? "match" : "idle",
       );
     case "thermometer":
-      // 4 tiers numerically (within 1 / 2-3 / 4-5 / 6+) but only 3
-      // visual buckets: tier 0 and tier 1 share `close` so no slot
-      // ever paints `match` (green) for thermometer — green is
-      // reserved for clues that turn a slot into certainty, and
-      // thermometer no longer does. The full per-tier breakdown still
-      // surfaces in the explain popover.
+      // 4 visual tiers without `match` (green): green is reserved for
+      // clues that turn a slot into certainty, and thermometer no
+      // longer does. close → hint → warm → cold gives a 4-step heat
+      // ramp where `hint` is a faded warn between close and warm.
       return result.tier.map((t) => {
-        if (t <= 1) return "close";
+        if (t === 0) return "close";
+        if (t === 1) return "hint";
         if (t === 2) return "warm";
         return "cold";
       });

@@ -323,6 +323,10 @@ const EMPTY_ID_SET: ReadonlySet<ClueId> = new Set();
  *   compositional. Final positions are shuffled so positional cards
  *   may land at any index, including 0.
  *
+ * Both modes also honor `ROUND1_EXCLUDE_IDS`: the slot-0 clue (the one
+ * the player faces on round 1) is never an excluded id. Excluded ids
+ * can still appear in slots 1..N-1.
+ *
  * Determinism: same seed produces the same deck so daily-style fairness
  * holds within a game session.
  */
@@ -355,15 +359,41 @@ export function buildPreselectedDeck(
       }
       out.push(id);
     }
-    return fisherYates(out, seededRng(`pre:adv:order:${seed}`));
+    const shuffled = fisherYates(out, seededRng(`pre:adv:order:${seed}`));
+    return enforceRound1ExclusionAtSlot0(shuffled);
   }
 
-  // Standard: slot 0 positional, slots 1..N-1 random non-special.
-  const shuffledP = fisherYates(positional, seededRng(`pre:std:p:${seed}`));
-  const slot0 = shuffledP[0];
+  // Standard: slot 0 positional (excluding ROUND1_EXCLUDE_IDS — those
+  // are too strong as the round-1 clue), slots 1..N-1 random
+  // non-special. Excluded positionals are still reachable from slot 1
+  // onward via the rest pool.
+  const slot0Pool = positional.filter((id) => !ROUND1_EXCLUDE_IDS.has(id));
+  const slot0 = fisherYates(slot0Pool, seededRng(`pre:std:p:${seed}`))[0];
   const rest = fisherYates(
-    [...shuffledP.slice(1), ...compositional],
+    [
+      ...positional.filter((id) => id !== slot0),
+      ...compositional,
+    ],
     seededRng(`pre:std:rest:${seed}`),
   );
   return [slot0, ...rest.slice(0, Math.max(0, count - 1))];
+}
+
+/** If `deck[0]` is a ROUND1_EXCLUDE_IDS id, swap it with the first
+ *  later slot whose id isn't excluded. Used by the advanced
+ *  preselected branch where slot 0 is determined by a final shuffle
+ *  rather than by construction. */
+function enforceRound1ExclusionAtSlot0(deck: ClueId[]): ClueId[] {
+  if (deck.length === 0 || !ROUND1_EXCLUDE_IDS.has(deck[0])) return deck;
+  const out = deck.slice();
+  for (let i = 1; i < out.length; i++) {
+    if (!ROUND1_EXCLUDE_IDS.has(out[i])) {
+      [out[0], out[i]] = [out[i], out[0]];
+      return out;
+    }
+  }
+  // No non-excluded id found — leave deck as-is. In practice this
+  // can't happen unless every drawn clue is in ROUND1_EXCLUDE_IDS,
+  // and that set is small.
+  return out;
 }
