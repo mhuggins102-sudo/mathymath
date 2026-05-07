@@ -150,7 +150,7 @@ function resultKey(r: ClueResult): string {
     case "sumDelta":
       return `SD:${r.delta}`;
     case "digitOverlap":
-      return `DO:${r.count}`;
+      return "DO:" + r.mask.map((m) => (m ? "1" : "0")).join("");
     case "parityBalance":
       return `PB:${r.cmp}`;
     case "primeCount":
@@ -173,8 +173,6 @@ function resultKey(r: ClueResult): string {
       return `UD:${r.cmp}`;
     case "bullseyeTrend":
       return `BT:${r.delta}`;
-    case "echo":
-      return "E:" + r.mask.map((m) => (m ? "1" : "0")).join("");
     case "elimination":
       return "EL:" + r.mask.map((m) => (m ? "1" : "0")).join("");
     case "extraLock":

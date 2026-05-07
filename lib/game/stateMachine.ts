@@ -65,10 +65,7 @@ export interface GameState {
    *  picked and unpicked options across all pairs, including those
    *  burned via redraws). Passed to pickTwoClues as a soft exclusion
    *  so the walk-forward / backfill paths can't re-surface a card the
-   *  player has already seen — the bug this prevents shows up in
-   *  advanced mode after the positional cap, where filtering positional
-   *  cards out of the walk burns extra deck positions that would
-   *  otherwise leak forward into the next pair's region. */
+   *  player has already seen. */
   offeredClueIds: ClueId[];
   /** "Advanced" rules toggle, captured at game start. Setting changes
    *  during a game don't affect the in-progress reducer — only the next

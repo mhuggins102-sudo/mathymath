@@ -18,7 +18,6 @@ import { totalDeviationClue } from "./totalDeviation";
 import { diceCountClue } from "./diceCount";
 import { upsAndDownsClue } from "./upsAndDowns";
 import { bullseyeTrendClue } from "./bullseyeTrend";
-import { echoClue } from "./echo";
 import { eliminationClue } from "./elimination";
 import { extraLockClue } from "./extraLock";
 import { clueReuseClue } from "./clueReuse";
@@ -28,6 +27,11 @@ import { clueReuseClue } from "./clueReuse";
 //     is a lossy subset of the signed delta).
 //   - maxDigitClue — overlaps rangeCompareClue (range = max − min); range
 //     encodes max-info plus more, so retiring max and keeping range wins.
+// Retired 2026-05-08:
+//   - The original count-style Digit Overlap (just the multiset-
+//     intersection size) was strictly dominated by Echo (same algorithm,
+//     mask vs. count). Echo was renamed to Digit Overlap and the count-
+//     style clue dropped.
 // totalDeviationClue was briefly retired (overlaps thermometer) but put
 // back: the collapsed-to-a-number feel is different from thermometer's
 // per-slot heat grid and the chooser rhythm benefits from having it.
@@ -51,7 +55,6 @@ export const CLUES: readonly Clue[] = [
   diceCountClue,
   upsAndDownsClue,
   bullseyeTrendClue,
-  echoClue,
   eliminationClue,
   extraLockClue,
   clueReuseClue,

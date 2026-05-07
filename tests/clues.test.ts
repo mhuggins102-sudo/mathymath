@@ -21,7 +21,6 @@ import {
   upsAndDownsClue,
 } from "@/lib/game/clues/upsAndDowns";
 import { bullseyeTrendClue } from "@/lib/game/clues/bullseyeTrend";
-import { echoClue } from "@/lib/game/clues/echo";
 import { eliminationClue } from "@/lib/game/clues/elimination";
 import { extraLockClue } from "@/lib/game/clues/extraLock";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
@@ -189,27 +188,6 @@ describe("Sum Delta", () => {
   });
 });
 
-describe("Digit Overlap", () => {
-  it("is a multiset intersection (caps repeats at the target's count)", () => {
-    // guess 22245 vs target 57221: target has two 2s, so the three 2s in
-    // the guess claim only 2. Plus the single 5. Total: 3.
-    expect(digitOverlapClue.compute("22245", "57221").count).toBe(3);
-  });
-  it("counts each distinct match when target holds all copies", () => {
-    // guess 23446 vs target 44215: target {4:2, 2:1, 1:1, 5:1};
-    //   one 2 matches, two 4s match → 3.
-    expect(digitOverlapClue.compute("23446", "44215").count).toBe(3);
-  });
-  it("excess repeats in the guess don't count", () => {
-    // guess 11111 vs target 10234: target has only one 1, so only one
-    // of the guess's five 1s can claim it.
-    expect(digitOverlapClue.compute("11111", "10234").count).toBe(1);
-  });
-  it("disjoint is 0", () => {
-    expect(digitOverlapClue.compute("11111", "22222").count).toBe(0);
-  });
-});
-
 describe("Parity Balance", () => {
   it("compares even-digit counts", () => {
     // target 02468 -> 5 evens; guess 24680 -> 5 evens => eq
@@ -363,7 +341,7 @@ describe("Distinct Digits", () => {
   });
 });
 
-describe("Echo", () => {
+describe("Digit Overlap", () => {
   it("marks slots whose digit appears in the target (distinct digits)", () => {
     // target "12345"; guess "13579":
     //   slot 0 '1' ✓ (target has one 1, consumed by slot 0)
@@ -371,39 +349,29 @@ describe("Echo", () => {
     //   slot 2 '5' ✓
     //   slot 3 '7' ✗
     //   slot 4 '9' ✗
-    expect(echoClue.compute("13579", "12345").mask).toEqual([
+    expect(digitOverlapClue.compute("13579", "12345").mask).toEqual([
       true, true, true, false, false,
     ]);
   });
   it("only highlights up to the target's count for repeated guess digits", () => {
     // Target has only ONE '1', so a guess of "11111" gets exactly one
     // warm slot (the first; subsequent 1s are 'wasted' duplicates).
-    expect(echoClue.compute("11111", "12345").mask).toEqual([
+    expect(digitOverlapClue.compute("11111", "12345").mask).toEqual([
       true, false, false, false, false,
     ]);
   });
-  it("user example A: target 44532, guess 55341 → first 5, the 3, the 4", () => {
-    //   slot 0 '5' ✓ (target has one 5, consumed)
-    //   slot 1 '5' ✗ (target's only 5 is gone)
-    //   slot 2 '3' ✓
-    //   slot 3 '4' ✓ (target has two 4s, one remaining)
-    //   slot 4 '1' ✗
-    expect(echoClue.compute("55341", "44532").mask).toEqual([
+  it("multiset example A: target 44532, guess 55341 → first 5, the 3, the 4", () => {
+    expect(digitOverlapClue.compute("55341", "44532").mask).toEqual([
       true, false, true, true, false,
     ]);
   });
-  it("user example B: target 44321, guess 24544 → 2, first two 4s only", () => {
-    //   slot 0 '2' ✓
-    //   slot 1 '4' ✓ (1st 4, target has 2)
-    //   slot 2 '5' ✗
-    //   slot 3 '4' ✓ (2nd 4, target's 4s now consumed)
-    //   slot 4 '4' ✗ (3rd 4, no remaining target 4s)
-    expect(echoClue.compute("24544", "44321").mask).toEqual([
+  it("multiset example B: target 44321, guess 24544 → 2, first two 4s only", () => {
+    expect(digitOverlapClue.compute("24544", "44321").mask).toEqual([
       true, true, false, true, false,
     ]);
   });
   it("all-false when no guess digit is in target", () => {
-    expect(echoClue.compute("66666", "12345").mask).toEqual([
+    expect(digitOverlapClue.compute("66666", "12345").mask).toEqual([
       false, false, false, false, false,
     ]);
   });
@@ -416,9 +384,10 @@ describe("Elimination", () => {
       false, false, false, true, true,
     ]);
   });
-  it("inverts Echo when the guess has no repeated digits beyond the target's count", () => {
-    // With distinct guess digits, Echo's multiset rule degrades to
-    // simple "is digit present", so Elimination is the exact inverse.
+  it("inverts Digit Overlap when the guess has no repeated digits beyond the target's count", () => {
+    // With distinct guess digits, Digit Overlap's multiset rule
+    // degrades to simple "is digit present", so Elimination is the
+    // exact inverse.
     const cases: [string, string][] = [
       ["13579", "12345"],
       ["00000", "12345"],
@@ -426,9 +395,9 @@ describe("Elimination", () => {
       ["66666", "12345"],
     ];
     for (const [g, t] of cases) {
-      const echo = echoClue.compute(g, t).mask;
+      const overlap = digitOverlapClue.compute(g, t).mask;
       const elim = eliminationClue.compute(g, t).mask;
-      expect(elim).toEqual(echo.map((m) => !m));
+      expect(elim).toEqual(overlap.map((m) => !m));
     }
   });
 });
@@ -604,12 +573,16 @@ describe("6-digit length sanity", () => {
     // target sum: 2+4+7+6+2+8 = 29; guess sum: 30. delta = -1.
     expect(sumDeltaClue.compute(guess6, target6).delta).toBe(-1);
   });
-  it("Digit Overlap: multiset intersection caps correctly", () => {
+  it("Digit Overlap: multiset mask caps correctly", () => {
     // guess "555555" vs target "247628" — target has zero 5s, so
-    // overlap is 0.
-    expect(digitOverlapClue.compute(guess6, target6).count).toBe(0);
-    // Six 2s against target with two 2s → overlap = 2.
-    expect(digitOverlapClue.compute("222222", target6).count).toBe(2);
+    // every slot stays cold.
+    expect(digitOverlapClue.compute(guess6, target6).mask).toEqual([
+      false, false, false, false, false, false,
+    ]);
+    // Six 2s against target with two 2s → first two slots warm, rest cold.
+    expect(digitOverlapClue.compute("222222", target6).mask).toEqual([
+      true, true, false, false, false, false,
+    ]);
   });
   it("Distinct Digits: counts up to puzzle length", () => {
     expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(6);
@@ -654,10 +627,10 @@ describe("6-digit length sanity", () => {
 });
 
 describe("Registry", () => {
-  it("has 21 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(23);
+  it("has 22 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(22);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(23);
+    expect(ids.size).toBe(22);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }

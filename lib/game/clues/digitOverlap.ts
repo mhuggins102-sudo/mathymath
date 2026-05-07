@@ -1,32 +1,48 @@
 import type { Clue } from "./types";
 
-export const digitOverlapClue: Clue<{ kind: "digitOverlap"; count: number }> = {
+/**
+ * Digit Overlap — Wordle's yellow-tile mechanic. For each slot of the
+ * player's guess, marks whether that digit appears in the target,
+ * multiset-aware: each target occurrence of a digit can satisfy at
+ * most one matching guess slot (walked left-to-right). A guess with
+ * three 4s against a target with only two 4s lights up the first
+ * two and leaves the third idle.
+ */
+export const digitOverlapClue: Clue<{
+  kind: "digitOverlap";
+  mask: boolean[];
+}> = {
   id: "digitOverlap",
   name: "Digit Overlap",
   category: "compositional",
   description:
-    "How many of your digits have a match in the target. Duplicates are capped by the target's count — three 2s against a target with only two 2s scores 2, not 3.",
-  weight: 0.9,
+    "For each slot in your guess, marks whether that digit appears in the target — multiset-aware. Each target digit can satisfy at most one guess slot (left-to-right), so a guess with three 4s when the target has two 4s lights up the first two only.",
+  weight: 0.6,
+  legend: [{ state: "warm", label: "digit appears in target" }],
   compute(guess, target) {
-    // Multiset intersection: each digit in the target can match at most
-    // one digit in the guess. We tick off matches as we go.
-    const remaining = new Array(10).fill(0);
-    for (const ch of target) remaining[Number(ch)]++;
-    let count = 0;
-    for (const ch of guess) {
-      const d = Number(ch);
-      if (remaining[d] > 0) {
-        count++;
-        remaining[d]--;
-      }
-    }
-    return { kind: "digitOverlap", count };
+    const remaining = new Map<string, number>();
+    for (const ch of target)
+      remaining.set(ch, (remaining.get(ch) ?? 0) + 1);
+    const mask = [...guess].map((ch) => {
+      const left = remaining.get(ch) ?? 0;
+      if (left <= 0) return false;
+      remaining.set(ch, left - 1);
+      return true;
+    });
+    return { kind: "digitOverlap", mask };
   },
   example(target) {
-    const guess = "12348".slice(0, target.length).padEnd(target.length, "1");
+    const guess = ("0" + target).slice(0, target.length);
     return { guess, result: this.compute(guess, target) };
   },
-  explain(guess, result) {
-    return `${result.count} of your ${guess.length} digits have a matching digit in the target.`;
+  explain(_guess, result) {
+    const slots = result.mask
+      .map((m, i) => (m ? String(i + 1) : null))
+      .filter((v): v is string => v !== null);
+    if (slots.length === 0)
+      return "None of your digits appear in the target.";
+    if (slots.length === result.mask.length)
+      return "Every digit in your guess appears somewhere in the target.";
+    return `Slots ${slots.join(", ")} contain a digit that's somewhere in the target.`;
   },
 };

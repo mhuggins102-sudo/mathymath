@@ -50,7 +50,7 @@ describe("pickTwoClues — basics", () => {
 
   it("every registered info clue is reachable through the deck", () => {
     const seen = new Set<ClueId>();
-    for (let i = 0; i < 2000 && seen.size < 23; i++) {
+    for (let i = 0; i < 2000 && seen.size < 22; i++) {
       for (let round = 0; round < 11; round++) {
         const chosen = Array.from({ length: round }, () => "bullseyes" as ClueId);
         const [a, b] = pickTwoClues(`reach-${i}`, chosen);
@@ -78,7 +78,6 @@ describe("pickTwoClues — basics", () => {
       "diceCount",
       "upsAndDowns",
       "bullseyeTrend",
-      "echo",
       "elimination",
       "extraLock",
       "clueReuse",
@@ -115,7 +114,7 @@ describe("pickTwoClues — regular mode pair-1 curated guarantee", () => {
   it("ROUND1_CURATED_CLUE_IDS contains the user-specified set", () => {
     expect([...ROUND1_CURATED_CLUE_IDS].sort()).toEqual(
       [
-        "echo",
+        "digitOverlap",
         "elimination",
         "divisibleBy",
         "containsDigit",
@@ -321,7 +320,6 @@ describe("pickTwoClues — excludeIds soft filter", () => {
       "diceCount",
       "upsAndDowns",
       "extraLock",
-      "echo",
       "elimination",
       "bullseyes",
       "higherLower",

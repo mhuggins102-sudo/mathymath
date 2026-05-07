@@ -340,8 +340,11 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     pendingLockSlot: number;
   } {
     const oracleClueObj = getClueById("oracle");
-    for (let day = 1; day < 365; day++) {
-      const month = String(((day - 1) % 12) + 1).padStart(2, "0");
+    // Daily endpoints reject future dates, so confine the search to
+    // months strictly before today (2026-05). Plenty of past dates
+    // exist to find a viable oracle-at-round-4 setup.
+    for (let day = 1; day < 120; day++) {
+      const month = String(((day - 1) % 4) + 1).padStart(2, "0");
       const dayOfMonth = String(((day - 1) % 28) + 1).padStart(2, "0");
       const D = `2026-${month}-${dayOfMonth}`;
       const T = generateDailyTarget(D, 5);

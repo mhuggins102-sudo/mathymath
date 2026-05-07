@@ -23,7 +23,7 @@ export function isPositionalClueId(id: string | undefined): boolean {
  *  and the most legible compositional clues (Echo, Elimination,
  *  Divisible By, Contains Digit). Advanced mode ignores this list. */
 export const ROUND1_CURATED_CLUE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
-  "echo",
+  "digitOverlap",
   "elimination",
   "divisibleBy",
   "containsDigit",
@@ -180,8 +180,8 @@ export function pickTwoClues(
     isEligible(id) && !excludeIds.has(id);
 
   // Fast path: when both base/base+1 cards are fresh, take them
-  // directly. Preserves the existing offset semantics for the common
-  // case (no positional cap, not round 1, or round 1 with no redraw).
+  // directly. Preserves the offset semantics for the common case
+  // (not round 1, or round 1 with no redraw).
   const headA = deck[base];
   const headB = deck[base + 1];
   if (

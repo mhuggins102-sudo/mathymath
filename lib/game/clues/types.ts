@@ -30,7 +30,7 @@ export type ClueResult =
   | { kind: "thermometer"; tier: number[] } // 0=exact..4=far
   // Compositional
   | { kind: "sumDelta"; delta: number } // target - guess
-  | { kind: "digitOverlap"; count: number }
+  | { kind: "digitOverlap"; mask: boolean[] }
   | { kind: "parityBalance"; cmp: Cmp }
   | { kind: "primeCount"; cmp: Cmp }
   | { kind: "rangeCompare"; cmp: Cmp }
@@ -42,7 +42,6 @@ export type ClueResult =
   | { kind: "diceCount"; cmp: Cmp }
   | { kind: "upsAndDowns"; cmp: Cmp }
   | { kind: "bullseyeTrend"; delta: number }
-  | { kind: "echo"; mask: boolean[] }
   | { kind: "elimination"; mask: boolean[] }
   // Special — meta-action cards that don't reveal target info but
   // change game resources. extraLock grants +1 lock (see locks.ts).

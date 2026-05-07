@@ -52,7 +52,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           <p>
             After each guess you&apos;ll be offered{" "}
             <strong className="text-foreground">two clue options</strong>.
-            Pick the one that will help you most:
+            Pick the one that will help you most. The first pair is always
+            drawn so that at least one option is from the round-1 curated
+            set: Digit Overlap, Elimination, Divisible By, Contains Digit,
+            Higher or Lower, Within 2, Oracle, or Thermometer. Cards come
+            in three flavors:
           </p>
           <ul className="list-disc list-inside space-y-1 pl-1">
             <li>
@@ -70,10 +74,12 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             </li>
           </ul>
           <p>
-            You also start each game with one{" "}
-            <span className="text-foreground">🔒 lock</span> — tap a cell on
-            any guess to pin a digit you&apos;re sure of. Correct locks stay;
-            wrong locks are spent. You can also spend a lock to{" "}
+            You start each game with one{" "}
+            <span className="text-foreground">🔒 lock</span> (Advanced
+            unlimited mode starts with zero — you can still earn locks via
+            Extra Lock). Tap a cell on any guess to pin a digit you&apos;re
+            sure of. Correct locks stay; wrong locks are spent. You can
+            also spend a lock to{" "}
             <strong className="text-foreground">redraw</strong> the offered
             clue pair if neither option appeals, and{" "}
             <strong className="text-foreground">Clue Reuse</strong> costs 1
