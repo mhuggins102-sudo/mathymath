@@ -98,12 +98,6 @@ describe("subLabelFor — Sum Delta uses exact delta (Option B)", () => {
 });
 
 describe("subLabelFor — other clues unchanged", () => {
-  it("Digit Overlap", () => {
-    expect(subLabelFor("11111", { kind: "digitOverlap", count: 3 })).toEqual({
-      text: "3 shared",
-      className: "text-accent",
-    });
-  });
   it("Contains Digit (multi-pick sequence, per-pick green/red parts)", () => {
     expect(
       subLabelFor("11111", {
@@ -144,19 +138,20 @@ describe("subLabelFor — other clues unchanged", () => {
       ],
     });
   });
-  it("Echo (per-digit ✓ marks, distinct in guess order)", () => {
-    // Target 57243, guess 55776 → both 5s and both 7s warm, the 6 idle.
-    // Distinct included digits: 5 then 7 (guess order).
+  it("Digit Overlap (per-digit ✓ marks, distinct in guess order)", () => {
+    // Target 12243, guess 55776 + (mask shape) — distinct hit digits
+    // listed in guess order with a ✓ each, capped to those that
+    // actually fired in the multiset-aware mask.
     expect(
       subLabelFor("55776", {
-        kind: "echo",
-        mask: [true, true, true, true, false],
+        kind: "digitOverlap",
+        mask: [true, false, true, false, false],
       }),
     ).toEqual({ text: "5✓ 7✓", className: "text-warn" });
-    // Empty include set → "no hits" muted.
+    // Empty hits → "no hits" muted.
     expect(
       subLabelFor("55776", {
-        kind: "echo",
+        kind: "digitOverlap",
         mask: [false, false, false, false, false],
       }),
     ).toEqual({ text: "no hits", className: "text-muted" });

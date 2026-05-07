@@ -97,19 +97,6 @@ function diceCount(s: string): number {
   }
   return n;
 }
-function digitOverlap(guess: string, target: string): number {
-  const remaining = new Array(10).fill(0);
-  for (const ch of target) remaining[+ch]++;
-  let count = 0;
-  for (const ch of guess) {
-    const d = +ch;
-    if (remaining[d] > 0) {
-      count++;
-      remaining[d]--;
-    }
-  }
-  return count;
-}
 function thermometerTier(diff: number): number {
   const d = Math.abs(diff);
   if (d <= 1) return 0;
@@ -170,8 +157,21 @@ function targetMatchesResult(
       return true;
     case "sumDelta":
       return digitSum(target) - digitSum(guess) === result.delta;
-    case "digitOverlap":
-      return digitOverlap(guess, target) === result.count;
+    case "digitOverlap": {
+      // Multiset-aware mask: walk guess left-to-right, ticking off the
+      // remaining count of each digit in target.
+      const remaining = new Map<string, number>();
+      for (const ch of target)
+        remaining.set(ch, (remaining.get(ch) ?? 0) + 1);
+      for (let i = 0; i < guess.length; i++) {
+        const ch = guess[i];
+        const left = remaining.get(ch) ?? 0;
+        const expectHit = left > 0;
+        if (expectHit !== result.mask[i]) return false;
+        if (expectHit) remaining.set(ch, left - 1);
+      }
+      return true;
+    }
     case "parityBalance": {
       const t = evenCount(target);
       const g = evenCount(guess);
@@ -249,11 +249,6 @@ function targetMatchesResult(
       if (result.cmp === "gt") return t > g;
       return t < g;
     }
-    case "echo":
-      for (let i = 0; i < guess.length; i++) {
-        if (target.includes(guess[i]) !== result.mask[i]) return false;
-      }
-      return true;
     case "elimination":
       for (let i = 0; i < guess.length; i++) {
         if (!target.includes(guess[i]) !== result.mask[i]) return false;
@@ -708,7 +703,7 @@ function renderResult(result: ClueResult): string {
     case "sumDelta":
       return `delta=${result.delta >= 0 ? "+" : ""}${result.delta}`;
     case "digitOverlap":
-      return `count=${result.count}`;
+      return "overlap=[" + result.mask.map((m) => (m ? "Y" : "·")).join("") + "]";
     case "parityBalance":
       return `target ${result.cmp} guess`;
     case "primeCount":
@@ -736,8 +731,6 @@ function renderResult(result: ClueResult): string {
       return `target ${result.cmp} guess`;
     case "bullseyeTrend":
       return `trend=${result.delta >= 0 ? "+" : ""}${result.delta}`;
-    case "echo":
-      return "echo=[" + result.mask.map((m) => (m ? "Y" : "·")).join("") + "]";
     case "elimination":
       return "elim=[" + result.mask.map((m) => (m ? "X" : "·")).join("") + "]";
     case "extraLock":

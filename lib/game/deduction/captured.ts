@@ -26,8 +26,56 @@ interface RawPuzzle {
  *  those changes; load-time migration keeps them parseable by the
  *  current explain() / cellStates() functions instead of forcing a
  *  full re-capture. */
+function digitOverlapMask(guess: string, target: string): boolean[] {
+  const remaining = new Map<string, number>();
+  for (const ch of target)
+    remaining.set(ch, (remaining.get(ch) ?? 0) + 1);
+  return [...guess].map((ch) => {
+    const left = remaining.get(ch) ?? 0;
+    if (left <= 0) return false;
+    remaining.set(ch, left - 1);
+    return true;
+  });
+}
+
 function migrateResult(target: string, g: RawGuess): RawGuess {
   const r = g.result as unknown as Record<string, unknown>;
+  // Echo was renamed to Digit Overlap (and the old count-style Digit
+  // Overlap was retired). Old captured rows can carry kind: "echo"
+  // with a mask, OR kind: "digitOverlap" with just a count. Both map
+  // to the new { kind: "digitOverlap", mask: boolean[] } shape.
+  // `clueId` is typed as the current ClueId union, which no longer
+  // includes "echo" — but stored captured rows can carry it. Widen
+  // the comparison to a string check to handle both.
+  const cid = g.clueId as string;
+  if (cid === "echo" || cid === "digitOverlap") {
+    if (
+      r.kind === "digitOverlap" &&
+      Array.isArray((r as { mask?: unknown }).mask)
+    ) {
+      return g;
+    }
+    if (
+      (r.kind as string) === "echo" &&
+      Array.isArray((r as { mask?: unknown }).mask)
+    ) {
+      return {
+        ...g,
+        clueId: "digitOverlap" as ClueId,
+        result: { kind: "digitOverlap", mask: r.mask as boolean[] } as ClueResult,
+      };
+    }
+    if (typeof (r as { count?: unknown }).count === "number") {
+      return {
+        ...g,
+        clueId: "digitOverlap" as ClueId,
+        result: {
+          kind: "digitOverlap",
+          mask: digitOverlapMask(g.guess, target),
+        } as ClueResult,
+      };
+    }
+  }
   if (g.clueId === "containsDigit") {
     if (Array.isArray((r as { picks?: unknown }).picks)) return g;
     if ("digit" in r && "present" in r) {

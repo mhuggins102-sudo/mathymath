@@ -41,13 +41,13 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
         <div className="space-y-1">
           <Toggle
             label="Advanced unlimited mode"
-            description="At most 2 positional clues per game. Clue cards are fully shuffled — any combination can show up on round 1 (no compositional/positional pairing guarantee). Once you've picked your second positional clue, the chooser stops offering positional cards and Clue Reuse can only re-apply non-positional clues. Affects new unlimited games only — the daily puzzle is unchanged."
+            description="The full deck is shuffled with no turn-1 guarantee — any clue can show up on round 1 (Bullseye Trend excluded; it needs a prior guess). You start with 0 locks instead of 1; you can still earn one via Extra Lock and spend it on redraws. Clue Reuse is removed from the deck entirely. Affects new unlimited games only — the daily puzzle is unchanged."
             value={settings.advancedMode}
             onChange={(v) => setSetting("advancedMode", v)}
           />
           <Toggle
             label="Preselected Clues"
-            description="Show all 6 clues in advance, one per upcoming guess — no chooser. Locks are only used to pin a digit (no redraw, no Clue Reuse). With Advanced off, turn 1 is positional and the rest are random non-special. With Advanced on, the deck follows advanced rules: ≤ 2 positional anywhere in the 6, no positional guarantee on turn 1."
+            description="Show all 6 clues in advance, one per upcoming guess — no chooser. Locks pin a digit only (no redraw, no Clue Reuse). With Advanced off, turn 1 is drawn from the curated round-1 set (Digit Overlap, Elimination, Divisible By, Contains Digit, Higher or Lower, Within 2, Oracle, Thermometer) and the remaining slots are random non-special clues. With Advanced on, the 6-clue deck is fully shuffled with no curated guarantee on turn 1."
             value={settings.preselectedClues}
             onChange={(v) => setSetting("preselectedClues", v)}
           />

@@ -9,7 +9,7 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   oracle: "🔮",
   thermometer: "🌡️",
   sumDelta: "🔢",
-  digitOverlap: "♻️",
+  digitOverlap: "🟨",
   parityBalance: "⚪",
   primeCount: "🟣",
   rangeCompare: "🧭",
@@ -21,7 +21,6 @@ const CLUE_EMOJI: Record<ClueId, string> = {
   diceCount: "🎲",
   upsAndDowns: "🌊",
   bullseyeTrend: "📈",
-  echo: "💬",
   elimination: "🚫",
   extraLock: "🔒",
   clueReuse: "🔄",
@@ -52,7 +51,7 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
       const map = ["🟨", "🟧", "🟥"];
       return result.tier.map((t) => map[t] ?? "⬛").join("");
     }
-    case "echo":
+    case "digitOverlap":
       return result.mask.map((m) => (m ? "🟨" : "⬛")).join("");
     case "elimination":
       return result.mask.map((m) => (m ? "🟥" : "⬛")).join("");

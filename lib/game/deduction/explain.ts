@@ -12,19 +12,6 @@ function digitSum(s: string): number {
   for (const ch of s) n += +ch;
   return n;
 }
-function digitOverlap(guess: string, target: string): number {
-  const remaining = new Array(10).fill(0);
-  for (const ch of target) remaining[+ch]++;
-  let count = 0;
-  for (const ch of guess) {
-    const d = +ch;
-    if (remaining[d] > 0) {
-      count++;
-      remaining[d]--;
-    }
-  }
-  return count;
-}
 function evenCount(s: string): number {
   let n = 0;
   for (const ch of s) if (+ch % 2 === 0) n++;
@@ -162,9 +149,24 @@ function explainViolation(
       return `${name} said the target's digit sum is ${want} — your guess sums to ${got}.`;
     }
     case "digitOverlap": {
-      const got = digitOverlap(historyGuess, wrongGuess);
-      if (got === result.count) return null;
-      return `${name} said ${result.count} digit${result.count === 1 ? "" : "s"} of ${historyGuess} should appear in the target — your guess matches on ${got}.`;
+      // Mask-based: result.mask[i] says historyGuess[i] does/doesn't
+      // hit a still-available copy in target. Recompute the mask
+      // against the hypothesized wrongGuess and compare slot-by-slot.
+      const remaining = new Map<string, number>();
+      for (const ch of wrongGuess)
+        remaining.set(ch, (remaining.get(ch) ?? 0) + 1);
+      for (let i = 0; i < historyGuess.length; i++) {
+        const ch = historyGuess[i];
+        const left = remaining.get(ch) ?? 0;
+        const actuallyHit = left > 0;
+        if (actuallyHit) remaining.set(ch, left - 1);
+        if (actuallyHit !== result.mask[i]) {
+          return result.mask[i]
+            ? `${name} said ${ch} at slot ${i + 1} hits a target digit — your guess has no remaining ${ch} to match.`
+            : `${name} said ${ch} at slot ${i + 1} does NOT hit a target digit — your guess still has a free ${ch}.`;
+        }
+      }
+      return null;
     }
     case "parityBalance": {
       const t = evenCount(wrongGuess);
@@ -274,21 +276,6 @@ function explainViolation(
       // as un-violatable. Captured deduction puzzles predate this
       // clue and won't carry bullseyeTrend results anyway.
       return null;
-    case "echo": {
-      // Echo says historyGuess[i] is in target ⇔ result.mask[i].
-      // If wrongGuess were the target, then historyGuess[i] should be
-      // present in wrongGuess iff the recorded mask says so.
-      for (let i = 0; i < historyGuess.length; i++) {
-        const wantPresent = result.mask[i];
-        const actuallyPresent = wrongGuess.includes(historyGuess[i]);
-        if (wantPresent !== actuallyPresent) {
-          return wantPresent
-            ? `${name} said ${historyGuess[i]} appears somewhere in the target — your guess has no ${historyGuess[i]}.`
-            : `${name} said ${historyGuess[i]} does NOT appear in the target — your guess has at least one ${historyGuess[i]}.`;
-        }
-      }
-      return null;
-    }
     case "elimination": {
       // Inverse of Echo. mask[i]=true means historyGuess[i] is NOT in
       // target. So if wrongGuess were the target, historyGuess[i]

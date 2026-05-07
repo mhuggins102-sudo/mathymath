@@ -82,9 +82,10 @@ function cellStates(
       // BOTH guess and target — a small guess-dependent kicker on
       // top of the guess-independent count.
       return result.sharedRepeated.map((m) => (m ? "warm" : "idle"));
-    case "echo":
-      // Wordle-yellow: warm for digits that appear somewhere in the
-      // target (not necessarily at this slot). No certainty implied.
+    case "digitOverlap":
+      // Wordle-yellow: warm for digits that appear in the target
+      // (multiset-aware — repeated guess digits beyond the target's
+      // count stay idle). No slot-positional certainty implied.
       return result.mask.map((m) => (m ? "warm" : "idle"));
     case "elimination":
       // Inverse of Echo: cold for digits that are ABSENT from the
@@ -294,8 +295,6 @@ export function subLabelFor(
         className: "text-bad",
       };
     }
-    case "digitOverlap":
-      return { text: `${result.count} shared`, className: "text-accent" };
     case "parityMask":
       return { text: `${result.count} slots match`, className: "text-accent" };
     case "bullseyeTrend": {
@@ -350,14 +349,11 @@ export function subLabelFor(
       if (result.targetHasAny)
         return { text: "no shared divisor", className: "text-bad" };
       return { text: "no 2-9 divisor", className: "text-bad" };
-    case "echo": {
-      // Echo's per-slot warm tile fires for any digit that appears in
-      // the target — repeated guess digits all light up even if the
-      // target only contains that digit once. The sub-label lists
-      // the distinct included digits with a check after each so the
-      // sequence reads like containsDigit's pick history and the
-      // ✓ reinforces the "at least once" framing the per-slot color
-      // implies.
+    case "digitOverlap": {
+      // Multiset-aware Wordle-yellow: a slot is warm only while the
+      // target's count for that digit is still positive. Sub-label
+      // lists the distinct hit digits in guess order with a ✓ after
+      // each, mirroring Contains Digit's pick-history format.
       const seen = new Set<string>();
       const distinct: string[] = [];
       result.mask.forEach((m, i) => {
@@ -376,7 +372,7 @@ export function subLabelFor(
       };
     }
     case "elimination": {
-      // Same caveat as Echo, mirrored: a guess digit's slot is cold
+      // Mirrored from Digit Overlap: a guess digit's slot is cold
       // only when that digit is COMPLETELY absent from the target.
       // Sub-label lists each distinct excluded digit with an ✗ so it's
       // clear what's been ruled out (and not extrapolated to copies).
