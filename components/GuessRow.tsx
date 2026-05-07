@@ -293,11 +293,19 @@ export function subLabelFor(
       // ↓ is BAD. Departs from the cmp-clue convention where
       // eq=good, gt=warn, lt=bad — that mapping fits "your value vs
       // target's value" but not "your latest vs your previous."
-      if (result.cmp === "gt")
-        return { text: "↑ more matches", className: "text-good" };
-      if (result.cmp === "lt")
-        return { text: "↓ fewer matches", className: "text-bad" };
-      return { text: "= same matches", className: "text-muted" };
+      // Show the exact delta so the player can see *how much* their
+      // matches moved, not just direction.
+      if (result.delta > 0)
+        return {
+          text: `↑ ${result.delta} more`,
+          className: "text-good",
+        };
+      if (result.delta < 0)
+        return {
+          text: `↓ ${Math.abs(result.delta)} less`,
+          className: "text-bad",
+        };
+      return { text: "= same", className: "text-muted" };
     }
     case "distinctDigits":
       return { text: `${result.count} unique`, className: "text-accent" };
@@ -331,9 +339,10 @@ export function subLabelFor(
       // Echo's per-slot warm tile fires for any digit that appears in
       // the target — repeated guess digits all light up even if the
       // target only contains that digit once. The sub-label lists
-      // the distinct digits known to be in the target ("at least once")
-      // so the player isn't tempted to read multiplicity into the
-      // duplicated highlights.
+      // the distinct included digits with a check after each so the
+      // sequence reads like containsDigit's pick history and the
+      // ✓ reinforces the "at least once" framing the per-slot color
+      // implies.
       const seen = new Set<string>();
       const distinct: string[] = [];
       result.mask.forEach((m, i) => {
@@ -345,18 +354,17 @@ export function subLabelFor(
         }
       });
       if (distinct.length === 0)
-        return { text: "Includes none", className: "text-muted" };
+        return { text: "no hits", className: "text-muted" };
       return {
-        text: `Includes ${distinct.join(", ")}`,
+        text: distinct.map((d) => `${d}✓`).join(" "),
         className: "text-warn",
       };
     }
     case "elimination": {
       // Same caveat as Echo, mirrored: a guess digit's slot is cold
       // only when that digit is COMPLETELY absent from the target.
-      // A digit the target contains once but the guess contains
-      // twice highlights neither slot — list the distinct excluded
-      // digits in the sub-label so it's clear what's been ruled out.
+      // Sub-label lists each distinct excluded digit with an ✗ so it's
+      // clear what's been ruled out (and not extrapolated to copies).
       const seen = new Set<string>();
       const distinct: string[] = [];
       result.mask.forEach((m, i) => {
@@ -368,9 +376,9 @@ export function subLabelFor(
         }
       });
       if (distinct.length === 0)
-        return { text: "Excludes none", className: "text-muted" };
+        return { text: "no misses", className: "text-muted" };
       return {
-        text: `Excludes ${distinct.join(", ")}`,
+        text: distinct.map((d) => `${d}✗`).join(" "),
         className: "text-bad",
       };
     }

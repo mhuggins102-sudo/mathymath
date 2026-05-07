@@ -128,7 +128,7 @@ describe("subLabelFor — other clues unchanged", () => {
       }),
     ).toEqual({ text: "4✓ 4✓ 6✗", className: "text-bad" });
   });
-  it("Echo (lists distinct included digits, in guess order)", () => {
+  it("Echo (per-digit ✓ marks, distinct in guess order)", () => {
     // Target 57243, guess 55776 → both 5s and both 7s warm, the 6 idle.
     // Distinct included digits: 5 then 7 (guess order).
     expect(
@@ -136,16 +136,16 @@ describe("subLabelFor — other clues unchanged", () => {
         kind: "echo",
         mask: [true, true, true, true, false],
       }),
-    ).toEqual({ text: "Includes 5, 7", className: "text-warn" });
-    // Empty include set → "Includes none" muted.
+    ).toEqual({ text: "5✓ 7✓", className: "text-warn" });
+    // Empty include set → "no hits" muted.
     expect(
       subLabelFor("55776", {
         kind: "echo",
         mask: [false, false, false, false, false],
       }),
-    ).toEqual({ text: "Includes none", className: "text-muted" });
+    ).toEqual({ text: "no hits", className: "text-muted" });
   });
-  it("Elimination (lists distinct excluded digits, in guess order)", () => {
+  it("Elimination (per-digit ✗ marks, distinct in guess order)", () => {
     // Target 57243, guess 55776 → only the 6 cold; 5/7 are present in
     // target so they aren't excluded even though the guess has more
     // copies than the target.
@@ -154,15 +154,25 @@ describe("subLabelFor — other clues unchanged", () => {
         kind: "elimination",
         mask: [false, false, false, false, true],
       }),
-    ).toEqual({ text: "Excludes 6", className: "text-bad" });
-    // Empty exclude set → "Excludes none" muted (every guess digit
-    // is in the target somewhere).
+    ).toEqual({ text: "6✗", className: "text-bad" });
+    // Empty exclude set → "no misses" muted.
     expect(
       subLabelFor("12345", {
         kind: "elimination",
         mask: [false, false, false, false, false],
       }),
-    ).toEqual({ text: "Excludes none", className: "text-muted" });
+    ).toEqual({ text: "no misses", className: "text-muted" });
+  });
+  it("Bullseye Trend (signed delta with explicit count)", () => {
+    expect(
+      subLabelFor("12345", { kind: "bullseyeTrend", delta: 2 }),
+    ).toEqual({ text: "↑ 2 more", className: "text-good" });
+    expect(
+      subLabelFor("12345", { kind: "bullseyeTrend", delta: -3 }),
+    ).toEqual({ text: "↓ 3 less", className: "text-bad" });
+    expect(
+      subLabelFor("12345", { kind: "bullseyeTrend", delta: 0 }),
+    ).toEqual({ text: "= same", className: "text-muted" });
   });
 });
 

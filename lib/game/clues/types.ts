@@ -41,7 +41,7 @@ export type ClueResult =
   | { kind: "totalDeviation"; value: number }
   | { kind: "diceCount"; cmp: Cmp }
   | { kind: "upsAndDowns"; cmp: Cmp }
-  | { kind: "bullseyeTrend"; cmp: Cmp }
+  | { kind: "bullseyeTrend"; delta: number }
   | { kind: "echo"; mask: boolean[] }
   | { kind: "elimination"; mask: boolean[] }
   // Special — meta-action cards that don't reveal target info but
