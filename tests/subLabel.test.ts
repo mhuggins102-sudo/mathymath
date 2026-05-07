@@ -104,19 +104,27 @@ describe("subLabelFor — other clues unchanged", () => {
       className: "text-accent",
     });
   });
-  it("Contains Digit (multi-pick sequence)", () => {
+  it("Contains Digit (multi-pick sequence, per-pick green/red parts)", () => {
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
         picks: [{ digit: 7, present: true }],
       }),
-    ).toEqual({ text: "7✓", className: "text-good" });
+    ).toEqual({
+      text: "7✓",
+      className: "text-good",
+      parts: [{ text: "7✓", className: "text-good" }],
+    });
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
         picks: [{ digit: 7, present: false }],
       }),
-    ).toEqual({ text: "7✗", className: "text-bad" });
+    ).toEqual({
+      text: "7✗",
+      className: "text-bad",
+      parts: [{ text: "7✗", className: "text-bad" }],
+    });
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
@@ -126,7 +134,15 @@ describe("subLabelFor — other clues unchanged", () => {
           { digit: 6, present: false },
         ],
       }),
-    ).toEqual({ text: "4✓ 4✓ 6✗", className: "text-bad" });
+    ).toEqual({
+      text: "4✓ 4✓ 6✗",
+      className: "text-bad",
+      parts: [
+        { text: "4✓", className: "text-good" },
+        { text: "4✓", className: "text-good" },
+        { text: "6✗", className: "text-bad" },
+      ],
+    });
   });
   it("Echo (per-digit ✓ marks, distinct in guess order)", () => {
     // Target 57243, guess 55776 → both 5s and both 7s warm, the 6 idle.
@@ -163,13 +179,13 @@ describe("subLabelFor — other clues unchanged", () => {
       }),
     ).toEqual({ text: "no misses", className: "text-muted" });
   });
-  it("Bullseye Trend (signed delta with explicit count)", () => {
+  it("Bullseye Trend (signed delta with explicit count, no arrows)", () => {
     expect(
       subLabelFor("12345", { kind: "bullseyeTrend", delta: 2 }),
-    ).toEqual({ text: "↑ 2 more", className: "text-good" });
+    ).toEqual({ text: "2 more", className: "text-good" });
     expect(
       subLabelFor("12345", { kind: "bullseyeTrend", delta: -3 }),
-    ).toEqual({ text: "↓ 3 less", className: "text-bad" });
+    ).toEqual({ text: "3 less", className: "text-bad" });
     expect(
       subLabelFor("12345", { kind: "bullseyeTrend", delta: 0 }),
     ).toEqual({ text: "= same", className: "text-muted" });

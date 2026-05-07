@@ -362,9 +362,9 @@ describe("Distinct Digits", () => {
 });
 
 describe("Echo", () => {
-  it("marks slots whose digit appears anywhere in the target", () => {
+  it("marks slots whose digit appears in the target (distinct digits)", () => {
     // target "12345"; guess "13579":
-    //   slot 0 '1' in "12345" ✓
+    //   slot 0 '1' ✓ (target has one 1, consumed by slot 0)
     //   slot 1 '3' ✓
     //   slot 2 '5' ✓
     //   slot 3 '7' ✗
@@ -373,9 +373,31 @@ describe("Echo", () => {
       true, true, true, false, false,
     ]);
   });
-  it("all-true when every guess digit is in target", () => {
+  it("only highlights up to the target's count for repeated guess digits", () => {
+    // Target has only ONE '1', so a guess of "11111" gets exactly one
+    // warm slot (the first; subsequent 1s are 'wasted' duplicates).
     expect(echoClue.compute("11111", "12345").mask).toEqual([
-      true, true, true, true, true,
+      true, false, false, false, false,
+    ]);
+  });
+  it("user example A: target 44532, guess 55341 → first 5, the 3, the 4", () => {
+    //   slot 0 '5' ✓ (target has one 5, consumed)
+    //   slot 1 '5' ✗ (target's only 5 is gone)
+    //   slot 2 '3' ✓
+    //   slot 3 '4' ✓ (target has two 4s, one remaining)
+    //   slot 4 '1' ✗
+    expect(echoClue.compute("55341", "44532").mask).toEqual([
+      true, false, true, true, false,
+    ]);
+  });
+  it("user example B: target 44321, guess 24544 → 2, first two 4s only", () => {
+    //   slot 0 '2' ✓
+    //   slot 1 '4' ✓ (1st 4, target has 2)
+    //   slot 2 '5' ✗
+    //   slot 3 '4' ✓ (2nd 4, target's 4s now consumed)
+    //   slot 4 '4' ✗ (3rd 4, no remaining target 4s)
+    expect(echoClue.compute("24544", "44321").mask).toEqual([
+      true, true, false, true, false,
     ]);
   });
   it("all-false when no guess digit is in target", () => {
@@ -392,7 +414,9 @@ describe("Elimination", () => {
       false, false, false, true, true,
     ]);
   });
-  it("is the exact inverse of Echo", () => {
+  it("inverts Echo when the guess has no repeated digits beyond the target's count", () => {
+    // With distinct guess digits, Echo's multiset rule degrades to
+    // simple "is digit present", so Elimination is the exact inverse.
     const cases: [string, string][] = [
       ["13579", "12345"],
       ["00000", "12345"],

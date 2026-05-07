@@ -11,11 +11,25 @@ export const echoClue: Clue<{ kind: "echo"; mask: boolean[] }> = {
   name: "Echo",
   category: "compositional",
   description:
-    "For each slot in your guess, marks whether that digit appears anywhere in the target — same idea as Wordle's yellow tiles. Doesn't tell you WHERE, just that the digit is present somewhere.",
+    "For each slot in your guess, marks whether that digit appears in the target — multiset-aware. Each target digit can satisfy at most one guess slot (left-to-right), so a guess with three 4s when the target has two 4s lights up the first two only.",
   weight: 0.6,
   legend: [{ state: "warm", label: "digit appears in target" }],
   compute(guess, target) {
-    const mask = [...guess].map((ch) => target.includes(ch));
+    // Multiset-aware: each occurrence of a digit in the target can
+    // satisfy at most one matching slot in the guess. We walk the
+    // guess left-to-right, marking a slot warm only while the
+    // remaining count of that digit in the target is still positive,
+    // then decrementing. Repeated guess digits beyond the target's
+    // count stay idle — they're "wasted" duplicates, not extra hits.
+    const remaining = new Map<string, number>();
+    for (const ch of target)
+      remaining.set(ch, (remaining.get(ch) ?? 0) + 1);
+    const mask = [...guess].map((ch) => {
+      const left = remaining.get(ch) ?? 0;
+      if (left <= 0) return false;
+      remaining.set(ch, left - 1);
+      return true;
+    });
     return { kind: "echo", mask };
   },
   example(target) {
