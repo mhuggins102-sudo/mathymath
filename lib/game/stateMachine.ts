@@ -1,7 +1,6 @@
 import type { Clue, ClueId, ClueParam, ClueResult } from "./clues/types";
 import { getClueById } from "./clues/registry";
 import {
-  advancedPositionalCapReached,
   buildPreselectedDeck,
   pickTwoClues,
 } from "./clueSelector";
@@ -251,16 +250,11 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const usedClueIds = state.guesses
         .map((g) => g.clueId)
         .filter((id): id is ClueId => id !== undefined);
-      const excludePositional = advancedPositionalCapReached(
-        state.advancedMode,
-        state.guesses,
-      );
       const excludeIds = new Set(state.offeredClueIds);
       const options = pickTwoClues(
         state.seed,
         usedClueIds,
         state.deckOffset,
-        excludePositional,
         state.advancedMode,
         excludeIds,
       );
@@ -286,16 +280,11 @@ export function reduce(state: GameState, action: GameAction): GameState {
       const usedClueIds = state.guesses
         .map((g) => g.clueId)
         .filter((id): id is ClueId => id !== undefined);
-      const excludePositional = advancedPositionalCapReached(
-        state.advancedMode,
-        state.guesses,
-      );
       const excludeIds = new Set(state.offeredClueIds);
       const newOptions = pickTwoClues(
         state.seed,
         usedClueIds,
         newOffset,
-        excludePositional,
         state.advancedMode,
         excludeIds,
       );

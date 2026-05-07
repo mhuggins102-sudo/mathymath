@@ -160,10 +160,6 @@ function UnlimitedGame({
     tapCell,
     commitLock,
     advancedMode,
-    effectivePositionalCount,
-    advancedPositionalCap,
-    positionalCapReached,
-    advancedReusePoolEmpty,
     preselectedMode,
     preselectedDeck,
   } = useGame({
@@ -282,7 +278,6 @@ function UnlimitedGame({
                 confirmClueParam({ reusedClueId: clueId })
               }
               onCancel={cancelClueParam}
-              excludePositional={positionalCapReached}
             />
           ) : pendingClueParam?.paramKind === "digit" && state.pendingGuess ? (
             <DigitPicker
@@ -305,15 +300,10 @@ function UnlimitedGame({
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
                 locksAvailable={locksAvailable}
-                reusePoolEmpty={advancedReusePoolEmpty}
               />
               <ResourceBalance
                 lockBalance={hintLocks}
                 advancedMode={advancedMode}
-                positionalRemaining={Math.max(
-                  0,
-                  advancedPositionalCap - effectivePositionalCount,
-                )}
                 hint={
                   canRedraw ? (
                     <button
@@ -344,16 +334,7 @@ function UnlimitedGame({
               />
               <ResourceBalance
                 lockBalance={hintLocks}
-                // Preselected mode hides the "positional X/2" indicator
-                // since the player isn't picking clues — the cap is
-                // already enforced inside the pre-dealt deck. Pass
-                // advancedMode=false to suppress that section even
-                // when advanced rules are otherwise active.
                 advancedMode={advancedMode && !preselectedMode}
-                positionalRemaining={Math.max(
-                  0,
-                  advancedPositionalCap - effectivePositionalCount,
-                )}
                 hint={
                   lockMode ? (
                     unlockMode ? (

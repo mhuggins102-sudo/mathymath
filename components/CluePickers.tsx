@@ -165,36 +165,20 @@ export function DigitPicker({
  * Reuse picker — appears after the player chooses the Clue Reuse
  * special. Shows a list of previously-used non-special clues. Tapping
  * one applies that clue again to the current guess.
- *
- * In advanced unlimited mode, when the positional cap has been reached,
- * `excludePositional` is true and the pool is filtered to non-positional
- * previously-used clues only — re-applying a positional clue would push
- * the player past the cap, which the rules disallow.
  */
 export function ReusePicker({
   usedClueIds,
   onSelect,
   onCancel,
-  excludePositional,
 }: {
   usedClueIds: readonly ClueId[];
   onSelect: (clueId: ClueId) => void;
   onCancel: () => void;
-  excludePositional?: boolean;
 }) {
   // All previously-used clues are reusable EXCEPT Clue Reuse itself
   // (re-using a re-use is circular). Extra Lock IS reusable — picking
   // it again grants another lock.
-  const reusable = usedClueIds
-    .filter((id) => id !== "clueReuse")
-    .filter((id) => {
-      if (!excludePositional) return true;
-      try {
-        return getClueById(id).category !== "positional";
-      } catch {
-        return true;
-      }
-    });
+  const reusable = usedClueIds.filter((id) => id !== "clueReuse");
   const btn =
     "w-full text-left bg-surface-2 hover:bg-surface-2/80 active:scale-[0.99] transition rounded-lg px-4 py-3 border border-border";
   return (

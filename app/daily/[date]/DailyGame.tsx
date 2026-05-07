@@ -379,8 +379,6 @@ export function DailyGame({
                 />
                 <ResourceBalance
                   lockBalance={hintLocks}
-                  advancedMode={false}
-                  positionalRemaining={0}
                   hint={
                     canRedraw ? (
                       <button
@@ -411,8 +409,6 @@ export function DailyGame({
                 />
                 <ResourceBalance
                   lockBalance={hintLocks}
-                  advancedMode={false}
-                  positionalRemaining={0}
                   hint={
                     lockMode ? (
                       unlockMode ? (

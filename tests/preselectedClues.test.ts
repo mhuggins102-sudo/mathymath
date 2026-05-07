@@ -1,57 +1,49 @@
 import { describe, it, expect } from "vitest";
-import { buildPreselectedDeck } from "@/lib/game/clueSelector";
+import {
+  buildPreselectedDeck,
+  ROUND1_CURATED_CLUE_IDS,
+} from "@/lib/game/clueSelector";
 import { initGameState, reduce } from "@/lib/game/stateMachine";
 import { getClueById } from "@/lib/game/clues/registry";
-import { POSITIONAL_CLUE_IDS } from "@/lib/game/clueSelector";
 
 describe("buildPreselectedDeck", () => {
-  it("standard mode: slot 0 is positional, deck has 6 distinct clues", () => {
+  it("regular mode: slot 0 is from the curated round-1 set, deck has 6 distinct clues", () => {
     const deck = buildPreselectedDeck("seed-A", 6, false);
     expect(deck.length).toBe(6);
-    expect(POSITIONAL_CLUE_IDS.has(deck[0])).toBe(true);
+    expect(ROUND1_CURATED_CLUE_IDS.has(deck[0])).toBe(true);
     expect(new Set(deck).size).toBe(6);
-    // No special clues should appear.
     for (const id of deck) {
       expect(getClueById(id).category).not.toBe("special");
     }
   });
 
-  it("standard mode: deterministic for the same seed", () => {
+  it("regular mode: deterministic for the same seed", () => {
     const a = buildPreselectedDeck("seed-B", 6, false);
     const b = buildPreselectedDeck("seed-B", 6, false);
     expect(a).toEqual(b);
   });
 
-  it("advanced mode: at most 2 positional, 6 distinct, no special", () => {
-    // Spot-check several seeds since advanced shuffles freely; the
-    // cap should hold for every seed.
+  it("advanced mode: 6 distinct info clues, no specials, no curated guarantee", () => {
     for (let i = 0; i < 50; i++) {
       const deck = buildPreselectedDeck(`adv-${i}`, 6, true);
       expect(deck.length).toBe(6);
       expect(new Set(deck).size).toBe(6);
-      const positionalCount = deck.filter((id) =>
-        POSITIONAL_CLUE_IDS.has(id),
-      ).length;
-      expect(positionalCount).toBeLessThanOrEqual(2);
       for (const id of deck) {
         expect(getClueById(id).category).not.toBe("special");
       }
     }
   });
 
-  it("advanced mode: positional may land at any index (not always slot 0)", () => {
-    // Across many seeds, at least once we should see a non-positional
-    // clue at slot 0 (otherwise advanced mode is leaking the
-    // standard-mode guarantee).
-    let sawNonPositionalAt0 = false;
+  it("advanced mode: slot 0 is sometimes a non-curated clue (no slot-0 guarantee)", () => {
+    let sawNonCuratedAt0 = false;
     for (let i = 0; i < 200; i++) {
-      const deck = buildPreselectedDeck(`adv-pos0-${i}`, 6, true);
-      if (!POSITIONAL_CLUE_IDS.has(deck[0])) {
-        sawNonPositionalAt0 = true;
+      const deck = buildPreselectedDeck(`adv-noncurated-${i}`, 6, true);
+      if (!ROUND1_CURATED_CLUE_IDS.has(deck[0])) {
+        sawNonCuratedAt0 = true;
         break;
       }
     }
-    expect(sawNonPositionalAt0).toBe(true);
+    expect(sawNonCuratedAt0).toBe(true);
   });
 });
 

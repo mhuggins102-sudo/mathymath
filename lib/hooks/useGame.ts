@@ -22,13 +22,9 @@ import {
   canUseLockOnGuess,
   CLUE_REUSE_CLUE_ID,
   CLUE_REUSE_COST,
+  initialLocksFor,
   locksAvailable as computeLocksAvailable,
 } from "@/lib/game/locks";
-import {
-  ADVANCED_POSITIONAL_CAP,
-  countEffectivePositionalUses,
-  effectiveUsedPositionalIds,
-} from "@/lib/game/clueSelector";
 import {
   clearGame,
   loadGame,
@@ -99,22 +95,6 @@ export interface UseGameResult {
   /** The pre-dealt clue ids (one per non-final guess) or null when
    *  preselected mode is off. Stable across the game once set. */
   preselectedDeck: readonly ClueId[] | null;
-  /** Effective positional uses so far (direct + Clue-Reuse-of-positional).
-   *  Always populated; UI can decide whether to surface it based on
-   *  `advancedMode`. */
-  effectivePositionalCount: number;
-  /** Cap that applies under advanced rules. */
-  advancedPositionalCap: number;
-  /** Set of previously-used positional clue ids, used by the reuse
-   *  picker to filter the reusable pool when the cap is reached. */
-  usedPositionalClueIds: ReadonlySet<string>;
-  /** True when advanced rules + cap reached — Clue Reuse must restrict
-   *  its pool to non-positional previously-used clues. */
-  positionalCapReached: boolean;
-  /** True when advanced rules + cap reached AND the filtered reuse pool
-   *  would be empty. The chooser uses this to additionally disable the
-   *  Clue Reuse card. */
-  advancedReusePoolEmpty: boolean;
   appendDigit: (d: string) => void;
   backspace: () => void;
   submit: () => void;
@@ -259,7 +239,10 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // spent). The strict-during-chooser display keeps Clue Reuse and
   // redraw-again from looking affordable when the same-turn refund
   // hasn't actually happened yet. Mirrors useDailyGame.
-  const baseLocksAvailable = computeLocksAvailable(state.guesses);
+  const baseLocksAvailable = computeLocksAvailable(
+    state.guesses,
+    initialLocksFor(state.advancedMode),
+  );
   const pendingLocksUsedCount = state.pendingGuess?.locks?.length ?? 0;
   const pendingRedrawsCount = state.pendingGuess?.redraws ?? 0;
   const locksAvailableCount = state.pendingGuess
@@ -272,18 +255,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const canStartLock =
     canUseLocks && lockedSlots.length < locksAvailableCount;
 
-  // Advanced-mode positional accounting. Always computed so the UI can
-  // surface a "Positional X/2" hint when advancedMode is on, and so the
-  // chooser/picker can know whether the cap has been reached. Clue
-  // Reuse counts here only when its result.kind is positional.
-  const effectivePositionalCount = countEffectivePositionalUses(state.guesses);
-  const usedPositionalClueIds = useMemo(
-    () => effectiveUsedPositionalIds(state.guesses),
-    [state.guesses],
-  );
-  const positionalCapReached =
-    state.advancedMode &&
-    effectivePositionalCount >= ADVANCED_POSITIONAL_CAP;
   const pendingLockDigit = useMemo(() => {
     if (pendingLockSlot === null) return null;
     return (
@@ -526,23 +497,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
     picks?: { digit: number; present: boolean }[];
   } | null>(null);
 
-  // Clue-Reuse gating in advanced mode: once the positional cap is
-  // reached, the reuse pool is restricted to previously-used non-
-  // positional clues. If that filtered pool is empty, Clue Reuse is
-  // unselectable even when the lock budget would otherwise cover it.
-  const advancedReusePoolEmpty = useMemo(() => {
-    if (!positionalCapReached) return false;
-    // Set is typed over ClueId; widen to a string-keyed view for the
-    // membership check so the loop below doesn't fight the type system.
-    const positionalIds = usedPositionalClueIds as ReadonlySet<string>;
-    for (const g of state.guesses) {
-      if (!g.clueId) continue;
-      if (g.clueId === CLUE_REUSE_CLUE_ID) continue;
-      if (!positionalIds.has(g.clueId)) return false;
-    }
-    return true;
-  }, [positionalCapReached, state.guesses, usedPositionalClueIds]);
-
   const chooseClue = useCallback(
     (id: string) => {
       if (!state.pendingGuess) return;
@@ -558,12 +512,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
       ) {
         return;
       }
-      // Advanced mode: also refuse Clue Reuse when its filtered pool
-      // would be empty (positional cap reached AND every prior used
-      // clue was positional).
-      if (id === CLUE_REUSE_CLUE_ID && advancedReusePoolEmpty) {
-        return;
-      }
       if (clue.paramKind) {
         // Park in parameter-selection mode; the UI will render a picker.
         setPendingClueParam({ clueId: id, paramKind: clue.paramKind });
@@ -571,7 +519,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       }
       dispatch({ type: "CHOOSE_CLUE", clueId: id as never });
     },
-    [state.pendingGuess, locksAvailableCount, advancedReusePoolEmpty],
+    [state.pendingGuess, locksAvailableCount],
   );
 
   const confirmClueParam = useCallback(
@@ -719,11 +667,6 @@ export function useGame(config: UseGameConfig): UseGameResult {
     advancedMode: state.advancedMode,
     preselectedMode: state.preselectedDeck !== null,
     preselectedDeck: state.preselectedDeck,
-    effectivePositionalCount,
-    advancedPositionalCap: ADVANCED_POSITIONAL_CAP,
-    usedPositionalClueIds,
-    positionalCapReached,
-    advancedReusePoolEmpty,
     appendDigit,
     backspace,
     submit,
