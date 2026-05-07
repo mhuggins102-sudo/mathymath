@@ -139,13 +139,12 @@ function targetMatchesResult(
         if (result.exact && (diff === 0) !== result.exact[i]) return false;
       }
       return true;
-    case "parityMask": {
-      let count = 0;
+    case "parityMask":
       for (let i = 0; i < target.length; i++) {
-        if (+target[i] % 2 === +guess[i] % 2) count++;
+        const expected = +target[i] % 2 === +guess[i] % 2;
+        if (expected !== result.matches[i]) return false;
       }
-      return count === result.count;
-    }
+      return true;
     case "oracle":
       return target[result.slot] === String(result.digit);
     case "thermometer":
@@ -695,7 +694,7 @@ function renderResult(result: ClueResult): string {
       return "mask=[" + cells.join("") + "]";
     }
     case "parityMask":
-      return `count=${result.count}`;
+      return "parity=[" + result.matches.map((m) => (m ? "Y" : "·")).join("") + "]";
     case "oracle":
       return `slot=${result.slot} digit=${result.digit}`;
     case "thermometer":

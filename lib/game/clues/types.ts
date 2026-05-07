@@ -25,7 +25,7 @@ export type ClueResult =
   | { kind: "bullseyes"; hits: boolean[] }
   | { kind: "higherLower"; cmp: Cmp[] }
   | { kind: "within2"; mask: boolean[]; exact: boolean[] }
-  | { kind: "parityMask"; count: number }
+  | { kind: "parityMask"; matches: boolean[] }
   | { kind: "oracle"; slot: number; digit: number }
   | { kind: "thermometer"; tier: number[] } // 0=exact..4=far
   // Compositional

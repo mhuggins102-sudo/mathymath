@@ -68,14 +68,21 @@ describe("Within 2", () => {
   });
 });
 
-describe("Parity Mask", () => {
-  it("counts slots whose parity matches the target's", () => {
-    // guess 13579 vs target 02468: each slot odd-vs-even -> 0 matches
-    expect(parityMaskClue.compute("13579", "02468").count).toBe(0);
-    // guess 13579 vs target 97531: all odd-odd -> 5 matches
-    expect(parityMaskClue.compute("13579", "97531").count).toBe(5);
-    // guess 13579 vs target 12468: only slot 0 matches (1 vs 1, both odd)
-    expect(parityMaskClue.compute("13579", "12468").count).toBe(1);
+describe("Parity Mask (Odd or Even)", () => {
+  it("highlights each slot whose parity matches the target's", () => {
+    // guess 13579 vs target 02468: every slot is odd-vs-even → no
+    // matches.
+    expect(parityMaskClue.compute("13579", "02468").matches).toEqual([
+      false, false, false, false, false,
+    ]);
+    // guess 13579 vs target 97531: all odd-odd → all match.
+    expect(parityMaskClue.compute("13579", "97531").matches).toEqual([
+      true, true, true, true, true,
+    ]);
+    // guess 13579 vs target 12468: only slot 0 matches (1 vs 1, both odd).
+    expect(parityMaskClue.compute("13579", "12468").matches).toEqual([
+      true, false, false, false, false,
+    ]);
   });
 });
 
@@ -561,10 +568,8 @@ describe("6-digit length sanity", () => {
     expect(within2Clue.compute(guess6, target6).mask).toHaveLength(6);
     expect(within2Clue.compute(guess6, target6).exact).toHaveLength(6);
   });
-  it("Parity Mask: count is bounded by digit length", () => {
-    const c = parityMaskClue.compute(guess6, target6).count;
-    expect(c).toBeGreaterThanOrEqual(0);
-    expect(c).toBeLessThanOrEqual(6);
+  it("Parity Mask: matches array of length 6", () => {
+    expect(parityMaskClue.compute(guess6, target6).matches).toHaveLength(6);
   });
   it("Thermometer: tier array of length 6", () => {
     expect(thermometerClue.compute(guess6, target6).tier).toHaveLength(6);

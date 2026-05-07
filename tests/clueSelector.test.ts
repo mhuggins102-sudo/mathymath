@@ -116,7 +116,7 @@ describe("pickTwoClues — regular mode pair-1 curated guarantee", () => {
       [
         "digitOverlap",
         "elimination",
-        "divisibleBy",
+        "parityMask",
         "containsDigit",
         "higherLower",
         "within2",
