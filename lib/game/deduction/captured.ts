@@ -132,16 +132,18 @@ function migrateResult(target: string, g: RawGuess): RawGuess {
     }
   }
   if (g.clueId === "parityMask") {
-    if (typeof (r as { count?: unknown }).count === "number" && !Array.isArray((r as { matches?: unknown }).matches))
-      return g;
-    if (Array.isArray((r as { matches?: unknown }).matches)) {
-      const matches = r.matches as boolean[];
+    if (Array.isArray((r as { matches?: unknown }).matches)) return g;
+    if (typeof (r as { count?: unknown }).count === "number") {
+      // Mid-2026 the clue was briefly recast as a count-only result.
+      // Recompute the per-slot mask from (guess, target) so the
+      // restored mask UI has its info back.
+      const matches = [...g.guess].map(
+        (ch, i) =>
+          Number(ch) % 2 === Number(target[i]) % 2,
+      );
       return {
         ...g,
-        result: {
-          kind: "parityMask",
-          count: matches.filter(Boolean).length,
-        } as ClueResult,
+        result: { kind: "parityMask", matches } as ClueResult,
       };
     }
   }

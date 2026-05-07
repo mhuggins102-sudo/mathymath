@@ -117,14 +117,16 @@ function explainViolation(
       return null;
     }
     case "parityMask": {
-      // Count-only after the bandwidth nerf: compare totals rather
-      // than pinpointing slots.
-      let count = 0;
+      // Per-slot mask: parity match at each slot must agree between
+      // the recorded result and (historyGuess vs hypothesized
+      // wrongGuess-as-target).
       for (let i = 0; i < wrongGuess.length; i++) {
-        if (+wrongGuess[i] % 2 === +historyGuess[i] % 2) count++;
-      }
-      if (count !== result.count) {
-        return `${name} said ${result.count} slots should share parity with ${historyGuess} — your guess matches ${count}.`;
+        const expected = +wrongGuess[i] % 2 === +historyGuess[i] % 2;
+        if (expected !== result.matches[i]) {
+          return result.matches[i]
+            ? `${name} said slot ${i + 1} parity matches ${historyGuess[i]} — target digit at slot ${i + 1} would be different parity.`
+            : `${name} said slot ${i + 1} parity does NOT match ${historyGuess[i]} — target digit at slot ${i + 1} would have to share parity.`;
+        }
       }
       return null;
     }

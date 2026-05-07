@@ -73,9 +73,9 @@ function cellStates(
       // deriveCertainDigits no longer promoting Within-2 exacts.
       return result.mask.map((m) => (m ? "warm" : "idle"));
     case "parityMask":
-      // Count-only after the bandwidth nerf — no per-slot coloring.
-      // The matching count surfaces in the sub-label instead.
-      return new Array(digits).fill("idle");
+      // Warm highlight on each slot whose parity matches the
+      // target's parity at that slot.
+      return result.matches.map((m) => (m ? "warm" : "idle"));
     case "distinctDigits":
       // Sub-label still shows the count of distinct digits in target.
       // Per-slot warm highlights guess digits that are repeated in
@@ -295,8 +295,10 @@ export function subLabelFor(
         className: "text-bad",
       };
     }
-    case "parityMask":
-      return { text: `${result.count} slots match`, className: "text-accent" };
+    case "parityMask": {
+      const n = result.matches.filter(Boolean).length;
+      return { text: `${n} slots match`, className: "text-accent" };
+    }
     case "bullseyeTrend": {
       // Direction-of-progress clue: ↑ (more matches) is GOOD,
       // ↓ is BAD. Departs from the cmp-clue convention where

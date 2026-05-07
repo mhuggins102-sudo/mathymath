@@ -25,7 +25,7 @@ export function isPositionalClueId(id: string | undefined): boolean {
 export const ROUND1_CURATED_CLUE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
   "digitOverlap",
   "elimination",
-  "divisibleBy",
+  "parityMask",
   "containsDigit",
   "higherLower",
   "within2",

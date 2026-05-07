@@ -55,6 +55,8 @@ function perSlotLine(result: ClueResult | undefined, digits: number): string {
       return result.mask.map((m) => (m ? "🟨" : "⬛")).join("");
     case "elimination":
       return result.mask.map((m) => (m ? "🟥" : "⬛")).join("");
+    case "parityMask":
+      return result.matches.map((m) => (m ? "🟨" : "⬛")).join("");
     default: {
       // Compositional clue — single emoji, padded.
       return `${CLUE_EMOJI[result.kind]} `.repeat(digits).trim();
