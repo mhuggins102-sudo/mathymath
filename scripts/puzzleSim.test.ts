@@ -322,22 +322,9 @@ function bestParamForClue(
   clue: Clue,
   knownSlots: readonly number[],
 ): ClueComputeContext {
-  if (clue.paramKind === "slot") {
-    let bestSlot = 0;
-    let bestExp = Infinity;
-    const known = new Set(knownSlots);
-    for (let s = 0; s < DIGITS; s++) {
-      if (known.has(s)) continue;
-      const exp = expectedRemaining(candidates, guess, clue, {
-        selectedSlot: s,
-      });
-      if (exp < bestExp) {
-        bestExp = exp;
-        bestSlot = s;
-      }
-    }
-    return { selectedSlot: bestSlot };
-  }
+  // Oracle is the only positional clue that used to take a slot
+  // param; it now auto-picks the farthest-off slot inside compute,
+  // so the sim doesn't need a slot-search anymore.
   if (clue.paramKind === "digit") {
     // Contains Digit is now multi-pick. The sim only models a single
     // best first pick — accurate-enough approximation for relative

@@ -12,7 +12,7 @@ import { GuessGrid } from "@/components/GuessGrid";
 import { GearIcon } from "@/components/GearIcon";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
-import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
+import { DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { containsDigitAvailable } from "@/lib/game/clues/containsDigit";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
@@ -160,10 +160,6 @@ function UnlimitedGame({
     tapCell,
     commitLock,
     advancedMode,
-    effectivePositionalCount,
-    advancedPositionalCap,
-    positionalCapReached,
-    advancedReusePoolEmpty,
     preselectedMode,
     preselectedDeck,
   } = useGame({
@@ -261,19 +257,10 @@ function UnlimitedGame({
 
         <div className="mt-4">
           {/* Clue-param pickers: shown after the player picks a clue
-              that requires a slot (Oracle) or digit (Contains Digit)
-              selection before it resolves. */}
-          {pendingClueParam?.paramKind === "slot" ? (
-            <SlotPicker
-              digits={session.digits}
-              certainDigits={certainDigits}
-              compact={session.digits === 6}
-              onSelect={(slot) =>
-                confirmClueParam({ selectedSlot: slot })
-              }
-              onCancel={cancelClueParam}
-            />
-          ) : pendingClueParam?.paramKind === "reuse" ? (
+              that requires a parameter selection before it resolves.
+              Currently only Contains Digit (multi-pick) and Clue
+              Reuse (which previously-used clue) need pickers. */}
+          {pendingClueParam?.paramKind === "reuse" ? (
             <ReusePicker
               usedClueIds={state.guesses
                 .map((g) => g.clueId)
@@ -282,7 +269,6 @@ function UnlimitedGame({
                 confirmClueParam({ reusedClueId: clueId })
               }
               onCancel={cancelClueParam}
-              excludePositional={positionalCapReached}
             />
           ) : pendingClueParam?.paramKind === "digit" && state.pendingGuess ? (
             <DigitPicker
@@ -305,15 +291,10 @@ function UnlimitedGame({
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
                 locksAvailable={locksAvailable}
-                reusePoolEmpty={advancedReusePoolEmpty}
               />
               <ResourceBalance
                 lockBalance={hintLocks}
                 advancedMode={advancedMode}
-                positionalRemaining={Math.max(
-                  0,
-                  advancedPositionalCap - effectivePositionalCount,
-                )}
                 hint={
                   canRedraw ? (
                     <button
@@ -344,16 +325,7 @@ function UnlimitedGame({
               />
               <ResourceBalance
                 lockBalance={hintLocks}
-                // Preselected mode hides the "positional X/2" indicator
-                // since the player isn't picking clues — the cap is
-                // already enforced inside the pre-dealt deck. Pass
-                // advancedMode=false to suppress that section even
-                // when advanced rules are otherwise active.
                 advancedMode={advancedMode && !preselectedMode}
-                positionalRemaining={Math.max(
-                  0,
-                  advancedPositionalCap - effectivePositionalCount,
-                )}
                 hint={
                   lockMode ? (
                     unlockMode ? (

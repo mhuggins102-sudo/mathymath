@@ -10,8 +10,14 @@ export interface LockRecord {
   correct: boolean;
 }
 
-/** Each game begins with this many locks. */
+/** Regular-mode starting lock count. Advanced mode begins with 0
+ *  (the player can still gain a lock via the Extra Lock special). */
 export const INITIAL_LOCKS = 1;
+
+/** Resolves the starting-lock count for a game given its mode. */
+export function initialLocksFor(advancedMode: boolean): number {
+  return advancedMode ? 0 : INITIAL_LOCKS;
+}
 
 /** Locks can never exceed this. Extra Lock specials (including re-used
  *  Extra Locks via Clue Reuse) can add up to this cap. */

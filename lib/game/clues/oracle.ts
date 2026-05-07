@@ -1,34 +1,39 @@
 import type { Clue } from "./types";
-import { seededRng } from "../seededRng";
+
+/**
+ * Oracle reveals a single slot of the target — but the slot is no
+ * longer player-chosen. The clue auto-picks the slot where the
+ * player's current guess is FARTHEST from the target (highest
+ * |guess[i] - target[i]|), with leftmost-on-tie tiebreaking.
+ *
+ * Already-known slots have a delta of 0 by construction (the player
+ * has the right digit there in their guess), so they're naturally
+ * excluded from the maximum without explicit filtering.
+ */
+function pickFarthestSlot(guess: string, target: string): number {
+  let bestSlot = 0;
+  let bestDelta = -1;
+  const n = Math.min(guess.length, target.length);
+  for (let i = 0; i < n; i++) {
+    const delta = Math.abs(Number(guess[i]) - Number(target[i]));
+    if (delta > bestDelta) {
+      bestDelta = delta;
+      bestSlot = i;
+    }
+  }
+  return bestSlot;
+}
 
 export const oracleClue: Clue<{ kind: "oracle"; slot: number; digit: number }> = {
   id: "oracle",
   name: "Oracle",
   category: "positional",
   description:
-    "You pick a slot — the target's exact digit there is revealed.",
+    "Reveals the target's digit at the slot where your guess is farthest from correct (leftmost on a tie).",
   weight: 0.9,
-  paramKind: "slot",
   legend: [{ state: "match", label: "revealed digit" }],
-  compute(guess, target, context) {
-    // Player-selected: use the chosen slot directly.
-    if (context?.selectedSlot !== undefined) {
-      const slot = context.selectedSlot;
-      return { kind: "oracle", slot, digit: Number(target[slot]) };
-    }
-    // Fallback (sim / tests / backward compat): random pick excluding
-    // already-known slots.
-    const rng = seededRng(`oracle:${guess}:${target}`);
-    const known = new Set<number>(context?.knownSlots ?? []);
-    const pool: number[] = [];
-    for (let i = 0; i < target.length; i++) {
-      if (!known.has(i)) pool.push(i);
-    }
-    const candidates =
-      pool.length > 0
-        ? pool
-        : Array.from({ length: target.length }, (_, i) => i);
-    const slot = candidates[Math.floor(rng() * candidates.length)];
+  compute(guess, target) {
+    const slot = pickFarthestSlot(guess, target);
     return { kind: "oracle", slot, digit: Number(target[slot]) };
   },
   example(target) {

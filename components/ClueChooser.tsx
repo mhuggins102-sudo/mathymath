@@ -15,10 +15,6 @@ interface ClueChooserProps {
    *  with an empty budget. Optional — falls back to "always allowed"
    *  for callers that don't track locks. */
   locksAvailable?: number;
-  /** Advanced unlimited mode only: when the positional cap has been
-   *  reached AND the filtered reuse pool would be empty, Clue Reuse
-   *  must be unselectable even if the lock budget covers it. */
-  reusePoolEmpty?: boolean;
 }
 
 /**
@@ -32,7 +28,6 @@ export function ClueChooser({
   onRedraw,
   canRedraw,
   locksAvailable,
-  reusePoolEmpty,
 }: ClueChooserProps) {
   return (
     <div className="w-full max-w-md mx-auto select-none">
@@ -41,18 +36,14 @@ export function ClueChooser({
       </p>
       <div className="flex flex-col gap-2">
         {options.map((clue) => {
-          // Clue Reuse has two independent gates:
-          //   1. lock budget can't cover the cost
-          //   2. advanced-mode filtered reuse pool is empty
-          // Either one disables the card; the explanatory hint surfaces
-          // the relevant reason.
+          // Clue Reuse is gated on lock budget — it costs one lock to
+          // pick, so an empty budget makes the card unselectable.
           const isClueReuse = clue.id === CLUE_REUSE_CLUE_ID;
           const lockUnaffordable =
             isClueReuse &&
             locksAvailable !== undefined &&
             locksAvailable < CLUE_REUSE_COST;
-          const reuseEmpty = isClueReuse && !!reusePoolEmpty;
-          const disabled = lockUnaffordable || reuseEmpty;
+          const disabled = lockUnaffordable;
           return (
             <button
               key={clue.id}
@@ -94,11 +85,6 @@ export function ClueChooser({
               {lockUnaffordable && (
                 <p className="text-[10px] text-bad mt-1">
                   Not enough locks remaining.
-                </p>
-              )}
-              {!lockUnaffordable && reuseEmpty && (
-                <p className="text-[10px] text-bad mt-1">
-                  No non-positional clues left to re-use.
                 </p>
               )}
               {clue.legend && <ClueLegend entries={clue.legend} />}

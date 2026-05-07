@@ -1,9 +1,13 @@
-import type { Clue, ClueId, ClueResult } from "./clues/types";
+import type { Clue, ClueId } from "./clues/types";
 import { CLUES, getClueById } from "./clues/registry";
 import { seededRng } from "./seededRng";
 
-/** Positional clue ids — derived from the registry so adding a new
- *  positional clue automatically participates in advanced-mode rules. */
+/** Positional clue ids — kept around because cell-rendering hints and
+ *  some help-modal categorization still distinguish positional vs.
+ *  compositional. The advanced-mode "positional cap" mechanic that
+ *  previously gated card draws is gone (replaced by a turn-1 curated-
+ *  list guarantee for regular mode and a flat full shuffle for
+ *  advanced mode). */
 export const POSITIONAL_CLUE_IDS: ReadonlySet<ClueId> = new Set(
   CLUES.filter((c) => c.category === "positional").map((c) => c.id),
 );
@@ -13,97 +17,49 @@ export function isPositionalClueId(id: string | undefined): boolean {
   return POSITIONAL_CLUE_IDS.has(id as ClueId);
 }
 
-/** Advanced-mode positional cap. Two positional picks (in any
- *  combination — direct or via Clue Reuse) lock out positional cards
- *  for the rest of the game. */
-export const ADVANCED_POSITIONAL_CAP = 2;
-
-interface PositionalAccountingGuess {
-  clueId?: string;
-  result?: { kind?: string } | unknown;
-}
-
-/** Counts how many of the player's resolved guesses count as positional
- *  picks for advanced-mode purposes:
- *    - direct positional pick (clueId is in POSITIONAL_CLUE_IDS), OR
- *    - Clue Reuse pick whose result.kind is positional (i.e. the player
- *      reused a positional clue).
- *  Clue Reuse on a non-positional clue does NOT count. */
-export function countEffectivePositionalUses(
-  history: readonly PositionalAccountingGuess[],
-): number {
-  let n = 0;
-  for (const g of history) {
-    if (isPositionalClueId(g.clueId)) {
-      n++;
-      continue;
-    }
-    if (g.clueId === "clueReuse" && g.result && typeof g.result === "object") {
-      const r = g.result as { kind?: string };
-      if (isPositionalClueId(r.kind)) n++;
-    }
-  }
-  return n;
-}
-
-/** Returns the set of positional clue ids that have been "used" so far —
- *  either picked directly or reused via Clue Reuse. Used to filter the
- *  Clue-Reuse picker's pool in advanced mode (so a positional clue that
- *  was previously used can't be re-applied once the cap is reached). */
-export function effectiveUsedPositionalIds(
-  history: readonly PositionalAccountingGuess[],
-): ReadonlySet<ClueId> {
-  const out = new Set<ClueId>();
-  for (const g of history) {
-    if (isPositionalClueId(g.clueId)) {
-      out.add(g.clueId as ClueId);
-      continue;
-    }
-    if (g.clueId === "clueReuse" && g.result && typeof g.result === "object") {
-      const r = g.result as { kind?: string };
-      if (isPositionalClueId(r.kind)) out.add(r.kind as ClueId);
-    }
-  }
-  return out;
-}
-
-/** True iff advanced-mode rules apply AND the positional cap has been
- *  reached — meaning future pairs must omit positional cards and the
- *  Clue-Reuse pool must exclude positional clues. */
-export function advancedPositionalCapReached(
-  advancedMode: boolean,
-  history: readonly PositionalAccountingGuess[],
-): boolean {
-  if (!advancedMode) return false;
-  return countEffectivePositionalUses(history) >= ADVANCED_POSITIONAL_CAP;
-}
+/** Curated set of clues from which regular mode (and daily) guarantees
+ *  pair 1 contains at least one. Hand-picked for round-1 friendliness:
+ *  positional reveals (Higher/Lower, Within 2, Oracle, Thermometer)
+ *  and the most legible compositional clues (Echo, Elimination,
+ *  Divisible By, Contains Digit). Advanced mode ignores this list. */
+export const ROUND1_CURATED_CLUE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
+  "echo",
+  "elimination",
+  "divisibleBy",
+  "containsDigit",
+  "higherLower",
+  "within2",
+  "oracle",
+  "thermometer",
+]);
 
 /**
  * Deterministic deck for one game, built from the seed.
  *
- * Standard scheme (`deck_1p1c`, chosen by sim head-to-head over the
- * prior weighted selector):
- *   - Top two cards of the deck are exactly 1 positional + 1
- *     non-positional (compositional or special), shuffled within the
- *     pair. Pair 1 is always a category-contrast decision.
- *   - The rest of the deck is the remaining 5 positional + 10
- *     non-positional, shuffled together.
+ * Regular scheme (used by daily and unlimited's regular mode):
+ *   - Pair 1 is guaranteed to contain at least one card from
+ *     `ROUND1_CURATED_CLUE_IDS`. The other slot is drawn from the
+ *     remaining (curated or non-curated, but never round-1-ineligible).
+ *   - The rest of the deck is everything else — including Clue Reuse
+ *     and Bullseye Trend, which can't appear on round 1 by design —
+ *     shuffled freely.
  *
- * Advanced scheme (`deck_full_shuffle`, used when the player toggles
- * Advanced unlimited mode):
- *   - The full clue roster (minus Clue Reuse) is shuffled freely, so
- *     pair 1 may end up positional/positional, comp/comp, or any other
- *     mix — the category-contrast guarantee is dropped.
- *   - Clue Reuse is still excluded from pair 1 (no previously-used
- *     clues to reuse on round 1) and slotted into the post-pair-1 deck
- *     before that section is shuffled.
+ * Advanced scheme (used by unlimited's advanced mode):
+ *   - The full clue roster MINUS Clue Reuse is shuffled freely. No
+ *     curated guarantee on pair 1.
+ *   - Bullseye Trend is still kept out of pair 1 (needs a prior guess);
+ *     it slots into the post-pair-1 section before that shuffle.
+ *   - Clue Reuse never appears: advanced players start with 0 locks
+ *     and would have nothing to spend on it, so the card is dropped
+ *     from the deck entirely rather than offered as an unselectable
+ *     option.
  *
  * Both schemes share the "discard offered-but-unpicked" rule: a pair is
- * read at positions k*2 / k*2+1 and never returned to the pool. The
- * advanced scheme uses a different RNG namespace (`deckFullShuffle:`)
- * so toggling Advanced mid-game-prep yields a structurally distinct
- * order rather than a permutation of the standard deck.
+ * read at positions k*2 / k*2+1 and never returned to the pool. RNG
+ * namespaces differ between schemes so toggling Advanced mid-game-prep
+ * yields a structurally distinct order rather than a permutation.
  */
+
 /** Ids that are kept out of pair 1 because they cannot meaningfully
  *  resolve there. Clue Reuse needs a previously-used clue to re-apply,
  *  and Bullseye Trend needs a previously-resolved guess to compare
@@ -115,54 +71,61 @@ const ROUND1_INELIGIBLE_BY_DESIGN: ReadonlySet<ClueId> = new Set<ClueId>([
 ]);
 
 function buildDeck(seed: string, advancedMode: boolean = false): ClueId[] {
-  const ineligibleIds = CLUES
-    .map((c) => c.id)
-    .filter((id) => ROUND1_INELIGIBLE_BY_DESIGN.has(id));
-
   if (advancedMode) {
+    // Advanced: full shuffle, Clue Reuse removed entirely.
     const allEligible = CLUES.filter(
-      (c) => !ROUND1_INELIGIBLE_BY_DESIGN.has(c.id),
+      (c) => c.id !== "clueReuse" && !ROUND1_INELIGIBLE_BY_DESIGN.has(c.id),
     ).map((c) => c.id);
     const rngTop = seededRng(`deckFullShuffle:top:${seed}`);
     const shuffled = fisherYates(allEligible, rngTop);
     const pair1 = shuffled.slice(0, 2);
+    // Bullseye Trend goes into "rest" so it can show from round 2 on.
+    // Clue Reuse intentionally excluded everywhere in advanced mode.
     const rngRest = seededRng(`deckFullShuffle:rest:${seed}`);
     const rest = fisherYates(
-      [...shuffled.slice(2), ...ineligibleIds],
+      [...shuffled.slice(2), "bullseyeTrend" as ClueId],
       rngRest,
     );
     return [...pair1, ...rest];
   }
 
-  const positional = CLUES.filter((c) => c.category === "positional");
-  // Pair-1 compositional pool excludes the by-design-ineligible ids
-  // (Clue Reuse, Bullseye Trend). They're pushed into the rest
-  // section so they can appear from round 2 onward.
-  const otherForPair1 = CLUES.filter(
-    (c) =>
-      c.category !== "positional" && !ROUND1_INELIGIBLE_BY_DESIGN.has(c.id),
-  );
+  // Regular: pair 1 has ≥1 curated. We pick one curated for slot A,
+  // then anything pair-1-eligible (curated or other) for slot B.
+  const curatedAll = CLUES
+    .filter((c) => ROUND1_CURATED_CLUE_IDS.has(c.id))
+    .map((c) => c.id);
+  const otherPair1Eligible = CLUES
+    .filter(
+      (c) =>
+        !ROUND1_CURATED_CLUE_IDS.has(c.id) &&
+        !ROUND1_INELIGIBLE_BY_DESIGN.has(c.id),
+    )
+    .map((c) => c.id);
+  const ineligible = CLUES
+    .filter((c) => ROUND1_INELIGIBLE_BY_DESIGN.has(c.id))
+    .map((c) => c.id);
 
-  const rngP = seededRng(`deck1p1cP:${seed}`);
-  const shuffledP = fisherYates(
-    positional.map((c) => c.id),
-    rngP,
-  );
-  const rngC = seededRng(`deck1p1cC:${seed}`);
-  const shuffledC = fisherYates(
-    otherForPair1.map((c) => c.id),
-    rngC,
-  );
+  const rngCurated = seededRng(`deckCurated:c:${seed}`);
+  const shuffledCurated = fisherYates(curatedAll, rngCurated);
+  const rngOther = seededRng(`deckCurated:o:${seed}`);
+  const shuffledOther = fisherYates(otherPair1Eligible, rngOther);
 
-  const rngPair = seededRng(`deck1p1cPair:${seed}`);
-  const pair1 = fisherYates([shuffledP[0], shuffledC[0]], rngPair);
+  // Slot A: the first curated card. Slot B: the first non-curated
+  // pair-1-eligible card (or, if there are no eligible non-curated
+  // cards, the second curated). Final pair order randomized so the
+  // curated card isn't always on the left.
+  const slotA = shuffledCurated[0];
+  const slotB = shuffledOther[0] ?? shuffledCurated[1];
+  const rngPair = seededRng(`deckCurated:pair:${seed}`);
+  const pair1 = fisherYates([slotA, slotB], rngPair);
 
-  const rngRest = seededRng(`deck1p1cRest:${seed}`);
+  const usedInPair = new Set(pair1);
+  const rngRest = seededRng(`deckCurated:rest:${seed}`);
   const rest = fisherYates(
     [
-      ...shuffledP.slice(1),
-      ...shuffledC.slice(1),
-      ...ineligibleIds,
+      ...curatedAll.filter((id) => !usedInPair.has(id)),
+      ...otherPair1Eligible.filter((id) => !usedInPair.has(id)),
+      ...ineligible,
     ],
     rngRest,
   );
@@ -183,42 +146,22 @@ function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
  * Picks two clue options for the current chooser round.
  *
  * The round index is `chosenClueIds.length` — each chosen clue advances
- * the round. `deckOffset` adds extra positions consumed by redraws
- * (the burn-lock-to-redraw mechanic). In the deck model the pair is
- * simply `deck[(round + offset) * 2]` and `deck[(round + offset) * 2 + 1]`.
+ * the round. `deckOffset` adds extra positions consumed by redraws.
+ * In the deck model the pair is simply `deck[(round + offset) * 2]`
+ * and `deck[(round + offset) * 2 + 1]`.
  *
- * `advancedMode` switches to the fully-shuffled deck variant (no
- * pair-1 category-contrast guarantee). It must be threaded through on
- * every call within a single game so the deck stays consistent across
- * rounds.
+ * `advancedMode` switches to the full-shuffle deck variant (no curated
+ * pair-1 guarantee, Clue Reuse removed). Must be threaded through on
+ * every call within a single game so the deck stays consistent.
  *
- * Eligibility filter: cards that fail `isEligible` (locked-out
- * positional after the cap; Clue Reuse on round 1) are skipped past —
- * the deck pointer leapfrogs them. The skipped cards are effectively
- * discarded for the rest of the game, but downstream offsets remain
- * the same, so subsequent rounds are deterministic from the seed.
- *
- * Round-1 Clue Reuse exclusion: pair 1 of the standard deck already
- * lacks Clue Reuse (the buildDeck "rest" section is where it lives),
- * but a redraw on round 1 walks into "rest" where Clue Reuse may sit,
- * which previously surfaced it before the player had any used clues to
- * re-apply. The eligibility check here suppresses that on every
- * round-1 draw regardless of redraws.
- *
- * `excludeIds` is a "soft" filter: cards in this set are avoided when
- * possible but allowed as a last-resort fallback if the hard-eligible
- * pool runs dry. Callers use it to track previously-offered clue ids
- * so the walk-forward path can't resurrect them in a later round.
- * Without this, advanced-mode rounds where `deck[base]` is positional
- * after the cap walk past the boundary and consume cards from the
- * next pair's region — which then re-appear when the next round's
- * `base` lands on them.
- */
+ * Eligibility filter: cards that fail `isEligible` (Clue Reuse or
+ * Bullseye Trend on round 1) are skipped past. `excludeIds` is a
+ * soft filter: cards in this set are avoided when possible but allowed
+ * as a last-resort fallback if the hard-eligible pool runs dry. */
 export function pickTwoClues(
   seed: string,
   chosenClueIds: readonly ClueId[],
   deckOffset: number = 0,
-  excludePositional: boolean = false,
   advancedMode: boolean = false,
   excludeIds: ReadonlySet<ClueId> = EMPTY_ID_SET,
 ): [Clue, Clue] {
@@ -227,7 +170,6 @@ export function pickTwoClues(
   const isRound1 = chosenClueIds.length === 0;
 
   const isEligible = (id: ClueId): boolean => {
-    if (excludePositional && isPositionalClueId(id)) return false;
     if (isRound1 && id === "clueReuse") return false;
     // Bullseye Trend compares the current guess to the previous guess,
     // so it makes no sense on round 1 where there's no prior guess.
@@ -287,17 +229,15 @@ const EMPTY_ID_SET: ReadonlySet<ClueId> = new Set();
 /**
  * Pre-deals N distinct info clues for "Preselected Clues" mode (one
  * clue per guess except the final one). Special clues — extraLock and
- * clueReuse — are excluded from the pool: clueReuse can't function
- * without a chooser, and extraLock would burn an info slot on a
- * deduction-focused mode.
+ * clueReuse — are excluded from the pool.
  *
- * Standard mode (advancedMode=false):
- *   deck[0] is guaranteed positional; deck[1..N-1] are random non-special.
+ * Standard mode: slot 0 is drawn from the round-1 curated set; slots
+ * 1..N-1 are random non-special. Bullseye Trend may appear at any
+ * non-zero slot.
  *
- * Advanced mode (advancedMode=true):
- *   Up to 2 positional anywhere in the deck; the remaining slots are
- *   compositional. Final positions are shuffled so positional cards
- *   may land at any index, including 0.
+ * Advanced mode: full shuffle, no curated guarantee. If Bullseye Trend
+ * lands at slot 0 it's swapped with the first later eligible slot
+ * (still round-1-ineligible by design).
  *
  * Determinism: same seed produces the same deck so daily-style fairness
  * holds within a game session.
@@ -307,34 +247,14 @@ export function buildPreselectedDeck(
   count: number,
   advancedMode: boolean,
 ): ClueId[] {
-  const positional = CLUES.filter((c) => c.category === "positional").map(
-    (c) => c.id,
-  );
-  const compositional = CLUES.filter((c) => c.category === "compositional").map(
-    (c) => c.id,
-  );
+  const infoClues = CLUES.filter(
+    (c) => c.category === "positional" || c.category === "compositional",
+  ).map((c) => c.id);
 
   if (advancedMode) {
-    // Walk a shuffled deck of all info clues, taking the first `count`
-    // with at most ADVANCED_POSITIONAL_CAP positional. Then re-shuffle
-    // so positional cards aren't always front-loaded.
-    const allInfo = [...positional, ...compositional];
-    const walk = fisherYates(allInfo, seededRng(`pre:adv:walk:${seed}`));
-    const out: ClueId[] = [];
-    let posUsed = 0;
-    for (const id of walk) {
-      if (out.length === count) break;
-      const isP = POSITIONAL_CLUE_IDS.has(id);
-      if (isP) {
-        if (posUsed >= ADVANCED_POSITIONAL_CAP) continue;
-        posUsed++;
-      }
-      out.push(id);
-    }
+    const walk = fisherYates(infoClues, seededRng(`pre:adv:walk:${seed}`));
+    const out = walk.slice(0, count);
     const shuffled = fisherYates(out, seededRng(`pre:adv:order:${seed}`));
-    // Bullseye Trend can't resolve on round 1 (no prior guess to
-    // compare against). If the final shuffle dropped it at slot 0,
-    // swap with the first later slot whose id is round-1-eligible.
     if (shuffled.length > 0 && ROUND1_INELIGIBLE_BY_DESIGN.has(shuffled[0])) {
       for (let i = 1; i < shuffled.length; i++) {
         if (!ROUND1_INELIGIBLE_BY_DESIGN.has(shuffled[i])) {
@@ -346,11 +266,14 @@ export function buildPreselectedDeck(
     return shuffled;
   }
 
-  // Standard: slot 0 positional, slots 1..N-1 random non-special.
-  const shuffledP = fisherYates(positional, seededRng(`pre:std:p:${seed}`));
-  const slot0 = shuffledP[0];
+  // Regular: slot 0 from the curated round-1 set; remaining slots are
+  // any other info clue, shuffled.
+  const curated = infoClues.filter((id) => ROUND1_CURATED_CLUE_IDS.has(id));
+  const other = infoClues.filter((id) => !ROUND1_CURATED_CLUE_IDS.has(id));
+  const shuffledCurated = fisherYates(curated, seededRng(`pre:std:c:${seed}`));
+  const slot0 = shuffledCurated[0];
   const rest = fisherYates(
-    [...shuffledP.slice(1), ...compositional],
+    [...shuffledCurated.slice(1), ...other],
     seededRng(`pre:std:rest:${seed}`),
   );
   return [slot0, ...rest.slice(0, Math.max(0, count - 1))];

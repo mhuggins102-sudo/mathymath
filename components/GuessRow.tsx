@@ -236,10 +236,20 @@ function computeDigitSum(s: string): number {
  *
  * Exported so the unit test can assert text output without rendering.
  */
+/** Sub-label model. `text` + `className` is the simple single-color
+ *  case. When `parts` is present the renderer joins each part with a
+ *  space and gives each its own color — used by Contains Digit so
+ *  ✓ marks turn green and ✗ marks turn red within the same row. */
+export interface SubLabel {
+  text: string;
+  className: string;
+  parts?: { text: string; className: string }[];
+}
+
 export function subLabelFor(
   guess: string,
   result: ClueResult,
-): { text: string; className: string } | null {
+): SubLabel | null {
   switch (result.kind) {
     case "rangeCompare":
     case "parityBalance":
@@ -297,12 +307,12 @@ export function subLabelFor(
       // matches moved, not just direction.
       if (result.delta > 0)
         return {
-          text: `↑ ${result.delta} more`,
+          text: `${result.delta} more`,
           className: "text-good",
         };
       if (result.delta < 0)
         return {
-          text: `↓ ${Math.abs(result.delta)} less`,
+          text: `${Math.abs(result.delta)} less`,
           className: "text-bad",
         };
       return { text: "= same", className: "text-muted" };
@@ -312,18 +322,23 @@ export function subLabelFor(
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit": {
-      // Show every pick the player made, with ✓ for in-target and
-      // ✗ for the wrong one (always the last, by construction).
+      // Show every pick the player made, with ✓ for in-target (green)
+      // and ✗ for the wrong one (red — always the last, by
+      // construction). Per-pick colors via the `parts` channel so the
+      // checks and the cross don't share a single dominant color.
       if (result.picks.length === 0)
         return { text: "no picks", className: "text-muted" };
-      const text = result.picks
-        .map((p) => `${p.digit}${p.present ? "✓" : "✗"}`)
-        .join(" ");
+      const parts = result.picks.map((p) => ({
+        text: `${p.digit}${p.present ? "✓" : "✗"}`,
+        className: p.present ? "text-good" : "text-bad",
+      }));
+      const text = parts.map((p) => p.text).join(" ");
       const lastWrong =
         result.picks[result.picks.length - 1].present === false;
       return {
         text,
         className: lastWrong ? "text-bad" : "text-good",
+        parts,
       };
     }
     case "divisibleBy":
@@ -412,8 +427,17 @@ function ClueLabelContent({
         {meta.name}
       </span>
       {sub && (
-        <span className={`text-[11px] sm:text-[12px] font-mono ${sub.className} truncate leading-tight`}>
-          {sub.text}
+        <span
+          className={`text-[11px] sm:text-[12px] font-mono truncate leading-tight ${sub.parts ? "" : sub.className}`}
+        >
+          {sub.parts
+            ? sub.parts.map((p, i) => (
+                <span key={i} className={p.className}>
+                  {i > 0 ? " " : ""}
+                  {p.text}
+                </span>
+              ))
+            : sub.text}
         </span>
       )}
     </div>

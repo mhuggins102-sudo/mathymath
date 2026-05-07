@@ -286,52 +286,98 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     expect(body.result).toEqual(expected);
   });
 
-  it("returns won when an Oracle reveal + pending lock completes certainty", async () => {
-    // 2026-08-23 is a date whose deck offers Oracle in round 4 and where
-    // rounds 1-3 each have a "safe" no-reveal compositional option.
-    // Target = 87710. Plan: prior 3 guesses each pin a slot via a
-    // correct lock; the pending guess locks slot 3 and picks Oracle on
-    // slot 4, completing all 5 certain slots → server should signal
-    // `won`.
-    const D = "2026-04-23";
-    const T = generateDailyTarget(D, 5);
-    expect(T).toBe("76852");
+  /** Build a 3-round history pinning the slots in `lockSlots` via
+   *  correct locks. Each round uses the first non-Oracle option offered
+   *  by pickTwoClues for date D. Returns null if the deck doesn't
+   *  produce 3 non-Oracle options OR Oracle isn't offered at round 4. */
+  function buildOraclePriorHistory(
+    D: string,
+    T: string,
+    probe: string,
+    lockSlots: readonly number[],
+  ): Array<{
+    guess: string;
+    clueId: string;
+    result: ReturnType<ReturnType<typeof getClueById>["compute"]>;
+    locks: Array<{ slot: number; digit: string; correct: boolean }>;
+  }> | null {
+    const chosen: string[] = [];
+    const history: Array<{
+      guess: string;
+      clueId: string;
+      result: ReturnType<ReturnType<typeof getClueById>["compute"]>;
+      locks: Array<{ slot: number; digit: string; correct: boolean }>;
+    }> = [];
+    for (let r = 0; r < 3; r++) {
+      const pair = pickTwoClues(D, chosen as never, 0);
+      const opt = pair.find((c) => c.id !== "oracle");
+      if (!opt) return null;
+      chosen.push(opt.id);
+      history.push({
+        guess: probe,
+        clueId: opt.id,
+        result: opt.compute(probe, T),
+        locks: [{ slot: lockSlots[r], digit: T[lockSlots[r]], correct: true }],
+      });
+    }
+    const r4Pair = pickTwoClues(D, chosen as never, 0);
+    if (!r4Pair.some((c) => c.id === "oracle")) return null;
+    return history;
+  }
 
-    // Use guess "33333" so the picked clues don't accidentally reveal
-    // any slots (no 3s in 76852).
-    const probe = "33333";
-    const r1Clue = getClueById("primeCount");
-    const r2Clue = getClueById("median");
-    const r3Clue = getClueById("rangeCompare");
+  /** Find a date for which Oracle is offered at round 4. The probe
+   *  is a digit absent from T so the auto-picked Oracle slot has a
+   *  non-zero delta everywhere — i.e. Oracle picks slot 0 (leftmost
+   *  among ties when probe is "Xxxxx"). The 3 prior locks pin slots
+   *  1, 2, 3; the pending lock pins slot 4. Together with Oracle's
+   *  slot-0 reveal that's all five slots known → win. */
+  function findOracleSetup(): {
+    D: string;
+    T: string;
+    probe: string;
+    oracleSlot: number;
+    priorLockSlots: number[];
+    pendingLockSlot: number;
+  } {
+    const oracleClueObj = getClueById("oracle");
+    for (let day = 1; day < 365; day++) {
+      const month = String(((day - 1) % 12) + 1).padStart(2, "0");
+      const dayOfMonth = String(((day - 1) % 28) + 1).padStart(2, "0");
+      const D = `2026-${month}-${dayOfMonth}`;
+      const T = generateDailyTarget(D, 5);
+      const probeDigit = "0123456789".split("").find((d) => !T.includes(d));
+      if (probeDigit === undefined) continue;
+      const probe = probeDigit.repeat(5);
+      const oracleResult = oracleClueObj.compute(probe, T);
+      if (oracleResult.kind !== "oracle") continue;
+      const oracleSlot = oracleResult.slot;
+      const otherSlots = [0, 1, 2, 3, 4].filter((s) => s !== oracleSlot);
+      const priorLockSlots = otherSlots.slice(0, 3);
+      const pendingLockSlot = otherSlots[3];
+      const history = buildOraclePriorHistory(D, T, probe, priorLockSlots);
+      if (history === null) continue;
+      return { D, T, probe, oracleSlot, priorLockSlots, pendingLockSlot };
+    }
+    throw new Error("No suitable date found for Oracle-at-round-4 test");
+  }
 
-    const history = [
-      {
-        guess: probe,
-        clueId: "primeCount",
-        result: r1Clue.compute(probe, T),
-        locks: [{ slot: 0, digit: "7", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "median",
-        result: r2Clue.compute(probe, T),
-        locks: [{ slot: 1, digit: "6", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "rangeCompare",
-        result: r3Clue.compute(probe, T),
-        locks: [{ slot: 2, digit: "8", correct: true }],
-      },
-    ];
+  it("returns won when an Oracle auto-reveal + pending lock completes certainty", async () => {
+    // Plan: 3 prior rounds each pin a non-Oracle slot via a correct
+    // lock; the pending guess locks the remaining non-Oracle slot and
+    // picks Oracle, which auto-reveals the last unknown slot →
+    // server should signal `won`.
+    const { D, T, probe, oracleSlot, priorLockSlots, pendingLockSlot } =
+      findOracleSetup();
+    const history = buildOraclePriorHistory(D, T, probe, priorLockSlots)!;
 
     const res = await chooseClue(
       mockRequest({
         history,
         pendingGuess: probe,
         clueId: "oracle",
-        clueParam: { selectedSlot: 4 },
-        pendingLocks: [{ slot: 3, digit: "5", correct: true }],
+        pendingLocks: [
+          { slot: pendingLockSlot, digit: T[pendingLockSlot], correct: true },
+        ],
       }),
       { params: paramsP(D) },
     );
@@ -339,44 +385,21 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     const body = await res.json();
     expect(body.kind).toBe("won");
     expect(body.target).toBe(T);
-    expect(body.result).toEqual({ kind: "oracle", slot: 4, digit: 2 });
+    expect(body.result).toEqual({
+      kind: "oracle",
+      slot: oracleSlot,
+      digit: Number(T[oracleSlot]),
+    });
   });
 
   it("returns continue (not won) when pendingLocks are missing on Oracle reveal", async () => {
-    // Same scenario as the win test above, but the client does not send
-    // `pendingLocks`. Without them the server can't see slot-3's lock,
-    // so certainty is incomplete and the response must be `continue`,
-    // NOT `won`. (Pre-fix this was the only path — and it caused the
-    // "next guess line + game freezes on submit" bug the user reported.)
-    const D = "2026-04-23";
-    const T = generateDailyTarget(D, 5);
-    const probe = "33333";
-    const history = [
-      {
-        guess: probe,
-        clueId: "primeCount",
-        result: getClueById("primeCount").compute(probe, T),
-        locks: [{ slot: 0, digit: "7", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "median",
-        result: getClueById("median").compute(probe, T),
-        locks: [{ slot: 1, digit: "6", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "rangeCompare",
-        result: getClueById("rangeCompare").compute(probe, T),
-        locks: [{ slot: 2, digit: "8", correct: true }],
-      },
-    ];
+    const { D, T, probe, priorLockSlots } = findOracleSetup();
+    const history = buildOraclePriorHistory(D, T, probe, priorLockSlots)!;
     const res = await chooseClue(
       mockRequest({
         history,
         pendingGuess: probe,
         clueId: "oracle",
-        clueParam: { selectedSlot: 4 },
       }),
       { params: paramsP(D) },
     );
@@ -386,42 +409,19 @@ describe("POST /api/daily/[date]/choose-clue", () => {
   });
 
   it("ignores a tampered pending lock that lies about correctness", async () => {
-    // Defense-in-depth: a malicious client could send `correct: true` on
-    // a slot that doesn't actually match the target to fake an Oracle
-    // win. The server must re-resolve correctness against the real
-    // target — a wrong lock contributes nothing to certain digits, so
-    // the response is `continue` even if the client claimed `correct`.
-    const D = "2026-04-23";
-    const T = generateDailyTarget(D, 5);
-    const probe = "33333";
-    const history = [
-      {
-        guess: probe,
-        clueId: "primeCount",
-        result: getClueById("primeCount").compute(probe, T),
-        locks: [{ slot: 0, digit: "7", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "median",
-        result: getClueById("median").compute(probe, T),
-        locks: [{ slot: 1, digit: "6", correct: true }],
-      },
-      {
-        guess: probe,
-        clueId: "rangeCompare",
-        result: getClueById("rangeCompare").compute(probe, T),
-        locks: [{ slot: 2, digit: "8", correct: true }],
-      },
-    ];
+    const { D, T, probe, priorLockSlots, pendingLockSlot } = findOracleSetup();
+    const history = buildOraclePriorHistory(D, T, probe, priorLockSlots)!;
+    const wrongDigit = "0123456789"
+      .split("")
+      .find((d) => d !== T[pendingLockSlot])!;
     const res = await chooseClue(
       mockRequest({
         history,
         pendingGuess: probe,
         clueId: "oracle",
-        clueParam: { selectedSlot: 4 },
-        // target[3] is "5", not "9" — claim true anyway.
-        pendingLocks: [{ slot: 3, digit: "9", correct: true }],
+        pendingLocks: [
+          { slot: pendingLockSlot, digit: wrongDigit, correct: true },
+        ],
       }),
       { params: paramsP(D) },
     );

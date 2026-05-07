@@ -1,16 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-  ADVANCED_POSITIONAL_CAP,
-  advancedPositionalCapReached,
-  countEffectivePositionalUses,
-  effectiveUsedPositionalIds,
+  ROUND1_CURATED_CLUE_IDS,
   isPositionalClueId,
   pickTwoClues,
 } from "@/lib/game/clueSelector";
 import { getClueById } from "@/lib/game/clues/registry";
 import type { ClueId } from "@/lib/game/clues/types";
 
-describe("pickTwoClues (deck_1p1c scheme)", () => {
+describe("pickTwoClues — basics", () => {
   it("returns two distinct clues", () => {
     const [a, b] = pickTwoClues("2026-04-14", []);
     expect(a.id).not.toBe(b.id);
@@ -22,29 +19,13 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
     expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
   });
 
-  it("pair 1 is always exactly 1 positional + 1 non-positional (across many seeds)", () => {
-    for (let i = 0; i < 200; i++) {
-      const [a, b] = pickTwoClues(`seed-${i}`, []);
-      const positionals = [a, b].filter(
-        (c) => c.category === "positional",
-      ).length;
-      expect(positionals).toBe(1);
-    }
-  });
-
   it("round index is driven by chosenClueIds.length, not its content", () => {
-    // Two callers at the same round (length 1) with different content
-    // see the SAME pair — in the deck model the pair at position 2-3 is
-    // deterministic from the seed, independent of which specific clue
-    // was chosen at round 0.
     const a = pickTwoClues("2026-04-14", ["bullseyes"]);
     const b = pickTwoClues("2026-04-14", ["oracle"]);
     expect(a.map((c) => c.id).sort()).toEqual(b.map((c) => c.id).sort());
   });
 
-  it("never offers a clue that already appeared in an earlier pair (poof discard)", () => {
-    // Walk the deck: draw a pair per round, pick either option, assert
-    // the card id has not appeared before (in either pair slot).
+  it("never offers a clue that already appeared in an earlier pair", () => {
     const seenIds = new Set<ClueId>();
     const chosen: ClueId[] = [];
     for (let round = 0; round < 6; round++) {
@@ -58,11 +39,6 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
   });
 
   it("clue appearance spreads across the roster over many seeds", () => {
-    // Over 10k seeds, every clue should appear at least some of the time.
-    // The deck_1p1c scheme drops weights, so we just sanity-check that
-    // no clue is starved. 10k seeds × 2 cards drawn in pair 1 = 20k
-    // slots; with 17 clues, uniform would give ~1176 per clue. Set a
-    // conservative floor of 200 so CI noise can't flake this.
     const counts = new Map<ClueId, number>();
     for (let i = 0; i < 10_000; i++) {
       for (const c of pickTwoClues(`bench-${i}`, [])) {
@@ -72,21 +48,16 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
     for (const [, n] of counts) expect(n).toBeGreaterThan(200);
   });
 
-  it("every registered clue is reachable through the deck (no clue is structurally excluded)", () => {
-    // For each seed, drawing across the available rounds visits most
-    // cards. Over enough seeds every clue id should appear at least
-    // once. Acts as a smoke test that neither deck shuffle accidentally
-    // filters a clue out.
+  it("every registered info clue is reachable through the deck", () => {
     const seen = new Set<ClueId>();
-    for (let i = 0; i < 200 && seen.size < 20; i++) {
-      for (let round = 0; round < 9; round++) {
+    for (let i = 0; i < 2000 && seen.size < 23; i++) {
+      for (let round = 0; round < 11; round++) {
         const chosen = Array.from({ length: round }, () => "bullseyes" as ClueId);
         const [a, b] = pickTwoClues(`reach-${i}`, chosen);
         seen.add(a.id);
         seen.add(b.id);
       }
     }
-    // Sanity: every clue in the registry should be visited.
     for (const c of [
       "bullseyes",
       "higherLower",
@@ -112,7 +83,6 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
       "extraLock",
       "clueReuse",
     ] as ClueId[]) {
-      // getClueById sanity + seen
       expect(getClueById(c).id).toBe(c);
       expect(seen.has(c)).toBe(true);
     }
@@ -120,7 +90,7 @@ describe("pickTwoClues (deck_1p1c scheme)", () => {
 });
 
 describe("isPositionalClueId", () => {
-  it("returns true for the 6 positional clue ids", () => {
+  it("returns true for positional clue ids", () => {
     for (const id of [
       "bullseyes",
       "higherLower",
@@ -141,250 +111,148 @@ describe("isPositionalClueId", () => {
   });
 });
 
-describe("countEffectivePositionalUses", () => {
-  it("counts direct positional picks", () => {
-    expect(
-      countEffectivePositionalUses([
-        { clueId: "oracle" },
-        { clueId: "sumDelta" },
-        { clueId: "thermometer" },
-      ]),
-    ).toBe(2);
+describe("pickTwoClues — regular mode pair-1 curated guarantee", () => {
+  it("ROUND1_CURATED_CLUE_IDS contains the user-specified set", () => {
+    expect([...ROUND1_CURATED_CLUE_IDS].sort()).toEqual(
+      [
+        "echo",
+        "elimination",
+        "divisibleBy",
+        "containsDigit",
+        "higherLower",
+        "within2",
+        "oracle",
+        "thermometer",
+      ].sort(),
+    );
   });
 
-  it("counts Clue Reuse only when result.kind is positional", () => {
-    expect(
-      countEffectivePositionalUses([
-        { clueId: "clueReuse", result: { kind: "thermometer" } },
-        { clueId: "clueReuse", result: { kind: "sumDelta" } },
-        { clueId: "clueReuse", result: { kind: "oracle" } },
-      ]),
-    ).toBe(2);
-  });
-
-  it("ignores Clue Reuse with non-object or missing result", () => {
-    expect(
-      countEffectivePositionalUses([
-        { clueId: "clueReuse" },
-        { clueId: "clueReuse", result: null },
-        { clueId: "clueReuse", result: { kind: "extraLock" } },
-      ]),
-    ).toBe(0);
-  });
-});
-
-describe("effectiveUsedPositionalIds", () => {
-  it("returns the set of positional clue ids used directly OR via Clue Reuse", () => {
-    const set = effectiveUsedPositionalIds([
-      { clueId: "oracle" },
-      { clueId: "sumDelta" },
-      { clueId: "clueReuse", result: { kind: "thermometer" } },
-    ]);
-    expect(set.has("oracle")).toBe(true);
-    expect(set.has("thermometer")).toBe(true);
-    expect(set.has("sumDelta")).toBe(false);
-  });
-});
-
-describe("advancedPositionalCapReached", () => {
-  it("only fires when advancedMode is on AND count >= cap", () => {
-    expect(
-      advancedPositionalCapReached(false, [
-        { clueId: "oracle" },
-        { clueId: "thermometer" },
-      ]),
-    ).toBe(false);
-    expect(
-      advancedPositionalCapReached(true, [
-        { clueId: "oracle" },
-        { clueId: "thermometer" },
-      ]),
-    ).toBe(true);
-    expect(
-      advancedPositionalCapReached(true, [{ clueId: "oracle" }]),
-    ).toBe(false);
-  });
-});
-
-describe("pickTwoClues with excludePositional", () => {
-  it("never offers a positional card when excludePositional is true", () => {
-    // Walk a long range of seeds × rounds and verify the constraint
-    // holds across deck shuffle variation.
-    for (let s = 0; s < 50; s++) {
-      for (let round = 0; round < 7; round++) {
-        const chosen = Array.from(
-          { length: round },
-          () => "sumDelta" as ClueId,
-        );
-        const [a, b] = pickTwoClues(`adv-${s}`, chosen, 0, true);
-        expect(a.category).not.toBe("positional");
-        expect(b.category).not.toBe("positional");
-      }
-    }
-  });
-
-  it("returns two distinct clues even when excluding positionals", () => {
-    for (let s = 0; s < 50; s++) {
-      const [a, b] = pickTwoClues(`adv-distinct-${s}`, [], 0, true);
-      expect(a.id).not.toBe(b.id);
-    }
-  });
-
-  it("falls back to standard pair when excludePositional is false (regression guard)", () => {
-    const seed = "regression-1";
-    const chosen: ClueId[] = ["sumDelta"];
-    const standard = pickTwoClues(seed, chosen, 0, false);
-    const implicit = pickTwoClues(seed, chosen, 0);
-    expect(standard.map((c) => c.id)).toEqual(implicit.map((c) => c.id));
-  });
-
-  it("ADVANCED_POSITIONAL_CAP is 2", () => {
-    expect(ADVANCED_POSITIONAL_CAP).toBe(2);
-  });
-});
-
-describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
-  it("does NOT enforce the standard 1-positional + 1-non-positional pair-1 rule", () => {
-    // Across many seeds the standard scheme is locked to exactly one
-    // positional in pair 1; the advanced scheme has no such constraint,
-    // so categorical mixes other than "1+1" must occur.
-    let standardOnePositional = 0;
-    let advancedOnePositional = 0;
-    let advancedZeroOrTwo = 0;
+  it("pair 1 always contains at least one curated clue (across many seeds)", () => {
     for (let i = 0; i < 500; i++) {
-      const seed = `adv-shuf-${i}`;
-      const std = pickTwoClues(seed, [], 0, false, false);
-      const adv = pickTwoClues(seed, [], 0, false, true);
-      const stdPos = std.filter((c) => c.category === "positional").length;
-      const advPos = adv.filter((c) => c.category === "positional").length;
-      if (stdPos === 1) standardOnePositional++;
-      if (advPos === 1) advancedOnePositional++;
-      else advancedZeroOrTwo++;
-    }
-    // Standard always 1 positional in pair 1 (regression guard).
-    expect(standardOnePositional).toBe(500);
-    // Advanced should produce a meaningful number of pair-1 outcomes
-    // that are NOT 1-and-1. A fully random shuffle of 6 positionals
-    // among 19 cards gives roughly P(both positional) ≈ 8.8%,
-    // P(neither positional) ≈ 51% — together >40% of seeds. A
-    // conservative floor of 100/500 (20%) is well below the expected
-    // value but well above noise.
-    expect(advancedZeroOrTwo).toBeGreaterThan(100);
-    expect(advancedOnePositional).toBeLessThan(500);
-  });
-
-  it("never offers Clue Reuse on round 1 (no prior clues to re-use)", () => {
-    for (let i = 0; i < 500; i++) {
-      const seed = `adv-no-reuse-r1-${i}`;
-      const adv = pickTwoClues(seed, [], 0, false, true);
-      for (const c of adv) expect(c.id).not.toBe("clueReuse");
+      const [a, b] = pickTwoClues(`curated-${i}`, []);
+      const hasCurated =
+        ROUND1_CURATED_CLUE_IDS.has(a.id) || ROUND1_CURATED_CLUE_IDS.has(b.id);
+      expect(hasCurated).toBe(true);
     }
   });
 
-  it("returns two distinct clues even in advanced mode", () => {
-    for (let i = 0; i < 200; i++) {
-      const [a, b] = pickTwoClues(`adv-distinct-${i}`, [], 0, false, true);
-      expect(a.id).not.toBe(b.id);
+  it("pair 1 covers a variety of curated cards (not just one)", () => {
+    // Confirm the curated guarantee doesn't degenerate into always
+    // showing the same card. Across many seeds, every curated id should
+    // appear at least once in pair 1.
+    const seenCurated = new Set<ClueId>();
+    for (let i = 0; i < 5_000 && seenCurated.size < ROUND1_CURATED_CLUE_IDS.size; i++) {
+      const [a, b] = pickTwoClues(`spread-${i}`, []);
+      if (ROUND1_CURATED_CLUE_IDS.has(a.id)) seenCurated.add(a.id);
+      if (ROUND1_CURATED_CLUE_IDS.has(b.id)) seenCurated.add(b.id);
     }
+    expect(seenCurated.size).toBe(ROUND1_CURATED_CLUE_IDS.size);
   });
 
-  it("is deterministic across calls for the same seed in advanced mode", () => {
-    const a = pickTwoClues("seedX", ["sumDelta"], 0, false, true);
-    const b = pickTwoClues("seedX", ["sumDelta"], 0, false, true);
-    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
-  });
-
-  it("never offers Clue Reuse on round 1 even after redraws (standard mode)", () => {
-    // Walk many seeds and many redraws; on round 1 (chosenClueIds=[])
-    // Clue Reuse must never appear regardless of how far the player
-    // burns into the deck. Pre-fix this only held for deckOffset=0
-    // because buildDeck's pair-1 section excluded it; redraws walked
-    // into "rest" where Clue Reuse can sit.
+  it("never offers Clue Reuse on round 1 even after redraws", () => {
     for (let s = 0; s < 200; s++) {
-      const seed = `r1-noreuse-std-${s}`;
+      const seed = `r1-noreuse-${s}`;
       for (let off = 0; off < 6; off++) {
-        const [a, b] = pickTwoClues(seed, [], off, false, false);
+        const [a, b] = pickTwoClues(seed, [], off);
         expect(a.id).not.toBe("clueReuse");
         expect(b.id).not.toBe("clueReuse");
       }
     }
   });
 
-  it("never offers Clue Reuse on round 1 even after redraws (advanced mode)", () => {
-    for (let s = 0; s < 200; s++) {
-      const seed = `r1-noreuse-adv-${s}`;
-      for (let off = 0; off < 6; off++) {
-        const [a, b] = pickTwoClues(seed, [], off, false, true);
-        expect(a.id).not.toBe("clueReuse");
-        expect(b.id).not.toBe("clueReuse");
-      }
-    }
-  });
-
-  it("never offers Bullseye Trend on round 1 (no prior guess to compare)", () => {
+  it("never offers Bullseye Trend on round 1 even after redraws", () => {
     for (let s = 0; s < 200; s++) {
       const seed = `r1-no-trend-${s}`;
       for (let off = 0; off < 6; off++) {
-        const stdPair = pickTwoClues(seed, [], off, false, false);
-        expect(stdPair[0].id).not.toBe("bullseyeTrend");
-        expect(stdPair[1].id).not.toBe("bullseyeTrend");
-        const advPair = pickTwoClues(seed, [], off, false, true);
-        expect(advPair[0].id).not.toBe("bullseyeTrend");
-        expect(advPair[1].id).not.toBe("bullseyeTrend");
+        const [a, b] = pickTwoClues(seed, [], off);
+        expect(a.id).not.toBe("bullseyeTrend");
+        expect(b.id).not.toBe("bullseyeTrend");
       }
     }
   });
 
   it("CAN offer Bullseye Trend from round 2 onward", () => {
-    let seenAfterRound1 = false;
-    for (let s = 0; s < 1000 && !seenAfterRound1; s++) {
+    let seen = false;
+    for (let s = 0; s < 1000 && !seen; s++) {
       const seed = `r2-trend-${s}`;
       for (let off = 0; off < 5; off++) {
-        const [a, b] = pickTwoClues(seed, ["sumDelta"], off, false, false);
+        const [a, b] = pickTwoClues(seed, ["sumDelta"], off);
         if (a.id === "bullseyeTrend" || b.id === "bullseyeTrend") {
-          seenAfterRound1 = true;
+          seen = true;
           break;
         }
       }
     }
-    expect(seenAfterRound1).toBe(true);
+    expect(seen).toBe(true);
   });
 
-  it("CAN offer Clue Reuse from round 2 onward", () => {
-    // Sanity guard: the round-1 exclusion shouldn't bleed into later
-    // rounds. Across enough seeds, Clue Reuse should be reachable in
-    // round 2+ pairs (it's a single card in the deck, but with deck
-    // walks plus modest redraws the chance of hitting it on a given
-    // seed is appreciable).
-    let seenAfterRound1 = false;
-    for (let s = 0; s < 1000 && !seenAfterRound1; s++) {
+  it("CAN offer Clue Reuse from round 2 onward in regular mode", () => {
+    let seen = false;
+    for (let s = 0; s < 1000 && !seen; s++) {
       const seed = `r2-reuse-${s}`;
-      // Pretend the player picked sumDelta on round 1 (any non-reuse
-      // clue id works — pickTwoClues uses chosenClueIds.length, not
-      // its content).
       for (let off = 0; off < 5; off++) {
-        const [a, b] = pickTwoClues(seed, ["sumDelta"], off, false, false);
+        const [a, b] = pickTwoClues(seed, ["sumDelta"], off);
         if (a.id === "clueReuse" || b.id === "clueReuse") {
-          seenAfterRound1 = true;
+          seen = true;
           break;
         }
       }
     }
-    expect(seenAfterRound1).toBe(true);
+    expect(seen).toBe(true);
+  });
+});
+
+describe("pickTwoClues — advanced mode (full shuffle, no Clue Reuse)", () => {
+  it("never offers Clue Reuse anywhere in advanced mode", () => {
+    // Walk many seeds × rounds and assert Clue Reuse is structurally
+    // excluded from the advanced deck (the user removed it because
+    // advanced players start with 0 locks and would have nothing to
+    // spend on it).
+    for (let s = 0; s < 200; s++) {
+      const seed = `adv-no-reuse-${s}`;
+      const chosen: ClueId[] = [];
+      for (let round = 0; round < 7; round++) {
+        const [a, b] = pickTwoClues(seed, chosen, 0, true);
+        expect(a.id).not.toBe("clueReuse");
+        expect(b.id).not.toBe("clueReuse");
+        chosen.push(a.id);
+      }
+    }
   });
 
-  it("standard and advanced modes produce different decks at the same seed", () => {
-    // Walking the first 6 rounds at the same seed, the two schemes
-    // should disagree on at least one pair somewhere — they use
-    // different RNG namespaces and a different roster split.
+  it("never offers Bullseye Trend on round 1 in advanced mode", () => {
+    for (let s = 0; s < 200; s++) {
+      const seed = `adv-no-trend-r1-${s}`;
+      for (let off = 0; off < 6; off++) {
+        const [a, b] = pickTwoClues(seed, [], off, true);
+        expect(a.id).not.toBe("bullseyeTrend");
+        expect(b.id).not.toBe("bullseyeTrend");
+      }
+    }
+  });
+
+  it("returns two distinct clues even in advanced mode", () => {
+    for (let i = 0; i < 200; i++) {
+      const [a, b] = pickTwoClues(`adv-distinct-${i}`, [], 0, true);
+      expect(a.id).not.toBe(b.id);
+    }
+  });
+
+  it("is deterministic across calls for the same seed in advanced mode", () => {
+    const a = pickTwoClues("seedX", ["sumDelta"], 0, true);
+    const b = pickTwoClues("seedX", ["sumDelta"], 0, true);
+    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
+  });
+
+  it("regular and advanced modes produce different decks at the same seed", () => {
     let diverged = 0;
     for (let i = 0; i < 50; i++) {
       const seed = `cmp-${i}`;
       let chosen: ClueId[] = [];
       let differs = false;
       for (let r = 0; r < 6; r++) {
-        const std = pickTwoClues(seed, chosen, 0, false, false);
-        const adv = pickTwoClues(seed, chosen, 0, false, true);
+        const std = pickTwoClues(seed, chosen, 0, false);
+        const adv = pickTwoClues(seed, chosen, 0, true);
         const stdIds = std.map((c) => c.id).sort().join(",");
         const advIds = adv.map((c) => c.id).sort().join(",");
         if (stdIds !== advIds) {
@@ -397,30 +265,35 @@ describe("pickTwoClues with advancedMode=true (fully-shuffled deck)", () => {
     }
     expect(diverged).toBe(50);
   });
+
+  it("advanced mode does NOT enforce a curated pair-1 guarantee", () => {
+    // The curated guarantee is regular-mode only. In advanced mode the
+    // pair-1 distribution is closer to uniform across the (non-Clue-
+    // Reuse, pair-1-eligible) roster, so a meaningful share of seeds
+    // produce pairs entirely outside the curated set.
+    let allNonCurated = 0;
+    for (let i = 0; i < 1000; i++) {
+      const [a, b] = pickTwoClues(`adv-nocurated-${i}`, [], 0, true);
+      const onlyNonCurated =
+        !ROUND1_CURATED_CLUE_IDS.has(a.id) &&
+        !ROUND1_CURATED_CLUE_IDS.has(b.id);
+      if (onlyNonCurated) allNonCurated++;
+    }
+    // 8 of ~21 pair-1-eligible cards are curated → P(both non-curated)
+    // ≈ (13/21)*(12/20) ≈ 37%. Floor of 100/1000 (10%) leaves ample
+    // headroom over CI noise.
+    expect(allNonCurated).toBeGreaterThan(100);
+  });
 });
 
-describe("pickTwoClues with excludeIds (offered-pool soft filter)", () => {
+describe("pickTwoClues — excludeIds soft filter", () => {
   it("never offers a clue in excludeIds when the eligible pool has alternatives", () => {
-    // Walk many seeds × rounds with a populated excludeIds set; if the
-    // hard-eligible pool is bigger than excludeIds, the returned pair
-    // must be entirely outside the set. Failure means the walk-forward
-    // or backfill path is leaking previously-offered ids.
     for (let s = 0; s < 200; s++) {
       const seed = `excl-${s}`;
-      // Walk a 7-round advanced-mode game post-cap, accumulating
-      // offered ids as the exclude set, and verify each new pair is
-      // disjoint from prior offers.
       const offered = new Set<ClueId>();
       const chosen: ClueId[] = [];
       for (let round = 0; round < 7; round++) {
-        const pair = pickTwoClues(
-          seed,
-          chosen,
-          0,
-          true, // excludePositional (cap reached)
-          true, // advancedMode
-          offered,
-        );
+        const pair = pickTwoClues(seed, chosen, 0, true, offered);
         expect(offered.has(pair[0].id)).toBe(false);
         expect(offered.has(pair[1].id)).toBe(false);
         offered.add(pair[0].id);
@@ -431,49 +304,48 @@ describe("pickTwoClues with excludeIds (offered-pool soft filter)", () => {
   });
 
   it("falls back to a duplicate only when no fresh eligible card exists", () => {
-    // Synthesize an exclude set that covers every non-positional, non-
-    // reuse clue. With excludePositional + round 1 (no reuse) + every
-    // other id excluded, the function has nothing fresh to offer and
-    // must fall back. Just assert it returns two clue objects without
-    // throwing — the contract is "always returns a pair".
-    const allNonPositionalNonReuse = new Set<ClueId>(
-      [
-        "sumDelta",
-        "digitOverlap",
-        "parityBalance",
-        "primeCount",
-        "rangeCompare",
-        "containsDigit",
-        "distinctDigits",
-        "median",
-        "divisibleBy",
-        "totalDeviation",
-        "diceCount",
-        "upsAndDowns",
-        "extraLock",
-      ] as ClueId[],
-    );
+    // Synthesize an exclude set that covers nearly every clue. The
+    // function still has to return a pair — we just need it to not
+    // throw. Empty-eligible-pool fallback path is exercised here.
+    const everyId = [
+      "sumDelta",
+      "digitOverlap",
+      "parityBalance",
+      "primeCount",
+      "rangeCompare",
+      "containsDigit",
+      "distinctDigits",
+      "median",
+      "divisibleBy",
+      "totalDeviation",
+      "diceCount",
+      "upsAndDowns",
+      "extraLock",
+      "echo",
+      "elimination",
+      "bullseyes",
+      "higherLower",
+      "within2",
+      "parityMask",
+      "oracle",
+      "thermometer",
+    ] as ClueId[];
     const [a, b] = pickTwoClues(
       "fallback-seed",
       [],
       0,
-      true, // excludePositional
-      true, // advancedMode
-      allNonPositionalNonReuse,
+      true,
+      new Set(everyId),
     );
     expect(a).toBeDefined();
     expect(b).toBeDefined();
   });
 
   it("default empty excludeIds preserves prior behavior (regression guard)", () => {
-    // Calling pickTwoClues without excludeIds (or with empty) must
-    // produce the same pair as the pre-fix implementation for the
-    // common path. This test also indirectly guarantees daily-game
-    // callers (which never pass excludeIds) are unaffected.
     for (let s = 0; s < 50; s++) {
       const seed = `default-excl-${s}`;
-      const a = pickTwoClues(seed, [], 0, false, false);
-      const b = pickTwoClues(seed, [], 0, false, false, new Set());
+      const a = pickTwoClues(seed, [], 0, false);
+      const b = pickTwoClues(seed, [], 0, false, new Set());
       expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id));
     }
   });
