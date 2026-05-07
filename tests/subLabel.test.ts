@@ -190,6 +190,16 @@ describe("subLabelFor — other clues unchanged", () => {
       subLabelFor("12345", { kind: "bullseyeTrend", delta: 0 }),
     ).toEqual({ text: "= same", className: "text-muted" });
   });
+  it("Oracle (shows |guess[slot] - revealed digit| as '# off')", () => {
+    // guess "06906", revealed slot 2 with digit 4 → |9-4|=5.
+    expect(
+      subLabelFor("06906", { kind: "oracle", slot: 2, digit: 4 }),
+    ).toEqual({ text: "5 off", className: "text-accent" });
+    // guess "12345", revealed slot 3 with target digit 5 → |4-5|=1.
+    expect(
+      subLabelFor("12345", { kind: "oracle", slot: 3, digit: 5 }),
+    ).toEqual({ text: "1 off", className: "text-accent" });
+  });
 });
 
 describe("isOracleWinRow", () => {

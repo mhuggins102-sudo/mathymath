@@ -345,6 +345,20 @@ export function reduce(state: GameState, action: GameAction): GameState {
       if (!won && result.kind === "oracle") {
         const certain = deriveCertainDigits(guesses, state.digits);
         if (certain.every((d) => d !== null)) oracleWon = true;
+        // Also win if the player's current guess matches the target
+        // at every slot except the Oracle slot — Oracle just filled
+        // in the only mistake, and forcing the player to re-enter the
+        // same digits to commit the win is wasteful. This handles the
+        // case where the player has a near-correct guess but no locks
+        // at the matching slots, so deriveCertainDigits doesn't count
+        // them as known.
+        if (!oracleWon) {
+          const oracleSlot = result.slot;
+          const matchesElsewhere = [...guess].every(
+            (ch, i) => i === oracleSlot || ch === state.target[i],
+          );
+          if (matchesElsewhere) oracleWon = true;
+        }
       }
       const lost = !won && !oracleWon && guesses.length >= state.maxGuesses;
       return {

@@ -243,6 +243,17 @@ export async function POST(
     if (certain.every((d) => d !== null)) {
       return NextResponse.json({ kind: "won", result, target });
     }
+    // Fallback win: if the player's pending guess matches the target
+    // at every slot except the Oracle-revealed slot, Oracle just
+    // filled the only mistake and the player has effectively solved
+    // the puzzle. Skip the redundant resubmit step.
+    const oracleSlot = result.slot;
+    const matchesElsewhere = [...pendingGuess].every(
+      (ch, i) => i === oracleSlot || ch === target[i],
+    );
+    if (matchesElsewhere) {
+      return NextResponse.json({ kind: "won", result, target });
+    }
   }
 
   return NextResponse.json({ kind: "continue", result });
