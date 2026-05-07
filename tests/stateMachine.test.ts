@@ -161,6 +161,48 @@ describe("stateMachine", () => {
     expect(next.pendingGuess).toBeNull();
   });
 
+  it("Oracle wins when guess matches target at every slot except the Oracle slot (no locks needed)", () => {
+    // User example: target 31187, guess 35187 — only slot 1 differs.
+    // Oracle's auto-pick lands on slot 1 (delta |5-1|=4, the only
+    // nonzero delta), and since the rest of the guess matches the
+    // target the player has effectively solved the puzzle. Without
+    // this branch the player would have to re-type the same digits
+    // to commit the win.
+    const oracle = getClueById("oracle");
+    const sumDelta = getClueById("sumDelta");
+    const state: GameState = {
+      target: "31187",
+      digits: 5,
+      maxGuesses: 7,
+      seed: "t",
+      deckOffset: 0,
+      offeredClueIds: [],
+      advancedMode: false,
+      preselectedDeck: null,
+      status: "playing",
+      guesses: [
+        { guess: "00000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 20 } },
+      ],
+      pendingGuess: {
+        guess: "35187",
+        options: [oracle, sumDelta] as [typeof oracle, typeof sumDelta],
+        redraws: 0,
+      },
+    };
+    const next = reduce(state, {
+      type: "CHOOSE_CLUE",
+      clueId: "oracle",
+    });
+    expect(next.status).toBe("won");
+    expect(next.pendingGuess).toBeNull();
+    const lastRow = next.guesses[next.guesses.length - 1];
+    expect(lastRow.result?.kind).toBe("oracle");
+    if (lastRow.result?.kind === "oracle") {
+      expect(lastRow.result.slot).toBe(1);
+      expect(lastRow.result.digit).toBe(1);
+    }
+  });
+
   it("Oracle does NOT win when it leaves slots still unknown", () => {
     const oracle = getClueById("oracle");
     const sumDelta = getClueById("sumDelta");

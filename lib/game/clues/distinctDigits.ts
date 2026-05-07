@@ -24,10 +24,21 @@ export const distinctDigitsClue: Clue<{
   compute(guess, target) {
     const guessCounts = digitCounts(guess);
     const targetCounts = digitCounts(target);
-    const sharedRepeated = [...guess].map(
-      (ch) =>
-        (guessCounts.get(ch) ?? 0) >= 2 && (targetCounts.get(ch) ?? 0) >= 2,
-    );
+    // Highlight only the leftmost target_count occurrences of each
+    // digit that's repeated in BOTH guess and target. Excess
+    // duplicates beyond what the target carries stay idle so the
+    // mask doesn't overcount.
+    const remaining = new Map<string, number>();
+    for (const [d, gc] of guessCounts) {
+      const tc = targetCounts.get(d) ?? 0;
+      if (gc >= 2 && tc >= 2) remaining.set(d, tc);
+    }
+    const sharedRepeated = [...guess].map((ch) => {
+      const left = remaining.get(ch) ?? 0;
+      if (left <= 0) return false;
+      remaining.set(ch, left - 1);
+      return true;
+    });
     return {
       kind: "distinctDigits",
       count: new Set(target).size,

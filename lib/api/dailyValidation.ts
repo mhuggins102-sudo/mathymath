@@ -267,6 +267,15 @@ export function validateDailyHistory(
       );
       if (certain.every((d) => d !== null)) {
         status = "won";
+      } else {
+        // Also win when the player's guess at this row matched the
+        // target at every slot except the Oracle slot — Oracle filled
+        // the only mistake.
+        const oracleSlot = expected.slot;
+        const matchesElsewhere = [...g.guess].every(
+          (ch, idx) => idx === oracleSlot || ch === target[idx],
+        );
+        if (matchesElsewhere) status = "won";
       }
     }
   }

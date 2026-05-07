@@ -327,13 +327,20 @@ describe("Distinct Digits", () => {
     expect(distinctDigitsClue.compute("00000", "12345").count).toBe(5);
     expect(distinctDigitsClue.compute("00000", "11111").count).toBe(1);
   });
-  it("highlights guess slots whose digit is repeated in BOTH guess and target", () => {
-    // Target 22445 — repeats {2, 4}. Guess 35422 — repeats {2}. Both
-    // sets contain only 2, so the two 2-slots in the guess (slots 3 and 4)
-    // are the only highlights.
+  it("highlights guess slots whose digit is repeated in BOTH guess and target, capped at target's count", () => {
+    // Target 22445 — counts {2:2, 4:2, 5:1}. Guess 35422 — counts
+    // {3:1, 5:1, 4:1, 2:2}. Digit 2 is repeated in both; target has 2,
+    // guess has 2 → highlight both 2-slots in guess (slots 3 and 4).
     const r = distinctDigitsClue.compute("35422", "22445");
     expect(r.count).toBe(3);
     expect(r.sharedRepeated).toEqual([false, false, false, true, true]);
+  });
+  it("user example: target 55606, guess 55705 → only the FIRST TWO 5s", () => {
+    // target 55606 has two 5s; guess 55705 has three 5s (slots 0, 1, 4).
+    // Highlight only the leftmost two — the 3rd 5 (slot 4) is a wasted
+    // duplicate.
+    const r = distinctDigitsClue.compute("55705", "55606");
+    expect(r.sharedRepeated).toEqual([true, true, false, false, false]);
   });
   it("does not highlight if a digit is repeated in only one of guess/target", () => {
     // Target 22345 repeats {2}; guess 11234 repeats {1}. No overlap.
@@ -341,10 +348,18 @@ describe("Distinct Digits", () => {
     expect(r.sharedRepeated).toEqual([false, false, false, false, false]);
   });
   it("highlights every slot when both guess and target are uniform", () => {
-    // Guess 33333, target 33333: both repeat 3 (target distinct = {3}).
+    // Guess 33333 (count {3:5}), target 33333 (count {3:5}); cap at
+    // target's 5 means all five slots highlight.
     const r = distinctDigitsClue.compute("33333", "33333");
     expect(r.count).toBe(1);
     expect(r.sharedRepeated).toEqual([true, true, true, true, true]);
+  });
+  it("caps highlights at target's count when guess has more duplicates than target", () => {
+    // Target 11222 (count {1:2, 2:3}), guess 11122 (count {1:3, 2:2}).
+    // Digit 1: target has 2, guess has 3 → highlight leftmost 2 (slots 0, 1).
+    // Digit 2: target has 3, guess has 2 → both 2-slots highlight (slots 3, 4).
+    const r = distinctDigitsClue.compute("11122", "11222");
+    expect(r.sharedRepeated).toEqual([true, true, false, true, true]);
   });
 });
 

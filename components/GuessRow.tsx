@@ -397,8 +397,17 @@ export function subLabelFor(
         className: "text-bad",
       };
     }
-    case "oracle":
-      return { text: `slot ${result.slot + 1}`, className: "text-muted" };
+    case "oracle": {
+      // The player's own digit at the revealed slot tells us how far
+      // off they were. Cell coloring already shows WHICH slot was
+      // revealed; the sub-label conveys HOW WRONG the guess was at
+      // that slot — also a hint that Oracle's auto-pick chose this
+      // slot because it had the largest delta.
+      const off = Math.abs(
+        Number(guess[result.slot]) - result.digit,
+      );
+      return { text: `${off} off`, className: "text-accent" };
+    }
     case "extraLock":
       // Special card — not a target clue. Surface the reward instead.
       return { text: "+1 🔒", className: "text-good" };
