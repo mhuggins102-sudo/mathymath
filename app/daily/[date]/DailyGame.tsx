@@ -9,7 +9,7 @@ import { GuessGrid } from "@/components/GuessGrid";
 import { GearIcon } from "@/components/GearIcon";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
-import { SlotPicker, DigitPicker, ReusePicker } from "@/components/CluePickers";
+import { DigitPicker, ReusePicker } from "@/components/CluePickers";
 import { containsDigitAvailable } from "@/lib/game/clues/containsDigit";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
@@ -336,16 +336,7 @@ export function DailyGame({
         )}
         {hydrated && state.status === "playing" && (
           <div className="mt-4">
-            {pendingClueParam?.paramKind === "slot" ? (
-              <SlotPicker
-                digits={5}
-                certainDigits={certainDigits}
-                onSelect={(slot) =>
-                  confirmClueParam({ selectedSlot: slot })
-                }
-                onCancel={cancelClueParam}
-              />
-            ) : pendingClueParam?.paramKind === "reuse" ? (
+            {pendingClueParam?.paramKind === "reuse" ? (
               <ReusePicker
                 usedClueIds={state.guesses
                   .map((g) => g.clueId)

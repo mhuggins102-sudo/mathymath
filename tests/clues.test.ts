@@ -123,49 +123,36 @@ describe("Bullseye Trend", () => {
 });
 
 describe("Oracle", () => {
-  it("returns a valid slot and the true digit there", () => {
-    const target = "74827";
-    const r = oracleClue.compute("00000", target);
-    expect(r.slot).toBeGreaterThanOrEqual(0);
-    expect(r.slot).toBeLessThan(target.length);
-    expect(r.digit).toBe(Number(target[r.slot]));
+  it("auto-picks the slot with the largest |guess[i] - target[i]|", () => {
+    // User example: target 23456, guess 06906 → deltas 2, 3, 5, 5, 0.
+    // Max is 5; tie between slots 2 and 3; leftmost wins → slot 2.
+    const r = oracleClue.compute("06906", "23456");
+    expect(r.slot).toBe(2);
+    expect(r.digit).toBe(4);
   });
-  it("is deterministic per (guess, target)", () => {
+  it("uses leftmost-on-tie tiebreaking even when several slots share the max", () => {
+    // target 11111, guess 99999 → all deltas are 8 (tied). Leftmost
+    // wins → slot 0.
+    const r = oracleClue.compute("99999", "11111");
+    expect(r.slot).toBe(0);
+    expect(r.digit).toBe(1);
+  });
+  it("returns digit at slot 0 when guess equals target everywhere except slot 0", () => {
+    // target 23456, guess 92345 — wait, that shifts. Build a clearer
+    // case: target 23456, guess 73456 → delta 5 at slot 0, 0 elsewhere.
+    // Slot 0 wins.
+    const r = oracleClue.compute("73456", "23456");
+    expect(r.slot).toBe(0);
+    expect(r.digit).toBe(2);
+  });
+  it("is pure on (guess, target)", () => {
     const a = oracleClue.compute("12345", "74827");
     const b = oracleClue.compute("12345", "74827");
     expect(a).toEqual(b);
   });
-  it("skips slots the player already knows (context.knownSlots)", () => {
+  it("returns a valid slot and the true digit there", () => {
     const target = "74827";
-    // Pick a (guess,target) the plain call would map to some slot S.
-    const plain = oracleClue.compute("12345", target);
-    // Now pass that slot as already known. Oracle must pick a DIFFERENT
-    // slot — never re-reveal.
-    const withKnown = oracleClue.compute("12345", target, {
-      knownSlots: [plain.slot],
-    });
-    expect(withKnown.slot).not.toBe(plain.slot);
-    expect(withKnown.digit).toBe(Number(target[withKnown.slot]));
-  });
-  it("is deterministic per (guess, target, knownSlots)", () => {
-    const target = "74827";
-    const a = oracleClue.compute("12345", target, { knownSlots: [0, 2] });
-    const b = oracleClue.compute("12345", target, { knownSlots: [0, 2] });
-    expect(a).toEqual(b);
-    // Different known-set → potentially different slot.
-    const c = oracleClue.compute("12345", target, { knownSlots: [1, 3] });
-    // They MAY coincide by luck, but the determinism property still
-    // says each call is stable with its own knownSlots.
-    expect(c).toEqual(
-      oracleClue.compute("12345", target, { knownSlots: [1, 3] }),
-    );
-  });
-  it("falls back to the full pool if every slot is somehow already known", () => {
-    const target = "74827";
-    const r = oracleClue.compute("12345", target, {
-      knownSlots: [0, 1, 2, 3, 4],
-    });
-    // Just has to return SOMETHING valid rather than crash.
+    const r = oracleClue.compute("00000", target);
     expect(r.slot).toBeGreaterThanOrEqual(0);
     expect(r.slot).toBeLessThan(target.length);
     expect(r.digit).toBe(Number(target[r.slot]));
@@ -642,10 +629,12 @@ describe("6-digit length sanity", () => {
     expect(r.targetHasAny).toBe(true);
     expect(r.divisors).toEqual([]);
   });
-  it("Oracle: reveals a slot inside the 6-digit range", () => {
-    const r = oracleClue.compute(guess6, target6, { selectedSlot: 5 });
-    expect(r.slot).toBe(5);
-    expect(r.digit).toBe(8);
+  it("Oracle: reveals the leftmost largest-delta slot inside the 6-digit range", () => {
+    // target 247628, guess 555555 → deltas [3,1,2,1,3,3]. Max=3 ties
+    // among slots 0, 4, 5; leftmost wins → slot 0 (digit 2).
+    const r = oracleClue.compute(guess6, target6);
+    expect(r.slot).toBe(0);
+    expect(r.digit).toBe(2);
   });
 });
 

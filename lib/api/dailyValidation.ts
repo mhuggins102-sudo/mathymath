@@ -202,9 +202,10 @@ export function validateDailyHistory(
     const clueParam: Record<string, unknown> = {};
     if (g.result && typeof g.result === "object") {
       const r = g.result as Record<string, unknown>;
-      if (r.kind === "oracle" && typeof r.slot === "number") {
-        clueParam.selectedSlot = r.slot;
-      }
+      // Oracle auto-picks its slot from (guess, target), so the
+      // validator doesn't need to feed selectedSlot back in — the
+      // re-computed slot will match the stored result, or
+      // resultsMatch will fail.
       if (r.kind === "containsDigit" && Array.isArray(r.picks)) {
         clueParam.picks = (r.picks as Array<{ digit: number }>).map(
           (p) => p.digit,

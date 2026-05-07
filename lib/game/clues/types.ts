@@ -60,7 +60,9 @@ export type ClueId = ClueResult["kind"];
 export interface ClueComputeContext {
   /** Indices of slots whose target digit is already known. */
   knownSlots?: readonly number[];
-  /** Player-chosen slot for clues with paramKind "slot" (Oracle). */
+  /** Player-chosen slot. Currently unused — Oracle was the only
+   *  consumer and now auto-picks. Field retained for future
+   *  positional clues that need explicit slot choice. */
   selectedSlot?: number;
   /** Player-chosen digit for clues with paramKind "digit". (Currently
    *  unused — Contains Digit moved to a multi-pick model and uses
@@ -106,10 +108,10 @@ export interface Clue<R extends ClueResult = ClueResult> {
    *  so color references don't need to live in the description text. */
   legend?: LegendEntry[];
   /** If set, the player must provide a parameter after choosing this
-   *  clue — "slot" shows a 5-cell position picker (Oracle), "digit"
-   *  shows a 0-9 numpad (Contains Digit). Clues without this resolve
+   *  clue — "digit" shows the multi-pick numpad (Contains Digit),
+   *  "reuse" shows the Clue Reuse picker. Clues without this resolve
    *  immediately when chosen. */
-  paramKind?: "slot" | "digit" | "reuse";
+  paramKind?: "digit" | "reuse";
   compute(guess: string, target: string, context?: ClueComputeContext): R;
   example(target: string): { guess: string; result: R };
   /** Plain-language explanation of the result for this specific guess.

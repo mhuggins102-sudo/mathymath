@@ -84,7 +84,7 @@ export interface UseGameResult {
    *  across the multi-pick UI. */
   pendingClueParam: {
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "digit" | "reuse";
     reusedClueId?: string;
     picks?: { digit: number; present: boolean }[];
   } | null;
@@ -492,7 +492,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // confirms → hook dispatches CHOOSE_CLUE with the param attached.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "digit" | "reuse";
     reusedClueId?: string;
     picks?: { digit: number; present: boolean }[];
   } | null>(null);
@@ -525,16 +525,17 @@ export function useGame(config: UseGameConfig): UseGameResult {
   const confirmClueParam = useCallback(
     (param: ClueParam) => {
       if (!pendingClueParam) return;
-      // Chained flow for Clue Reuse → Oracle / Contains Digit:
-      // When the reuse picker yields a clue that itself has a paramKind,
-      // we enter that clue's sub-picker before dispatching.
+      // Chained flow for Clue Reuse → Contains Digit: when the reuse
+      // picker yields a clue with paramKind=digit, enter that clue's
+      // multi-pick picker before dispatching. Oracle no longer needs
+      // a sub-picker (it auto-picks the farthest-off slot).
       if (pendingClueParam.paramKind === "reuse" && param.reusedClueId) {
         try {
           const reusedClue = getClueById(param.reusedClueId as never);
-          if (reusedClue.paramKind && (reusedClue.paramKind === "slot" || reusedClue.paramKind === "digit")) {
+          if (reusedClue.paramKind === "digit") {
             setPendingClueParam({
               clueId: pendingClueParam.clueId,
-              paramKind: reusedClue.paramKind,
+              paramKind: "digit",
               reusedClueId: param.reusedClueId,
             });
             return;

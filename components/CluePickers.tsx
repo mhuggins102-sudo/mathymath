@@ -2,66 +2,6 @@
 
 import type { ClueId } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
-import { Digit, type DigitState } from "./Digit";
-
-/**
- * Slot picker — appears after the player chooses Oracle in the clue
- * chooser. Shows 5 cells; already-known slots are grayed out (not
- * tappable). Tapping an unknown slot confirms the selection.
- */
-export function SlotPicker({
-  digits,
-  certainDigits,
-  onSelect,
-  onCancel,
-  compact,
-}: {
-  digits: number;
-  certainDigits: (string | null)[];
-  onSelect: (slot: number) => void;
-  onCancel: () => void;
-  /** Tightens cell sizing to match the 6-digit row layout in the grid. */
-  compact?: boolean;
-}) {
-  return (
-    <div className="w-full max-w-md mx-auto select-none text-center">
-      <p className="text-[10px] uppercase tracking-wider text-muted mb-2">
-        Pick a slot to reveal
-      </p>
-      <div
-        className={`flex items-center justify-center mb-3 ${
-          compact ? "gap-1 sm:gap-1.5" : "gap-1.5 sm:gap-2"
-        }`}
-      >
-        {Array.from({ length: digits }, (_, i) => {
-          const known = certainDigits[i] !== null;
-          const state: DigitState = known ? "match" : "idle";
-          return (
-            <Digit
-              key={i}
-              value={known ? certainDigits[i] : null}
-              size={compact ? "lg-narrow" : "lg"}
-              state={state}
-              onClick={known ? undefined : () => onSelect(i)}
-              ariaLabel={
-                known
-                  ? `Slot ${i + 1} already known`
-                  : `Reveal slot ${i + 1}`
-              }
-            />
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="text-xs text-muted hover:text-foreground "
-      >
-        cancel — pick a different clue
-      </button>
-    </div>
-  );
-}
 
 /**
  * Digit picker — appears after the player chooses Contains Digit.

@@ -91,7 +91,7 @@ export interface UseDailyGameResult {
   unlockMode: boolean;
   pendingClueParam: {
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "digit" | "reuse";
     reusedClueId?: string;
     picks?: { digit: number; present: boolean }[];
   } | null;
@@ -571,7 +571,7 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // response.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "slot" | "digit" | "reuse";
+    paramKind: "digit" | "reuse";
     reusedClueId?: string;
     picks?: { digit: number; present: boolean }[];
   } | null>(null);
@@ -698,14 +698,16 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   const confirmClueParam = useCallback(
     (param: ClueParam) => {
       if (!pendingClueParam) return;
-      // Chained flow for Clue Reuse → Oracle / Contains Digit:
+      // Chained flow for Clue Reuse → Contains Digit: enter the
+      // multi-pick picker before dispatching. Oracle reused via Clue
+      // Reuse needs no sub-picker — it auto-picks its slot now.
       if (pendingClueParam.paramKind === "reuse" && param.reusedClueId) {
         try {
           const reusedClue = getClueById(param.reusedClueId as never);
-          if (reusedClue.paramKind && (reusedClue.paramKind === "slot" || reusedClue.paramKind === "digit")) {
+          if (reusedClue.paramKind === "digit") {
             setPendingClueParam({
               clueId: pendingClueParam.clueId,
-              paramKind: reusedClue.paramKind,
+              paramKind: "digit",
               reusedClueId: param.reusedClueId,
             });
             return;

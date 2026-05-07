@@ -178,9 +178,9 @@ export async function POST(
       (r): r is import("@/lib/game/clues/types").ClueResult => r !== undefined,
     );
   const priorGuesses = parsed.data.history.map((g) => g.guess);
-  // Player-selected params (Oracle → selectedSlot) are forwarded into
-  // the compute context alongside knownSlots. Clues without a
-  // paramKind simply ignore them.
+  // Player-selected params (Contains Digit → picks; Clue Reuse →
+  // reusedClueId) are forwarded into the compute context alongside
+  // knownSlots. Oracle auto-picks its slot, so it ignores selectedSlot.
   const { clueParam } = parsed.data;
   const result = clue.compute(pendingGuess, target, {
     knownSlots,
