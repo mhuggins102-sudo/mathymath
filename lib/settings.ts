@@ -19,6 +19,11 @@ const settingsSchema = z.object({
    *  positional clue on turn 1 and the rest are random non-special. */
   preselectedClues: z.boolean().default(false),
   colorblind: z.boolean().default(false),
+  /** When false, clue cards in the in-game chooser collapse to just
+   *  the name + lock cost + legend + curated star. The Help modal
+   *  always shows descriptions regardless. Default true so new
+   *  players keep the on-screen guide. */
+  showClueDescriptions: z.boolean().default(true),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -31,6 +36,7 @@ export function defaultSettings(): Settings {
     advancedMode: false,
     preselectedClues: false,
     colorblind: false,
+    showClueDescriptions: true,
   };
 }
 

@@ -184,7 +184,7 @@ describe("Thermometer", () => {
   });
 });
 
-describe("Sum Delta", () => {
+describe("Digit Sum", () => {
   it("reports signed digit-sum delta (target - guess)", () => {
     const g = "12000";
     const t = "33333";

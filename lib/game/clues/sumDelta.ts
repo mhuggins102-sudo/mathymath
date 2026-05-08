@@ -8,10 +8,10 @@ function digitSum(s: string): number {
 
 export const sumDeltaClue: Clue<{ kind: "sumDelta"; delta: number }> = {
   id: "sumDelta",
-  name: "Sum Delta",
+  name: "Digit Sum",
   category: "compositional",
   description:
-    "Exact signed difference between the target's digit sum and yours (target − guess).",
+    "Compares the digit sum of your guess to the target's, signed (target − guess).",
   // Exact signed digit-sum delta = strongest compositional clue.
   weight: 0.5,
   legend: [

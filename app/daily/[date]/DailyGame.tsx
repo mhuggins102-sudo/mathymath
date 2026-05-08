@@ -367,6 +367,7 @@ export function DailyGame({
                   options={state.pendingGuess.options}
                   onChoose={chooseClue}
                   locksAvailable={locksAvailable}
+                  isRound1={state.guesses.length === 0}
                 />
                 <ResourceBalance
                   lockBalance={hintLocks}
@@ -461,7 +462,11 @@ export function DailyGame({
       </Modal>
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        context="daily"
+      />
       <LifetimeStatsModal
         open={statsOpen}
         onClose={() => setStatsOpen(false)}

@@ -30,7 +30,7 @@ export const bullseyeTrendClue: Clue<{
   name: "Bullseye Trend",
   category: "compositional",
   description:
-    "Compares the number of exact-slot matches in your current guess to your previous guess. Tells you if you're heading in the right direction. Not offered on round 1 — needs a prior guess to compare against.",
+    "Compares this guess's bullseye count to your previous guess.",
   // Information-theoretically thin (~1.5 bits) but the only clue that
   // explicitly rewards iterative guess construction. Weight kept
   // modest so it's a regular but not dominant draw.

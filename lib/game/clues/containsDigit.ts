@@ -76,7 +76,7 @@ export const containsDigitClue: Clue<{
   name: "Contains Digit",
   category: "compositional",
   description:
-    "Pick a digit from your guess and find out if it's in the target. As long as you keep picking correctly (and have digits left in your guess), you keep going. Each correct pick is multiset-aware: asking about a digit you've already picked checks for one MORE of it in the target.",
+    "Pick digits from your guess to ask if they're in the target. Keep going while you're correct. The round ends on your first wrong pick or once you've used every guess digit.",
   // Multi-pick rounds yield more information per turn than a single
   // yes/no, so weight stays moderate to keep them showing up.
   weight: 1.2,
