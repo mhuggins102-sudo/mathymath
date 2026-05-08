@@ -53,10 +53,13 @@ interface GuessRowProps {
   nextUp?: boolean;
 }
 
-/** Per-slot color state derived from the clue result. */
+/** Per-slot color state derived from the clue result. The `guess`
+ *  is needed for clues like Contains Digit whose per-pick result
+ *  must map back to slot positions in the player's input. */
 function cellStates(
   result: ClueResult | undefined,
   digits: number,
+  guess: string,
 ): DigitState[] {
   if (!result) return new Array(digits).fill("idle");
   switch (result.kind) {
@@ -105,6 +108,26 @@ function cellStates(
         if (t === 1) return "warm";
         return "cold";
       });
+    case "containsDigit": {
+      // Walk the picks left-to-right and color the leftmost
+      // not-yet-claimed slot in the guess that holds each picked
+      // digit. Correct picks → warm (yellow); the wrong pick (if
+      // any, always last by construction) → cold (red).
+      const states: DigitState[] = new Array(digits).fill("idle");
+      const queues = new Map<string, number[]>();
+      for (let i = 0; i < guess.length; i++) {
+        const ch = guess[i];
+        if (queues.has(ch)) queues.get(ch)!.push(i);
+        else queues.set(ch, [i]);
+      }
+      for (const pick of result.picks) {
+        const queue = queues.get(String(pick.digit));
+        if (!queue || queue.length === 0) continue;
+        const slot = queue.shift()!;
+        states[slot] = pick.present ? "warm" : "cold";
+      }
+      return states;
+    }
     default:
       return new Array(digits).fill("idle");
   }
@@ -297,7 +320,10 @@ export function subLabelFor(
     }
     case "parityMask": {
       const n = result.matches.filter(Boolean).length;
-      return { text: `${n} slots match`, className: "text-accent" };
+      return {
+        text: n === 1 ? "1 match" : `${n} matches`,
+        className: "text-accent",
+      };
     }
     case "bullseyeTrend": {
       // Direction-of-progress clue: ↑ (more matches) is GOOD,
@@ -343,10 +369,15 @@ export function subLabelFor(
       };
     }
     case "divisibleBy":
+      // Hits use text-warn so the helper-text color matches Digit
+      // Overlap's hits — both convey "shared info" between guess
+      // and target, and aligning them keeps the chooser palette
+      // predictable. The "no shared" / "no 2-9 divisor" cases stay
+      // text-bad.
       if (result.divisors.length > 0)
         return {
           text: `÷ ${result.divisors.join(" ")}`,
-          className: "text-good",
+          className: "text-warn",
         };
       if (result.targetHasAny)
         return { text: "no shared divisor", className: "text-bad" };
@@ -493,7 +524,7 @@ export function GuessRow({
       }
     } else {
       const d = displayDigits(guess, digits, result);
-      const s = cellStates(result, digits);
+      const s = cellStates(result, digits, guess);
       for (let i = 0; i < digits; i++) {
         displayed[i] = d[i];
         states[i] = s[i];

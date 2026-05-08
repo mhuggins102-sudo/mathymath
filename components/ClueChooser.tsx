@@ -2,6 +2,8 @@
 
 import type { Clue, ClueId } from "@/lib/game/clues/types";
 import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
+import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
+import { useSettings } from "@/lib/hooks/useSettings";
 import { ClueLegend } from "./ClueLegend";
 
 interface ClueChooserProps {
@@ -15,6 +17,10 @@ interface ClueChooserProps {
    *  with an empty budget. Optional — falls back to "always allowed"
    *  for callers that don't track locks. */
   locksAvailable?: number;
+  /** True only on the first round of a game. Clues in the curated
+   *  round-1 set get a small ⭐ in the top-right corner so the player
+   *  can spot the friendly opener. */
+  isRound1?: boolean;
 }
 
 /**
@@ -28,7 +34,10 @@ export function ClueChooser({
   onRedraw,
   canRedraw,
   locksAvailable,
+  isRound1,
 }: ClueChooserProps) {
+  const { settings } = useSettings();
+  const showDescriptions = settings.showClueDescriptions;
   return (
     <div className="w-full max-w-md mx-auto select-none">
       <p className="text-center text-[10px] uppercase tracking-wider text-muted mb-2">
@@ -44,6 +53,8 @@ export function ClueChooser({
             locksAvailable !== undefined &&
             locksAvailable < CLUE_REUSE_COST;
           const disabled = lockUnaffordable;
+          const showStar =
+            !!isRound1 && ROUND1_CURATED_CLUE_IDS.has(clue.id);
           return (
             <button
               key={clue.id}
@@ -67,21 +78,21 @@ export function ClueChooser({
                     </span>
                   )}
                 </span>
-                <span
-                  className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
-                    clue.category === "positional"
-                      ? "bg-accent/20 text-accent"
-                      : clue.category === "compositional"
-                      ? "bg-warn/20 text-warn"
-                      : "bg-good/20 text-good"
-                  }`}
-                >
-                  {clue.category}
-                </span>
+                {showStar && (
+                  <span
+                    className="text-warn text-sm shrink-0"
+                    title="Curated turn-1 clue"
+                    aria-label="Curated turn-1 clue"
+                  >
+                    ⭐
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-muted leading-relaxed">
-                {clue.description}
-              </p>
+              {showDescriptions && (
+                <p className="text-xs text-muted leading-relaxed">
+                  {clue.description}
+                </p>
+              )}
               {lockUnaffordable && (
                 <p className="text-[10px] text-bad mt-1">
                   Not enough locks remaining.

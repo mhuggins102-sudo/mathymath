@@ -9,7 +9,7 @@ export const within2Clue: Clue<{
   name: "Within 2",
   category: "positional",
   description:
-    "Marks each slot where your digit is within 2 of the target digit (direction unknown). Exact matches are not singled out — the clue tells you the digit is close, not which one.",
+    "Marks each slot where your digit is within 2 of the target. Direction not given, exact matches not singled out.",
   weight: 0.8,
   legend: [{ state: "warm", label: "0-2 off" }],
   compute(guess, target) {

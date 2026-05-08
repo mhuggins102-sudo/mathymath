@@ -16,7 +16,7 @@ export const digitOverlapClue: Clue<{
   name: "Digit Overlap",
   category: "compositional",
   description:
-    "For each slot in your guess, marks whether that digit appears in the target — multiset-aware. Each target digit can satisfy at most one guess slot (left-to-right), so a guess with three 4s when the target has two 4s lights up the first two only.",
+    "Marks each guess slot whose digit appears in the target — multiset-aware. A guess with three 4s vs target with two 4s lights up only the first two.",
   weight: 0.6,
   legend: [{ state: "warm", label: "digit appears in target" }],
   compute(guess, target) {

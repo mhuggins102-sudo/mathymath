@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Countdown } from "@/components/Countdown";
 import { HomeHeaderIcons } from "@/components/HomeHeaderIcons";
+import { UnlimitedHomeRow } from "@/components/UnlimitedHomeRow";
 
 export default function Home() {
   return (
@@ -33,12 +34,7 @@ export default function Home() {
               📅
             </Link>
           </div>
-          <Link
-            href="/unlimited"
-            className="block bg-surface-2 text-foreground font-semibold py-4 rounded-xl border border-border active:scale-[0.99] transition text-center"
-          >
-            Unlimited
-          </Link>
+          <UnlimitedHomeRow />
           <Link
             href="/deduction"
             className="block bg-surface-2 text-foreground font-semibold py-4 rounded-xl border border-border active:scale-[0.99] transition text-center"

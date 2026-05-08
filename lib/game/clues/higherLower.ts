@@ -37,8 +37,8 @@ export const higherLowerClue: Clue<{ kind: "higherLower"; cmp: Cmp[] }> = {
     const lt = result.cmp.filter((c) => c === "lt").length;
     const parts: string[] = [];
     if (eq > 0) parts.push(`${eq} match`);
-    if (gt > 0) parts.push(`${gt} need higher`);
-    if (lt > 0) parts.push(`${lt} need lower`);
+    if (gt > 0) parts.push(`${gt} higher`);
+    if (lt > 0) parts.push(`${lt} lower`);
     return parts.join(" · ");
   },
 };

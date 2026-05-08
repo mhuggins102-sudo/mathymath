@@ -138,15 +138,16 @@ export function loadDailyGame(key: string): SavedDailyGame | null {
 
 // --- Unlimited mode preference ---
 //
-// The Unlimited page lets the player choose 5-digit, 6-digit, or "mix"
-// (weighted 3:1 between 5 and 6). The choice is saved so reloads keep
-// the preferred shape. Daily is unaffected — it's always 5-digit.
+// Unlimited mode: 5-digit or 6-digit. The choice is saved so reloads
+// keep the preferred shape. Daily is unaffected — it's always 5-digit.
+// Older saves may carry a retired "mix" value; loadUnlimitedMode falls
+// back to "5" for any unrecognized stored value.
 
-export type UnlimitedMode = "5" | "6" | "mix";
+export type UnlimitedMode = "5" | "6";
 
 const UNLIMITED_MODE_KEY = "unlimitedMode";
 
-const unlimitedModeSchema = z.enum(["5", "6", "mix"]);
+const unlimitedModeSchema = z.enum(["5", "6"]);
 
 export function loadUnlimitedMode(): UnlimitedMode {
   if (typeof window === "undefined") return "5";

@@ -40,7 +40,7 @@ describe("explainWrongGuess", () => {
     // from sumDelta result {delta:1} means target sum = 28+1 = 29).
     // 47390 sums to 23 — also fails sumDelta.
     const failures = explainWrongGuess(samplePuzzle, "47390");
-    const sumFailure = failures.find((f) => f.includes("Sum Delta"));
+    const sumFailure = failures.find((f) => f.includes("Digit Sum"));
     expect(sumFailure).toBeDefined();
     expect(sumFailure).toContain("digit sum");
   });
