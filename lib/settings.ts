@@ -4,19 +4,20 @@ import { z } from "zod";
 
 const settingsSchema = z.object({
   version: z.literal(1),
-  /** Unlimited-mode "Advanced" rules: at most 2 positional clues across
-   *  the game, with the deck shuffled freely (no pair-1 category
-   *  guarantees). Once the cap is reached, the chooser stops offering
-   *  positional cards and Clue Reuse is restricted to previously-used
-   *  non-positional clues. Daily play is unaffected — the daily puzzle
-   *  always uses the standard ruleset so leaderboards stay comparable. */
+  /** Unlimited-mode Hard difficulty (player-facing label "Hard";
+   *  internal storage key kept as `advancedMode` so legacy saves
+   *  parse cleanly without a migration). Hard rules: full deck
+   *  shuffle (no curated round-1 guarantee), start with 0 locks,
+   *  and Clue Reuse is removed. Daily play is unaffected — the
+   *  daily puzzle always uses Normal so leaderboards stay
+   *  comparable. */
   advancedMode: z.boolean().default(false),
-  /** Unlimited-mode "Preselected Clues" mode: the game deals 6 clues
-   *  up-front, one per guess. The clue chooser, redraw, and Clue Reuse
-   *  are disabled; locks are only used to pin a digit. When advancedMode
-   *  is also on, the deck follows advanced rules (≤ 2 positional, no
-   *  positional guarantee on turn 1). When off, the deck guarantees a
-   *  positional clue on turn 1 and the rest are random non-special. */
+  /** Unlimited-mode Auto clue selection (player-facing label "Auto";
+   *  internal key kept as `preselectedClues`). The game deals 6
+   *  clues up-front, one per guess. The chooser, redraw, and Clue
+   *  Reuse are disabled; locks pin a digit only. When advancedMode
+   *  (Hard) is also on, the deck shuffles freely with no curated
+   *  turn-1 guarantee. */
   preselectedClues: z.boolean().default(false),
   colorblind: z.boolean().default(false),
   /** When false, clue cards in the in-game chooser collapse to just

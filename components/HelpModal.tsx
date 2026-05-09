@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { CLUES } from "@/lib/game/clues/registry";
 import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
 import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
 import { GuessRow } from "./GuessRow";
 import { ClueLegend } from "./ClueLegend";
 import { Modal } from "./Modal";
+
+type AccordionId = "basics" | "clues" | "locks" | "tips";
 
 interface HelpModalProps {
   open: boolean;
@@ -27,6 +30,17 @@ interface HelpModalProps {
 const EXAMPLE_TARGET = "47628";
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
+  // Mutually-exclusive accordion state. "The basics" starts open;
+  // opening any other section closes the previous one, and clicking
+  // the open one again collapses everything. Reset on every
+  // modal-open so the player always lands on the same first section.
+  const [openSection, setOpenSection] = useState<AccordionId | null>("basics");
+  useEffect(() => {
+    if (open) setOpenSection("basics");
+  }, [open]);
+  const toggleSection = (id: AccordionId) =>
+    setOpenSection((cur) => (cur === id ? null : id));
+
   return (
     <Modal open={open} onClose={onClose} titleId="help-modal-title" variant="overlay">
       <div className="bg-surface rounded-xl border border-border shadow-2xl p-4">
@@ -44,7 +58,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
         </div>
 
         <div className="space-y-2 mb-6">
-          <Accordion title="The basics" defaultOpen>
+          <Accordion
+            title="The basics"
+            isOpen={openSection === "basics"}
+            onToggle={() => toggleSection("basics")}
+          >
             <p>
               Guess the secret 5-digit number in 8 tries. Digits can
               repeat — e.g.{" "}
@@ -58,7 +76,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             </p>
           </Accordion>
 
-          <Accordion title="Choosing clues">
+          <Accordion
+            title="Choosing clues"
+            isOpen={openSection === "clues"}
+            onToggle={() => toggleSection("clues")}
+          >
             <p>
               After every guess you&apos;re offered{" "}
               <strong className="text-foreground">two clue options</strong>.
@@ -76,7 +98,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             </p>
           </Accordion>
 
-          <Accordion title="Locks">
+          <Accordion
+            title="Locks"
+            isOpen={openSection === "locks"}
+            onToggle={() => toggleSection("locks")}
+          >
             <p>
               You start each game with one{" "}
               <span className="text-foreground">🔒 lock</span>. Tap a cell
@@ -91,12 +117,16 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               (costs 1 🔒) to repeat a previously-used clue.
             </p>
             <p>
-              Advanced Unlimited starts with zero locks — you can still
-              earn them via Extra Lock during the game.
+              Hard Unlimited starts with zero locks — you can still earn
+              them via Extra Lock during the game.
             </p>
           </Accordion>
 
-          <Accordion title="Tips & strategy">
+          <Accordion
+            title="Tips & strategy"
+            isOpen={openSection === "tips"}
+            onToggle={() => toggleSection("tips")}
+          >
             <p>
               Your guess doesn&apos;t have to be your best estimate of the
               target. A strategic guess — like all 5s — often extracts more
@@ -173,36 +203,44 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
   );
 }
 
-/** Native <details>/<summary> accordion with project-styled chrome.
- *  Browsers handle the open/close state and keyboard interaction
- *  natively; we only style it. The chevron rotates via the
- *  [open] attribute selector. */
+/** Controlled accordion section. Built on a button + conditional
+ *  panel rather than native <details> so the parent can enforce
+ *  mutual exclusion (only one open at a time). The chevron rotates
+ *  via a class swap. */
 function Accordion({
   title,
-  defaultOpen,
+  isOpen,
+  onToggle,
   children,
 }: {
   title: string;
-  defaultOpen?: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <details
-      open={defaultOpen}
-      className="group bg-surface-2/50 rounded-lg border border-border overflow-hidden"
-    >
-      <summary className="flex items-center justify-between cursor-pointer select-none px-3 py-2 text-sm font-semibold text-foreground hover:bg-surface-2 list-none [&::-webkit-details-marker]:hidden">
+    <div className="bg-surface-2/50 rounded-lg border border-border overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="w-full flex items-center justify-between cursor-pointer select-none px-3 py-2 text-sm font-semibold text-foreground hover:bg-surface-2"
+      >
         <span>{title}</span>
         <span
           aria-hidden
-          className="text-muted text-xs transition-transform group-open:rotate-90"
+          className={`text-muted text-xs transition-transform ${
+            isOpen ? "rotate-90" : ""
+          }`}
         >
           ▶
         </span>
-      </summary>
-      <div className="px-3 pb-3 pt-1 text-sm text-muted leading-relaxed space-y-2">
-        {children}
-      </div>
-    </details>
+      </button>
+      {isOpen && (
+        <div className="px-3 pb-3 pt-1 text-sm text-muted leading-relaxed space-y-2">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }

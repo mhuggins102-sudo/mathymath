@@ -308,23 +308,58 @@ function DistributionBars({
   maxGuesses: number;
   losses: number;
 }) {
-  const values = Object.values(distribution);
+  // Bars 4..maxGuesses always render individually. Scores 1-3 start
+  // consolidated into a "≤3" bar and split out one at a time as the
+  // player achieves them: scoring a 3 promotes 3 to its own bar (the
+  // bucket becomes "≤2"); scoring a 2 promotes 2 (bucket "≤1"); a 1
+  // splits everything apart.
+  const lowestAchieved =
+    (distribution["1"] ?? 0) > 0
+      ? 1
+      : (distribution["2"] ?? 0) > 0
+      ? 2
+      : (distribution["3"] ?? 0) > 0
+      ? 3
+      : 4;
+  const consolidatedCap = lowestAchieved - 1; // 0..3
+  // Sum of distribution[k] for k in [1..consolidatedCap]. By
+  // construction those slots are all zero (the lowest non-zero score
+  // is `lowestAchieved`), so this stays at zero in practice — but we
+  // sum anyway so the bar reflects truth if data is ever pre-seeded
+  // or migrated from an older shape.
+  let consolidatedCount = 0;
+  for (let k = 1; k <= consolidatedCap; k++) {
+    consolidatedCount += distribution[String(k)] ?? 0;
+  }
+
+  // Rows we'll render: optional "≤N" then individual lowestAchieved..maxGuesses.
+  const rows: { key: string; label: string; count: number }[] = [];
+  if (consolidatedCap >= 1) {
+    rows.push({
+      key: `lte-${consolidatedCap}`,
+      label: `≤${consolidatedCap}`,
+      count: consolidatedCount,
+    });
+  }
+  for (let n = lowestAchieved; n <= maxGuesses; n++) {
+    rows.push({ key: String(n), label: String(n), count: distribution[String(n)] ?? 0 });
+  }
+
   // Include DNFs in the max so the losses bar shares the same scale.
-  const max = Math.max(1, ...values, losses);
+  const max = Math.max(1, ...rows.map((r) => r.count), losses);
   return (
     <div className="space-y-1">
-      {Array.from({ length: maxGuesses }, (_, i) => i + 1).map((n) => {
-        const count = distribution[String(n)] ?? 0;
-        const pct = count === 0 ? 0 : (count / max) * 100;
+      {rows.map((row) => {
+        const pct = row.count === 0 ? 0 : (row.count / max) * 100;
         return (
-          <div key={n} className="flex items-center gap-2 text-xs">
-            <span className="w-4 text-muted font-mono">{n}</span>
+          <div key={row.key} className="flex items-center gap-2 text-xs">
+            <span className="w-7 text-muted font-mono text-right">{row.label}</span>
             <div className="flex-1 bg-surface rounded overflow-hidden h-5 relative">
               <div
                 className="bg-accent/60 h-full flex items-center justify-end px-2 text-[10px] font-mono text-background"
-                style={{ width: `${Math.max(pct, count ? 12 : 0)}%` }}
+                style={{ width: `${Math.max(pct, row.count ? 12 : 0)}%` }}
               >
-                {count || ""}
+                {row.count || ""}
               </div>
             </div>
           </div>
@@ -333,7 +368,7 @@ function DistributionBars({
       {/* DNF row: games ended without a solve (ran out of guesses). */}
       <div className="flex items-center gap-2 text-xs">
         <span
-          className="w-4 text-muted font-mono"
+          className="w-7 text-muted font-mono text-right"
           aria-label="did not finish"
           title="Did not finish"
         >
