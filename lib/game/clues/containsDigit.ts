@@ -1,13 +1,21 @@
 import type { Clue } from "./types";
 
 /**
- * Contains Digit — interactive multi-pick. The player picks digits
- * from their current guess, one at a time. Each pick is YES if the
- * target contains at least as many copies of that digit as the player
- * has asked about so far (multiset-aware). The round continues as
- * long as picks are correct and the player still has guess digits
- * left to spend; it ends on the first wrong pick or when the player
- * exhausts their guess multiset.
+ * Contains Digit — interactive multi-pick. The player taps slots in
+ * their current guess one at a time. Each pick resolves to one of
+ * three states:
+ *   - exact (green): the digit at that slot matches the target's
+ *     digit at the same slot AND the digit is still "available" in
+ *     the remaining target multiset.
+ *   - present (yellow): the digit appears somewhere in the remaining
+ *     target multiset, just not at this slot.
+ *   - absent (red): the digit is not (or no longer) in the remaining
+ *     target multiset. The round ends immediately on a red pick.
+ *
+ * Multiset accounting is strict: a yellow consumes one occurrence of
+ * the digit from "remaining," so a later exact-slot pick for the
+ * same digit can land red if the player burned the only copy on a
+ * mismatched slot earlier.
  */
 
 function digitCounts(s: string): Map<number, number> {
@@ -19,100 +27,127 @@ function digitCounts(s: string): Map<number, number> {
   return out;
 }
 
-/** Resolve a sequence of digit picks against the target into per-pick
- *  yes/no flags. Used by both compute (full pass) and the per-pick
- *  callers in the hook / API endpoint. */
+export interface ContainsDigitPick {
+  slot: number;
+  digit: number;
+  present: boolean;
+  exact: boolean;
+}
+
+/** Resolve a sequence of slot picks against the guess and target.
+ *  Used by both compute (full pass) and the per-pick callers in the
+ *  hook / API endpoint. */
 export function resolveContainsDigitPicks(
+  guess: string,
   target: string,
-  picks: readonly number[],
-): { digit: number; present: boolean }[] {
-  const targetCounts = digitCounts(target);
-  const used = new Map<number, number>();
-  const out: { digit: number; present: boolean }[] = [];
-  for (const digit of picks) {
-    const usedSoFar = used.get(digit) ?? 0;
-    const inTarget = targetCounts.get(digit) ?? 0;
-    out.push({ digit, present: inTarget > usedSoFar });
-    used.set(digit, usedSoFar + 1);
+  slotPicks: readonly number[],
+): ContainsDigitPick[] {
+  const remaining = digitCounts(target);
+  const out: ContainsDigitPick[] = [];
+  for (const slot of slotPicks) {
+    const digit = Number(guess[slot]);
+    const remainingForDigit = remaining.get(digit) ?? 0;
+    if (remainingForDigit > 0) {
+      const exact = Number(target[slot]) === digit;
+      out.push({ slot, digit, present: true, exact });
+      remaining.set(digit, remainingForDigit - 1);
+    } else {
+      out.push({ slot, digit, present: false, exact: false });
+    }
   }
   return out;
 }
 
-/** Digits still available to pick given the player's guess and the
- *  picks they've already made. Returns distinct digits sorted
- *  ascending — the picker UI uses this list to enable buttons. */
-export function containsDigitAvailable(
-  guess: string,
-  picks: readonly number[],
+/** Slots still available to pick: every slot index in [0..guess.length)
+ *  minus the slots already picked. Returned in ascending order. */
+export function containsDigitAvailableSlots(
+  guessLength: number,
+  picks: readonly { slot: number }[],
 ): number[] {
-  const guessCounts = digitCounts(guess);
-  const used = new Map<number, number>();
-  for (const d of picks) used.set(d, (used.get(d) ?? 0) + 1);
-  const available: number[] = [];
-  for (const [digit, count] of guessCounts) {
-    if ((used.get(digit) ?? 0) < count) available.push(digit);
+  const used = new Set(picks.map((p) => p.slot));
+  const out: number[] = [];
+  for (let i = 0; i < guessLength; i++) {
+    if (!used.has(i)) out.push(i);
   }
-  available.sort((a, b) => a - b);
-  return available;
+  return out;
 }
 
-/** Round-complete check: the round ends after a wrong pick, or after
- *  every digit in the player's guess has been asked about. */
+/** Round-complete check: ends after the first red pick (present=false)
+ *  or once every slot in the guess has been picked. */
 export function containsDigitRoundComplete(
   guess: string,
-  picks: readonly { digit: number; present: boolean }[],
+  picks: readonly { present: boolean }[],
 ): boolean {
   if (picks.length === 0) return false;
   if (!picks[picks.length - 1].present) return true;
-  const digitsOnly = picks.map((p) => p.digit);
-  return containsDigitAvailable(guess, digitsOnly).length === 0;
+  return picks.length >= guess.length;
 }
 
 export const containsDigitClue: Clue<{
   kind: "containsDigit";
-  picks: { digit: number; present: boolean }[];
+  picks: ContainsDigitPick[];
 }> = {
   id: "containsDigit",
   name: "Contains Digit",
   category: "compositional",
   description:
-    "Pick digits from your guess to ask if they're in the target. Keep going while you're correct. The round ends on your first wrong pick or once you've used every guess digit.",
+    "Tap a slot in your guess to ask if that digit is in the target. Green = exact-slot match; yellow = digit is in the target but at a different slot; red = digit is not in the target. The round ends on your first red pick.",
   // Multi-pick rounds yield more information per turn than a single
-  // yes/no, so weight stays moderate to keep them showing up.
-  weight: 1.2,
-  paramKind: "digit",
+  // yes/no — the slot-aware variant is stronger still since it can
+  // surface exact matches. Selector currently ignores `weight`.
+  weight: 1.0,
+  paramKind: "slot",
   legend: [
-    { state: "match", label: "digit present" },
+    { state: "match", label: "exact match" },
+    { state: "warm", label: "digit present" },
     { state: "cold", label: "digit absent" },
   ],
   compute(guess, target, context) {
-    const picks = context?.picks ?? [];
+    const slotPicks = context?.picks ?? [];
     return {
       kind: "containsDigit",
-      picks: resolveContainsDigitPicks(target, picks),
+      picks: resolveContainsDigitPicks(guess, target, slotPicks),
     };
   },
   example(target) {
-    // Pick the first two distinct digits from the target so the example
-    // shows two correct picks. With target "47628" the picks become 4
-    // and 7 — both present.
-    const distinct: number[] = [];
-    for (const ch of target) {
-      const d = Number(ch);
-      if (!distinct.includes(d)) distinct.push(d);
-      if (distinct.length === 2) break;
+    // Build a guess where slot 0 demos yellow, slot 2 demos green
+    // (exact match), and slot 3 demos red (a digit not in target).
+    // For the standard help-modal target "47628" this produces a
+    // visibly tri-colored row: 8 (yellow) at slot 0, 6 (green) at
+    // slot 2, 0 (red) at slot 3. Falls back gracefully for any
+    // other target.
+    const distinct = Array.from(new Set(target)).map(Number);
+    const padDigit = String(distinct[0] ?? 0);
+    const buf = new Array(target.length).fill(padDigit);
+    if (distinct.length > 0) {
+      // Slot 0 — last distinct digit (in target but at a different slot).
+      buf[0] = String(distinct[distinct.length - 1]);
     }
-    const guess = "98765".slice(0, target.length).padEnd(target.length, "9");
-    return {
-      guess,
-      result: this.compute(guess, target, { picks: distinct }),
-    };
+    if (target.length > 1 && distinct.length > 1) {
+      buf[1] = String(distinct[Math.max(0, distinct.length - 2)]);
+    }
+    if (target.length > 2) {
+      // Slot 2 — exact match.
+      buf[2] = target[2];
+    }
+    if (target.length > 3) {
+      // Slot 3 — a digit not in target (red).
+      const notInTarget =
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].find((d) => !distinct.includes(d)) ?? 0;
+      buf[3] = String(notInTarget);
+    }
+    const guess = buf.join("");
+    const picks = [0, 1, 2, 3].filter((i) => i < target.length);
+    return { guess, result: this.compute(guess, target, { picks }) };
   },
   explain(_guess, result) {
     if (result.picks.length === 0) return "No picks yet.";
-    const lines = result.picks.map(
-      (p) => `${p.digit}: ${p.present ? "yes" : "no"}`,
-    );
+    const lines = result.picks.map((p) => {
+      const slotLabel = `slot ${p.slot + 1}`;
+      if (p.exact) return `${slotLabel}: ${p.digit} exact match`;
+      if (p.present) return `${slotLabel}: ${p.digit} present`;
+      return `${slotLabel}: ${p.digit} absent`;
+    });
     return lines.join(" · ");
   },
 };

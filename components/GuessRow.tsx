@@ -109,22 +109,16 @@ function cellStates(
         return "cold";
       });
     case "containsDigit": {
-      // Walk the picks left-to-right and color the leftmost
-      // not-yet-claimed slot in the guess that holds each picked
-      // digit. Correct picks → warm (yellow); the wrong pick (if
-      // any, always last by construction) → cold (red).
+      // Slot-based picks paint each tested slot directly:
+      //   exact     → match (green)
+      //   present   → warm (yellow)
+      //   absent    → cold (red)
       const states: DigitState[] = new Array(digits).fill("idle");
-      const queues = new Map<string, number[]>();
-      for (let i = 0; i < guess.length; i++) {
-        const ch = guess[i];
-        if (queues.has(ch)) queues.get(ch)!.push(i);
-        else queues.set(ch, [i]);
-      }
       for (const pick of result.picks) {
-        const queue = queues.get(String(pick.digit));
-        if (!queue || queue.length === 0) continue;
-        const slot = queue.shift()!;
-        states[slot] = pick.present ? "warm" : "cold";
+        if (pick.slot < 0 || pick.slot >= digits) continue;
+        if (pick.exact) states[pick.slot] = "match";
+        else if (pick.present) states[pick.slot] = "warm";
+        else states[pick.slot] = "cold";
       }
       return states;
     }
@@ -350,25 +344,31 @@ export function subLabelFor(
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit": {
-      // Show every pick the player made, with ✓ for in-target (yellow)
-      // and ✗ for the wrong one (red — always the last, by
-      // construction). Per-pick colors via the `parts` channel so the
-      // checks and the cross don't share a single dominant color.
-      // Yellow on hits matches Digit Overlap's "shared info" hue.
+      // Show every pick the player made, color-coded:
+      //   ✓✓ (green) — exact-slot match
+      //   ✓ (yellow) — digit present elsewhere in target
+      //   ✗ (red)    — digit absent (round ender)
+      // Per-pick colors travel via `parts` so the marks don't
+      // collapse into one dominant color.
       if (result.picks.length === 0)
         return { text: "no picks", className: "text-muted" };
-      const parts = result.picks.map((p) => ({
-        text: `${p.digit}${p.present ? "✓" : "✗"}`,
-        className: p.present ? "text-warn" : "text-bad",
-      }));
+      const parts = result.picks.map((p) => {
+        const mark = p.exact ? "✓✓" : p.present ? "✓" : "✗";
+        const className = p.exact
+          ? "text-good"
+          : p.present
+            ? "text-warn"
+            : "text-bad";
+        return { text: `${p.digit}${mark}`, className };
+      });
       const text = parts.map((p) => p.text).join(" ");
-      const lastWrong =
-        result.picks[result.picks.length - 1].present === false;
-      return {
-        text,
-        className: lastWrong ? "text-bad" : "text-warn",
-        parts,
-      };
+      const last = result.picks[result.picks.length - 1];
+      const summaryClass = !last.present
+        ? "text-bad"
+        : last.exact
+          ? "text-good"
+          : "text-warn";
+      return { text, className: summaryClass, parts };
     }
     case "divisibleBy":
       // Hits use text-warn so the helper-text color matches Digit

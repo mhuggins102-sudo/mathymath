@@ -195,19 +195,18 @@ export async function POST(
   // pick. The round is finalized only when the player gets one wrong
   // or runs out of guess digits.
   if (result.kind === "containsDigit") {
-    const { containsDigitRoundComplete, containsDigitAvailable } = await import(
-      "@/lib/game/clues/containsDigit"
-    );
+    const { containsDigitRoundComplete, containsDigitAvailableSlots } =
+      await import("@/lib/game/clues/containsDigit");
     const complete = containsDigitRoundComplete(pendingGuess, result.picks);
     if (!complete) {
-      const available = containsDigitAvailable(
-        pendingGuess,
-        result.picks.map((p) => p.digit),
+      const availableSlots = containsDigitAvailableSlots(
+        pendingGuess.length,
+        result.picks,
       );
       return NextResponse.json({
         kind: "needs-pick",
         partialPicks: result.picks,
-        availableDigits: available,
+        availableSlots,
       });
     }
   }

@@ -100,42 +100,46 @@ describe("subLabelFor — Digit Sum shows target sum + signed delta", () => {
 });
 
 describe("subLabelFor — other clues unchanged", () => {
-  it("Contains Digit (multi-pick sequence, per-pick yellow/red parts)", () => {
+  it("Contains Digit (slot-based picks: green ✓✓ / yellow ✓ / red ✗)", () => {
+    // Yellow only — single pick, digit present at a different slot.
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
-        picks: [{ digit: 7, present: true }],
+        picks: [{ slot: 0, digit: 7, present: true, exact: false }],
       }),
     ).toEqual({
       text: "7✓",
       className: "text-warn",
       parts: [{ text: "7✓", className: "text-warn" }],
     });
+    // Red — single pick, digit absent.
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
-        picks: [{ digit: 7, present: false }],
+        picks: [{ slot: 0, digit: 7, present: false, exact: false }],
       }),
     ).toEqual({
       text: "7✗",
       className: "text-bad",
       parts: [{ text: "7✗", className: "text-bad" }],
     });
+    // Mixed sequence: yellow + green (exact) + red. Summary class
+    // follows the LAST pick (red here).
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
         picks: [
-          { digit: 4, present: true },
-          { digit: 4, present: true },
-          { digit: 6, present: false },
+          { slot: 0, digit: 4, present: true, exact: false },
+          { slot: 1, digit: 4, present: true, exact: true },
+          { slot: 2, digit: 6, present: false, exact: false },
         ],
       }),
     ).toEqual({
-      text: "4✓ 4✓ 6✗",
+      text: "4✓ 4✓✓ 6✗",
       className: "text-bad",
       parts: [
         { text: "4✓", className: "text-warn" },
-        { text: "4✓", className: "text-warn" },
+        { text: "4✓✓", className: "text-good" },
         { text: "6✗", className: "text-bad" },
       ],
     });

@@ -46,6 +46,10 @@ describe("explainWrongGuess", () => {
   });
 
   it("explains a containsDigit violation", () => {
+    // Recorded result says: picking slot 1 (digit 7 in guess "07000")
+    // returned absent against the real target. wrongGuess "12347"
+    // contains a 7, so the same slot pick would have returned present
+    // there — failure surfaces.
     const puzzle: DeductionPuzzle = {
       id: "test-2",
       digits: 5,
@@ -53,18 +57,20 @@ describe("explainWrongGuess", () => {
       difficulty: 30,
       guesses: [
         {
-          guess: "00000",
+          guess: "07000",
           clueId: "containsDigit",
           result: {
             kind: "containsDigit",
-            picks: [{ digit: 7, present: false }],
+            picks: [
+              { slot: 1, digit: 7, present: false, exact: false },
+            ],
           },
         },
       ],
     };
     const failures = explainWrongGuess(puzzle, "12347");
     expect(failures.length).toBe(1);
-    expect(failures[0]).toContain("fewer than 1 of 7");
+    expect(failures[0]).toContain("slot 2");
   });
 
   it("explains a distinctDigits violation", () => {

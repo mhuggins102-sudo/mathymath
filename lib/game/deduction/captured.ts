@@ -79,12 +79,20 @@ function migrateResult(target: string, g: RawGuess): RawGuess {
   if (g.clueId === "containsDigit") {
     if (Array.isArray((r as { picks?: unknown }).picks)) return g;
     if ("digit" in r && "present" in r) {
+      // Legacy single-pick shape from before slot tracking. Synthesize
+      // a slot-based pick for compat: slot 0, exact false (the old
+      // shape didn't carry exact-position information).
       return {
         ...g,
         result: {
           kind: "containsDigit",
           picks: [
-            { digit: r.digit as number, present: r.present as boolean },
+            {
+              slot: 0,
+              digit: r.digit as number,
+              present: r.present as boolean,
+              exact: false,
+            },
           ],
         } as ClueResult,
       };

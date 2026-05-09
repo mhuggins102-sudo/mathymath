@@ -207,8 +207,8 @@ export function validateDailyHistory(
       // re-computed slot will match the stored result, or
       // resultsMatch will fail.
       if (r.kind === "containsDigit" && Array.isArray(r.picks)) {
-        clueParam.picks = (r.picks as Array<{ digit: number }>).map(
-          (p) => p.digit,
+        clueParam.picks = (r.picks as Array<{ slot: number }>).map(
+          (p) => p.slot,
         );
       }
       // Clue Reuse: the result carries the re-used clue's kind, which

@@ -319,25 +319,24 @@ function bestParamForClue(
   // Oracle is the only positional clue that used to take a slot
   // param; it now auto-picks the farthest-off slot inside compute,
   // so the sim doesn't need a slot-search anymore.
-  if (clue.paramKind === "digit") {
-    // Contains Digit is now multi-pick. The sim only models a single
-    // best first pick — accurate-enough approximation for relative
-    // win-rate comparisons across balance changes, even though the
-    // real player can chain.
-    let bestDigit = 0;
+  if (clue.paramKind === "slot") {
+    // Contains Digit is now slot-based and multi-pick. The sim only
+    // models a single best first slot — an approximation that's good
+    // enough for relative win-rate comparisons across balance
+    // changes, even though the real player can chain through several
+    // slots before hitting a red.
+    let bestSlot = 0;
     let bestExp = Infinity;
-    const guessDigits = new Set([...guess].map(Number));
-    for (let d = 0; d < 10; d++) {
-      if (!guessDigits.has(d)) continue;
+    for (let s = 0; s < guess.length; s++) {
       const exp = expectedRemaining(candidates, guess, clue, {
-        picks: [d],
+        picks: [s],
       });
       if (exp < bestExp) {
         bestExp = exp;
-        bestDigit = d;
+        bestSlot = s;
       }
     }
-    return { picks: [bestDigit] };
+    return { picks: [bestSlot] };
   }
   return {};
 }
