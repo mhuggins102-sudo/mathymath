@@ -126,24 +126,24 @@ export function SettingsDrawer({
             info="Unlimited mode only. Choose 5- or 6-digit puzzles for new games."
           />
           <BinaryRow
-            label="Clue style"
-            optionA={{ value: "traditional", text: "Traditional" }}
-            optionB={{ value: "advanced", text: "Advanced" }}
-            value={settings.advancedMode ? "advanced" : "traditional"}
-            onChange={(v) => setSetting("advancedMode", v === "advanced")}
+            label="Difficulty"
+            optionA={{ value: "normal", text: "Normal" }}
+            optionB={{ value: "hard", text: "Hard" }}
+            value={settings.advancedMode ? "hard" : "normal"}
+            onChange={(v) => setSetting("advancedMode", v === "hard")}
             disabled={unlimitedDisabled}
-            disabledHint={unlimitedDisabled ? "Daily uses Traditional rules." : undefined}
-            info="Traditional: pair 1 always includes a curated round-1 clue (Digit Overlap, Elimination, Odd or Even, Contains Digit, Higher or Lower, Within 2, Oracle, or Thermometer); start with 1 lock. Advanced: full deck shuffle (no curated turn-1 guarantee), start with 0 locks, and Clue Reuse is removed."
+            disabledHint={unlimitedDisabled ? "Daily uses Normal rules." : undefined}
+            info="Normal: pair 1 always includes a curated round-1 clue (Digit Overlap, Elimination, Odd or Even, Contains Digit, Higher or Lower, Within 2, Oracle, or Thermometer); start with 1 lock. Hard: full deck shuffle (no curated turn-1 guarantee), start with 0 locks, and Clue Reuse is removed."
           />
           <BinaryRow
             label="Clue selection"
-            optionA={{ value: "user", text: "User Selected" }}
-            optionB={{ value: "preselected", text: "Preselected" }}
-            value={settings.preselectedClues ? "preselected" : "user"}
-            onChange={(v) => setSetting("preselectedClues", v === "preselected")}
+            optionA={{ value: "manual", text: "Manual" }}
+            optionB={{ value: "auto", text: "Auto" }}
+            value={settings.preselectedClues ? "auto" : "manual"}
+            onChange={(v) => setSetting("preselectedClues", v === "auto")}
             disabled={unlimitedDisabled}
-            disabledHint={unlimitedDisabled ? "Daily uses User Selected." : undefined}
-            info="User Selected: choose between two clues every round (the standard mode). Preselected: the full deck is dealt up-front, one clue per upcoming guess; the chooser, redraw, and Clue Reuse are disabled."
+            disabledHint={unlimitedDisabled ? "Daily uses Manual selection." : undefined}
+            info="Manual: choose between two clues every round (the standard mode). Auto: the full deck is dealt up-front, one clue per upcoming guess; the chooser, redraw, and Clue Reuse are disabled."
           />
           <ToggleRow
             label="Color blind palette"
@@ -183,8 +183,7 @@ export function SettingsDrawer({
 
 /** Two-state binary toggle row: label on the left, segmented A/B
  *  control on the right, optional (i) info popover. Used for the
- *  enum-style settings (5/6-digit, Traditional/Advanced,
- *  User/Preselected). */
+ *  enum-style settings (5/6-digit, Normal/Hard, Manual/Auto). */
 function BinaryRow<T extends string>({
   label,
   optionA,
@@ -204,10 +203,12 @@ function BinaryRow<T extends string>({
   disabled?: boolean;
   disabledHint?: string;
 }) {
+  // The disabled treatment dims only the segmented control on the
+  // right — labels and info-popover buttons stay fully readable so
+  // a player viewing settings during a Daily can still learn what
+  // each option means even though they can't toggle it.
   return (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 ${disabled ? "opacity-50" : ""}`}
-    >
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex-1 min-w-0 inline-flex items-center gap-1.5">
         <span className="text-sm font-medium text-foreground">{label}</span>
         <InfoPopover label={`Info about ${label}`} body={info} disabledHint={disabledHint} />
@@ -215,7 +216,9 @@ function BinaryRow<T extends string>({
       <div
         role="radiogroup"
         aria-label={label}
-        className="grid grid-cols-2 gap-1 bg-surface rounded-md p-0.5 text-[11px] font-semibold shrink-0"
+        className={`grid grid-cols-2 gap-1 bg-surface rounded-md p-0.5 text-[11px] font-semibold shrink-0 ${
+          disabled ? "opacity-50" : ""
+        }`}
       >
         {[optionA, optionB].map((opt) => {
           const selected = value === opt.value;
@@ -257,9 +260,7 @@ function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 ${disabled ? "opacity-50" : ""}`}
-    >
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex-1 min-w-0 inline-flex items-center gap-1.5">
         <span className="text-sm font-medium text-foreground">{label}</span>
         <InfoPopover label={`Info about ${label}`} body={info} />
@@ -272,7 +273,7 @@ function ToggleRow({
         onClick={() => onChange(!value)}
         className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
           value ? "bg-accent" : "bg-surface border border-border"
-        } ${disabled ? "cursor-not-allowed" : ""}`}
+        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <span
           className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
