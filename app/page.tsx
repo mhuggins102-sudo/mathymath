@@ -35,12 +35,6 @@ export default function Home() {
             </Link>
           </div>
           <UnlimitedHomeRow />
-          <Link
-            href="/deduction"
-            className="block bg-surface-2 text-foreground font-semibold py-4 rounded-xl border border-border active:scale-[0.99] transition text-center"
-          >
-            Logical Deduction
-          </Link>
         </div>
 
         <Countdown label="Next daily in" />
