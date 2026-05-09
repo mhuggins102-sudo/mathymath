@@ -124,7 +124,15 @@ export function Modal({
   if (variant === "overlay") {
     return (
       <div
-        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 text-left"
+        // Anchor overlay popups to a consistent top distance instead
+        // of vertically centering. Without this, taller modals (Help)
+        // pushed near the top while shorter ones (Settings, Stats)
+        // floated mid-screen, making the menu cluster feel
+        // inconsistent. `items-start` + `pt-[5vh]` gives every modal
+        // the same starting offset, matching the position the Help
+        // modal naturally took at `items-center` since its 90vh height
+        // already filled the available space.
+        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center px-4 pt-[5vh] pb-4 text-left"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

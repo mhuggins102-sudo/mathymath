@@ -193,7 +193,7 @@ function cellStatesActive(
 //
 // These mirror the helpers in the corresponding clue files but operate
 // on the player's own guess so we can show the implied bound next to
-// the direction symbol, e.g. "↑ 3" for "target has more than your 3".
+// the direction symbol, e.g. "> 3" for "target has more than your 3".
 
 function computeRange(s: string): number {
   const ds = [...s].map(Number);
@@ -255,7 +255,7 @@ function computeDigitSum(s: string): number {
 /**
  * Builds the short in-row sub-label that sits under the clue name.
  * Comparison clues show a direction symbol plus the player's own value
- * so the implied bound reads cleanly ("↑ 3" = "target has more than 3").
+ * so the implied bound reads cleanly ("> 3" = "target has more than 3").
  * Sum Delta keeps its exact magnitude.
  *
  * Exported so the unit test can assert text output without rendering.
@@ -294,7 +294,7 @@ export function subLabelFor(
           ? computeDirectionRuns(guess)
           : computeMedian(guess);
       const symbol =
-        result.cmp === "eq" ? "=" : result.cmp === "gt" ? "↑" : "↓";
+        result.cmp === "eq" ? "=" : result.cmp === "gt" ? ">" : "<";
       const className =
         result.cmp === "eq"
           ? "text-good"
