@@ -2,89 +2,74 @@
 
 import type { ClueId } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
+import { Digit, type DigitState } from "./Digit";
+
+export interface SlotPick {
+  slot: number;
+  digit: number;
+  present: boolean;
+  exact: boolean;
+}
 
 /**
- * Digit picker — appears after the player chooses Contains Digit.
- * Multi-pick: shows buttons 0-9, but only the digits still available
- * from the player's current guess (after subtracting prior picks)
- * are enabled. Each correct pick stays the picker open for another
- * round; a wrong pick or an exhausted multiset closes it. Prior
- * picks render along the top with ✓/✗ markers so the player can see
- * what they've spent.
+ * Slot picker — appears after the player chooses Contains Digit. The
+ * player's guess is rendered as tappable cells; tapping a slot tests
+ * the digit at that slot against the target's remaining multiset.
+ * Cells flip to their result color (green = exact-slot match, yellow
+ * = digit present elsewhere, red = digit absent). Already-picked
+ * slots become non-tappable. The round ends on a red pick or once
+ * every slot has been picked.
  */
-export function DigitPicker({
+export function SlotPicker({
+  guess,
   picks,
-  availableDigits,
   onPick,
   onCancel,
   busy,
 }: {
-  picks: { digit: number; present: boolean }[];
-  availableDigits: number[];
-  onPick: (digit: number) => void;
+  guess: string;
+  picks: SlotPick[];
+  onPick: (slot: number) => void;
   onCancel: () => void;
-  /** Disable buttons while a pick is in flight (daily mode awaits the
+  /** Disable taps while a pick is in flight (daily mode awaits the
    *  server response before the next pick). */
   busy?: boolean;
 }) {
-  const enabled = new Set(availableDigits);
-  const btnBase =
-    "h-12 select-none rounded-md font-semibold transition text-xl";
-  const btnEnabled = `${btnBase} bg-surface-2 text-foreground active:scale-95 active:bg-surface`;
-  const btnDisabled = `${btnBase} bg-surface text-muted/40 cursor-not-allowed`;
+  const pickBySlot = new Map<number, SlotPick>();
+  for (const p of picks) pickBySlot.set(p.slot, p);
   const lastWrong =
     picks.length > 0 && picks[picks.length - 1].present === false;
+  const allPicked = picks.length >= guess.length;
+  const stateFor = (slot: number): DigitState => {
+    const p = pickBySlot.get(slot);
+    if (!p) return "idle";
+    if (p.exact) return "match";
+    if (p.present) return "warm";
+    return "cold";
+  };
   return (
     <div className="w-full max-w-md mx-auto select-none text-center">
       <p className="text-[10px] uppercase tracking-wider text-muted mb-2">
         {picks.length === 0
-          ? "Pick a digit from your guess"
-          : lastWrong
-            ? "Wrong — round ending"
-            : "Keep picking — or wait for the round to wrap"}
+          ? "Tap a slot in your guess"
+          : lastWrong || allPicked
+            ? "Round ending…"
+            : "Tap another slot — or wait for the round to wrap"}
       </p>
-      {picks.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-2 text-sm font-mono">
-          {picks.map((p, i) => (
-            <span
+      <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-3">
+        {Array.from(guess).map((ch, i) => {
+          const picked = pickBySlot.has(i);
+          const tappable = !picked && !busy && !lastWrong && !allPicked;
+          return (
+            <Digit
               key={i}
-              className={p.present ? "text-good" : "text-bad"}
-            >
-              {p.digit}
-              {p.present ? "✓" : "✗"}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="grid grid-cols-5 gap-2 mb-2">
-        {[1, 2, 3, 4, 5].map((d) => {
-          const isEnabled = enabled.has(d) && !busy;
-          return (
-            <button
-              key={d}
-              type="button"
-              className={isEnabled ? btnEnabled : btnDisabled}
-              onClick={() => isEnabled && onPick(d)}
-              disabled={!isEnabled}
-            >
-              {d}
-            </button>
-          );
-        })}
-      </div>
-      <div className="grid grid-cols-5 gap-2 mb-3">
-        {[6, 7, 8, 9, 0].map((d) => {
-          const isEnabled = enabled.has(d) && !busy;
-          return (
-            <button
-              key={d}
-              type="button"
-              className={isEnabled ? btnEnabled : btnDisabled}
-              onClick={() => isEnabled && onPick(d)}
-              disabled={!isEnabled}
-            >
-              {d}
-            </button>
+              value={ch}
+              size="lg"
+              state={stateFor(i)}
+              animate={picked}
+              onClick={tappable ? () => onPick(i) : undefined}
+              ariaLabel={tappable ? `Test slot ${i + 1} (digit ${ch})` : undefined}
+            />
           );
         })}
       </div>

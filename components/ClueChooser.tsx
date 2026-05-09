@@ -36,8 +36,14 @@ export function ClueChooser({
   locksAvailable,
   isRound1,
 }: ClueChooserProps) {
-  const { settings } = useSettings();
-  const showDescriptions = settings.showClueDescriptions;
+  const { settings, hydrated } = useSettings();
+  // Don't render the description block until useSettings has read
+  // localStorage. With showClueDescriptions defaulting to `true`, the
+  // initial (pre-hydration) render would flash the full card before
+  // collapsing to the compact form on the next tick. Gating on
+  // hydrated trades that for a tiny appear-after-hydrate flash for
+  // users who keep descriptions ON, which is far less jarring.
+  const showDescriptions = hydrated && settings.showClueDescriptions;
   return (
     <div className="w-full max-w-md mx-auto select-none">
       <p className="text-center text-[10px] uppercase tracking-wider text-muted mb-2">

@@ -34,7 +34,21 @@ export type ClueResult =
   | { kind: "parityBalance"; cmp: Cmp }
   | { kind: "primeCount"; cmp: Cmp }
   | { kind: "rangeCompare"; cmp: Cmp }
-  | { kind: "containsDigit"; picks: { digit: number; present: boolean }[] }
+  | {
+      kind: "containsDigit";
+      picks: {
+        slot: number;
+        digit: number;
+        /** True when the player's slot digit appears anywhere in the
+         *  target (multiset-aware). False for absent picks; round
+         *  ends on the first false. */
+        present: boolean;
+        /** True when the slot's digit also matches the target's digit
+         *  AT that slot (exact match). Always false when present is
+         *  false. */
+        exact: boolean;
+      }[];
+    }
   | { kind: "distinctDigits"; count: number; sharedRepeated: boolean[] }
   | { kind: "median"; cmp: Cmp }
   | { kind: "divisibleBy"; divisors: number[]; targetHasAny: boolean }
@@ -63,16 +77,14 @@ export interface ClueComputeContext {
    *  consumer and now auto-picks. Field retained for future
    *  positional clues that need explicit slot choice. */
   selectedSlot?: number;
-  /** Player-chosen digit for clues with paramKind "digit". (Currently
-   *  unused — Contains Digit moved to a multi-pick model and uses
-   *  `picks` instead. Field retained for future single-digit clues
-   *  and to keep the ClueParam union forward-compatible.) */
+  /** Player-chosen digit for clues with paramKind "digit". Currently
+   *  unused — retained for future single-digit clues. */
   selectedDigit?: number;
-  /** Player-chosen sequence of digits, in order, for Contains Digit's
-   *  multi-pick interactive flow. Each digit must be present in the
-   *  current guess (with multiset accounting); the round resolves when
-   *  the player picks a digit that's not in the target with sufficient
-   *  multiplicity, or when every guess digit has been asked about. */
+  /** Player-chosen sequence of slot indices, in order, for Contains
+   *  Digit's interactive flow. Each pick reveals whether the digit
+   *  at that slot is present in the target (yellow) or matches the
+   *  target's digit at the same slot exactly (green); a digit not in
+   *  the remaining target multiset ends the round (red). */
   picks?: number[];
   /** Player-chosen previously-used clue to reuse (Clue Reuse special). */
   reusedClueId?: string;
@@ -107,10 +119,10 @@ export interface Clue<R extends ClueResult = ClueResult> {
    *  so color references don't need to live in the description text. */
   legend?: LegendEntry[];
   /** If set, the player must provide a parameter after choosing this
-   *  clue — "digit" shows the multi-pick numpad (Contains Digit),
-   *  "reuse" shows the Clue Reuse picker. Clues without this resolve
-   *  immediately when chosen. */
-  paramKind?: "digit" | "reuse";
+   *  clue — "slot" shows the slot picker (Contains Digit: tap a slot
+   *  in your guess to test that digit), "reuse" shows the Clue Reuse
+   *  picker. Clues without this resolve immediately when chosen. */
+  paramKind?: "slot" | "reuse";
   compute(guess: string, target: string, context?: ClueComputeContext): R;
   example(target: string): { guess: string; result: R };
   /** Plain-language explanation of the result for this specific guess.

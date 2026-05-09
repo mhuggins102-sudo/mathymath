@@ -84,9 +84,14 @@ export interface UseGameResult {
    *  across the multi-pick UI. */
   pendingClueParam: {
     clueId: string;
-    paramKind: "digit" | "reuse";
+    paramKind: "slot" | "reuse";
     reusedClueId?: string;
-    picks?: { digit: number; present: boolean }[];
+    picks?: {
+      slot: number;
+      digit: number;
+      present: boolean;
+      exact: boolean;
+    }[];
   } | null;
   /** Whether the game is being played under advanced rules. */
   advancedMode: boolean;
@@ -110,13 +115,14 @@ export interface UseGameResult {
   /** Cancels the pending clue param selection, returning to the
    *  chooser so the player can pick a different clue. */
   cancelClueParam: () => void;
-  /** Contains Digit interactive: append one digit pick to the
+  /** Contains Digit interactive: append one slot pick to the
    *  current Contains Digit round. Computes the new pick's
-   *  yes/no flag locally (target is in state). If the pick is
-   *  wrong or the player's guess multiset is now exhausted, the
-   *  round resolves and the row is appended to history; otherwise
-   *  the picker stays open with updated available digits. */
-  pickContainsDigit: (digit: number) => void;
+   *  exact/present/absent state locally (target is in state). On a
+   *  red pick (digit absent from remaining target multiset) or once
+   *  every slot has been picked, the round resolves and the row is
+   *  appended to history; otherwise the picker stays open with the
+   *  updated remaining slot list. */
+  pickContainsDigit: (slot: number) => void;
   /** Burns one lock to discard the current clue pair and draw the
    *  next from the deck. Only available when pendingGuess is set
    *  and the player has at least one lock remaining. */
@@ -492,9 +498,14 @@ export function useGame(config: UseGameConfig): UseGameResult {
   // confirms → hook dispatches CHOOSE_CLUE with the param attached.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "digit" | "reuse";
+    paramKind: "slot" | "reuse";
     reusedClueId?: string;
-    picks?: { digit: number; present: boolean }[];
+    picks?: {
+      slot: number;
+      digit: number;
+      present: boolean;
+      exact: boolean;
+    }[];
   } | null>(null);
 
   const chooseClue = useCallback(
@@ -526,16 +537,16 @@ export function useGame(config: UseGameConfig): UseGameResult {
     (param: ClueParam) => {
       if (!pendingClueParam) return;
       // Chained flow for Clue Reuse → Contains Digit: when the reuse
-      // picker yields a clue with paramKind=digit, enter that clue's
+      // picker yields a clue with paramKind=slot, enter that clue's
       // multi-pick picker before dispatching. Oracle no longer needs
       // a sub-picker (it auto-picks the farthest-off slot).
       if (pendingClueParam.paramKind === "reuse" && param.reusedClueId) {
         try {
           const reusedClue = getClueById(param.reusedClueId as never);
-          if (reusedClue.paramKind === "digit") {
+          if (reusedClue.paramKind === "slot") {
             setPendingClueParam({
               clueId: pendingClueParam.clueId,
-              paramKind: "digit",
+              paramKind: "slot",
               reusedClueId: param.reusedClueId,
             });
             return;
@@ -563,26 +574,26 @@ export function useGame(config: UseGameConfig): UseGameResult {
   }, []);
 
   const pickContainsDigit = useCallback(
-    (digit: number) => {
+    (slot: number) => {
       if (!pendingClueParam) return;
-      if (pendingClueParam.paramKind !== "digit") return;
+      if (pendingClueParam.paramKind !== "slot") return;
       const guess = state.pendingGuess?.guess;
       if (!guess) return;
-      const priorDigits = (pendingClueParam.picks ?? []).map((p) => p.digit);
-      const newDigits = [...priorDigits, digit];
+      const priorSlots = (pendingClueParam.picks ?? []).map((p) => p.slot);
+      const newSlots = [...priorSlots, slot];
       // Compute against the actual target — unlimited mode has it in
-      // state.target. Use the containsDigit clue directly so the
-      // resolved picks (with present flags) come back.
+      // state.target. The containsDigit clue resolves the full pick
+      // sequence (slot indices) into per-pick {present, exact} flags.
       const containsDigit = getClueById("containsDigit");
       const result = containsDigit.compute(guess, state.target, {
-        picks: newDigits,
+        picks: newSlots,
       });
       if (result.kind !== "containsDigit") return;
       const complete = containsDigitRoundComplete(guess, result.picks);
       if (complete) {
         const param = pendingClueParam.reusedClueId
-          ? { picks: newDigits, reusedClueId: pendingClueParam.reusedClueId }
-          : { picks: newDigits };
+          ? { picks: newSlots, reusedClueId: pendingClueParam.reusedClueId }
+          : { picks: newSlots };
         dispatch({
           type: "CHOOSE_CLUE",
           clueId: pendingClueParam.clueId as never,

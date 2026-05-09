@@ -91,9 +91,14 @@ export interface UseDailyGameResult {
   unlockMode: boolean;
   pendingClueParam: {
     clueId: string;
-    paramKind: "digit" | "reuse";
+    paramKind: "slot" | "reuse";
     reusedClueId?: string;
-    picks?: { digit: number; present: boolean }[];
+    picks?: {
+      slot: number;
+      digit: number;
+      present: boolean;
+      exact: boolean;
+    }[];
   } | null;
   redraw: () => void;
   canRedraw: boolean;
@@ -103,7 +108,7 @@ export interface UseDailyGameResult {
   chooseClue: (id: ClueId) => void;
   confirmClueParam: (param: ClueParam) => void;
   cancelClueParam: () => void;
-  pickContainsDigit: (digit: number) => void;
+  pickContainsDigit: (slot: number) => void;
   tapCell: (slot: number) => void;
   commitLock: () => void;
 }
@@ -571,9 +576,14 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   // response.
   const [pendingClueParam, setPendingClueParam] = useState<{
     clueId: string;
-    paramKind: "digit" | "reuse";
+    paramKind: "slot" | "reuse";
     reusedClueId?: string;
-    picks?: { digit: number; present: boolean }[];
+    picks?: {
+      slot: number;
+      digit: number;
+      present: boolean;
+      exact: boolean;
+    }[];
   } | null>(null);
 
   /** Internal: actually fires the choose-clue server call once we
@@ -617,14 +627,16 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
           // Contains Digit interactive: the round isn't done yet.
           // Update the picker's local state with the partial picks
           // returned by the server, and leave pendingGuess intact so
-          // the player can pick another digit.
+          // the player can pick another slot.
           setPendingClueParam((prev) =>
             prev
               ? {
                   ...prev,
                   picks: (body.partialPicks ?? []) as {
+                    slot: number;
                     digit: number;
                     present: boolean;
+                    exact: boolean;
                   }[],
                 }
               : null,
@@ -704,10 +716,10 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
       if (pendingClueParam.paramKind === "reuse" && param.reusedClueId) {
         try {
           const reusedClue = getClueById(param.reusedClueId as never);
-          if (reusedClue.paramKind === "digit") {
+          if (reusedClue.paramKind === "slot") {
             setPendingClueParam({
               clueId: pendingClueParam.clueId,
-              paramKind: "digit",
+              paramKind: "slot",
               reusedClueId: param.reusedClueId,
             });
             return;
@@ -730,13 +742,13 @@ export function useDailyGame(config: UseDailyGameConfig): UseDailyGameResult {
   }, []);
 
   const pickContainsDigit = useCallback(
-    (digit: number) => {
-      if (!pendingClueParam || pendingClueParam.paramKind !== "digit") return;
-      const priorDigits = (pendingClueParam.picks ?? []).map((p) => p.digit);
-      const newDigits = [...priorDigits, digit];
+    (slot: number) => {
+      if (!pendingClueParam || pendingClueParam.paramKind !== "slot") return;
+      const priorSlots = (pendingClueParam.picks ?? []).map((p) => p.slot);
+      const newSlots = [...priorSlots, slot];
       const param = pendingClueParam.reusedClueId
-        ? { picks: newDigits, reusedClueId: pendingClueParam.reusedClueId }
-        : { picks: newDigits };
+        ? { picks: newSlots, reusedClueId: pendingClueParam.reusedClueId }
+        : { picks: newSlots };
       void doChooseClue(pendingClueParam.clueId as ClueId, param);
     },
     [pendingClueParam, doChooseClue],

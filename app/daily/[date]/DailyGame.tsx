@@ -9,8 +9,7 @@ import { GuessGrid } from "@/components/GuessGrid";
 import { GearIcon } from "@/components/GearIcon";
 import { Keypad } from "@/components/Keypad";
 import { ClueChooser } from "@/components/ClueChooser";
-import { DigitPicker, ReusePicker } from "@/components/CluePickers";
-import { containsDigitAvailable } from "@/lib/game/clues/containsDigit";
+import { SlotPicker, ReusePicker } from "@/components/CluePickers";
 import { HelpModal } from "@/components/HelpModal";
 import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
@@ -346,13 +345,10 @@ export function DailyGame({
                 }
                 onCancel={cancelClueParam}
               />
-            ) : pendingClueParam?.paramKind === "digit" && state.pendingGuess ? (
-              <DigitPicker
+            ) : pendingClueParam?.paramKind === "slot" && state.pendingGuess ? (
+              <SlotPicker
+                guess={state.pendingGuess.guess}
                 picks={pendingClueParam.picks ?? []}
-                availableDigits={containsDigitAvailable(
-                  state.pendingGuess.guess,
-                  (pendingClueParam.picks ?? []).map((p) => p.digit),
-                )}
                 onPick={pickContainsDigit}
                 onCancel={cancelClueParam}
                 busy={loading}

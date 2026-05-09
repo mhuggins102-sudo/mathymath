@@ -195,23 +195,27 @@ function explainViolation(
       return `${name} said the target's digit range (max−min) is ${CMP_LABEL[result.cmp]} ${g} — your guess has range ${t}.`;
     }
     case "containsDigit": {
-      // Multi-pick: each pick is a multiset-aware "is this digit in
-      // the target?" question. For each pick, count how many copies
-      // of the digit appear in the hypothesized target (wrongGuess)
-      // and compare to the recorded present flag — the recorded flag
-      // is yes iff the n-th pick of that digit is the n-th-or-fewer
-      // copy in the target.
-      const usedSoFar = new Map<number, number>();
+      // Slot-based picks: each pick is { slot, digit, present, exact }.
+      // Simulate the same picks against the hypothesized target
+      // (wrongGuess) and bail out at the first slot whose
+      // present/exact flags don't match the recorded result.
+      const remaining = new Map<number, number>();
+      for (const ch of wrongGuess) {
+        const d = Number(ch);
+        remaining.set(d, (remaining.get(d) ?? 0) + 1);
+      }
       for (const p of result.picks) {
-        const used = usedSoFar.get(p.digit) ?? 0;
-        const inWrong = (wrongGuess.match(new RegExp(String(p.digit), "g")) ?? []).length;
-        const expected = inWrong > used;
-        if (expected !== p.present) {
-          return p.present
-            ? `${name} said the target has at least ${used + 1} of ${p.digit} — your guess has only ${inWrong}.`
-            : `${name} said the target has fewer than ${used + 1} of ${p.digit} — your guess has at least ${used + 1}.`;
+        const remainingForDigit = remaining.get(p.digit) ?? 0;
+        let actualPresent = false;
+        let actualExact = false;
+        if (remainingForDigit > 0) {
+          actualPresent = true;
+          actualExact = Number(wrongGuess[p.slot]) === p.digit;
+          remaining.set(p.digit, remainingForDigit - 1);
         }
-        usedSoFar.set(p.digit, used + 1);
+        if (actualPresent !== p.present || actualExact !== p.exact) {
+          return `${name} reported a different result at slot ${p.slot + 1} for digit ${p.digit}.`;
+        }
       }
       return null;
     }

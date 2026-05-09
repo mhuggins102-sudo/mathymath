@@ -28,7 +28,7 @@ export const divisibleByClue: Clue<{
   // the new variant still resolves quickly and reads as fun trivia.
   weight: 1.4,
   legend: [
-    { state: "match", label: "shared divisor" },
+    { state: "warm", label: "shared divisor" },
     { state: "cold", label: "no shared divisor" },
   ],
   compute(guess, target) {
