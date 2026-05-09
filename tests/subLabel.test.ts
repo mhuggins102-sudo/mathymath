@@ -10,11 +10,11 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
       className: "text-good",
     });
     expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "gt" })).toEqual({
-      text: "↑ 4",
+      text: "> 4",
       className: "text-warn",
     });
     expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "lt" })).toEqual({
-      text: "↓ 4",
+      text: "< 4",
       className: "text-bad",
     });
   });
@@ -26,7 +26,7 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
       className: "text-good",
     });
     expect(subLabelFor("13579", { kind: "parityBalance", cmp: "gt" })).toEqual({
-      text: "↑ 0",
+      text: "> 0",
       className: "text-warn",
     });
   });
@@ -39,7 +39,7 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
     });
     expect(subLabelFor("14680", { kind: "primeCount", cmp: "lt" })).toEqual({
       // no prime digits in 14680 → 0
-      text: "↓ 0",
+      text: "< 0",
       className: "text-bad",
     });
   });
@@ -52,7 +52,7 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
     });
     expect(subLabelFor("99111", { kind: "median", cmp: "gt" })).toEqual({
       // sorted [1,1,1,9,9] → median index 2 → 1
-      text: "↑ 1",
+      text: "> 1",
       className: "text-warn",
     });
   });
@@ -63,14 +63,14 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
       text: "= 2",
       className: "text-good",
     });
-    // 12345 has 1 direction; "↑" means target has more than 1.
+    // 12345 has 1 direction; ">" means target has more than 1.
     expect(subLabelFor("12345", { kind: "upsAndDowns", cmp: "gt" })).toEqual({
-      text: "↑ 1",
+      text: "> 1",
       className: "text-warn",
     });
     // 11111 has 0 direction changes.
     expect(subLabelFor("11111", { kind: "upsAndDowns", cmp: "lt" })).toEqual({
-      text: "↓ 0",
+      text: "< 0",
       className: "text-bad",
     });
   });

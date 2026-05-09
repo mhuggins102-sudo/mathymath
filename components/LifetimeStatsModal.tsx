@@ -142,17 +142,10 @@ export function LifetimeStatsModal({
     </>
   );
 
-  // Home ("both") uses the full-screen modal aesthetic shared with Help
-  // and Settings. In-game ("daily" / "unlimited") uses a centered card
-  // popup that closes on backdrop tap.
-  if (mode === "both") {
-    return (
-      <Modal open={open} onClose={onClose} titleId={titleId} variant="full">
-        <div className="max-w-md mx-auto p-4 pb-20">{content}</div>
-      </Modal>
-    );
-  }
-
+  // All three call sites — home ("both"), daily, unlimited — share
+  // the same overlay aesthetic now: centered card on a translucent
+  // backdrop, click outside or hit Escape to close. The mode prop
+  // still drives WHICH stat blocks render; only the chrome is shared.
   return (
     <Modal open={open} onClose={onClose} titleId={titleId} variant="overlay">
       <div className="bg-surface rounded-xl border border-border shadow-2xl p-4">
