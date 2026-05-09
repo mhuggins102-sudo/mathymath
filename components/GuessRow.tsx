@@ -631,6 +631,15 @@ export function GuessRow({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
+          // Same hover-to-open story as the resolved-row branch below.
+          onPointerEnter={(e) => {
+            if (e.pointerType !== "mouse") return;
+            setExpanded(true);
+          }}
+          onPointerLeave={(e) => {
+            if (e.pointerType !== "mouse") return;
+            setExpanded(false);
+          }}
           aria-expanded={expanded}
           aria-label={`Show description: ${upcomingClue.name}`}
           className="w-full h-full flex flex-col justify-center text-left min-w-0 rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
@@ -661,6 +670,18 @@ export function GuessRow({
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        // Hover-to-open on desktop. PointerEvent's pointerType lets us
+        // skip touch-originated enter/leave so tap stays click-toggle
+        // on phones. iOS Safari fires synthetic mouse-enter after a
+        // tap; using pointer events avoids that gotcha.
+        onPointerEnter={(e) => {
+          if (e.pointerType !== "mouse") return;
+          setExpanded(true);
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType !== "mouse") return;
+          setExpanded(false);
+        }}
         aria-expanded={expanded}
         aria-label={`Explain clue: ${meta?.name ?? ""}`}
         className="w-full h-full text-left rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"

@@ -43,42 +43,70 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           </button>
         </div>
 
-        <div className="space-y-3 text-sm text-muted leading-relaxed mb-6">
-          <p>
-            Guess the secret 5-digit number in 8 tries. Digits can repeat
-            (e.g. <span className="font-mono text-foreground">74727</span>).
-            Unlimited mode also offers a harder 6-digit variant with the
-            same 8-tries budget.
-          </p>
-          <p>
-            After each guess you&apos;ll be offered{" "}
-            <strong className="text-foreground">two clue options</strong>.
-            Pick the one that will help you most. On round 1, friendly
-            opener clues are marked with a{" "}
-            <span className="text-warn">⭐</span> in the chooser — these are
-            the ones most useful to play first.
-          </p>
-          <p>
-            You start each game with one{" "}
-            <span className="text-foreground">🔒 lock</span> (Advanced
-            unlimited mode starts with zero — you can still earn locks via
-            Extra Lock). Tap a cell on any guess to pin a digit you&apos;re
-            sure of. Correct locks stay; wrong locks are spent. You can
-            also spend a lock to{" "}
-            <strong className="text-foreground">redraw</strong> the offered
-            clue pair if neither option appeals, and{" "}
-            <strong className="text-foreground">Clue Reuse</strong> costs 1
-            lock per use.
-          </p>
-          <p>
-            A clue type can only be chosen once per game — used types
-            won&apos;t appear as future options.
-          </p>
-          <p className="text-foreground/80 italic">
-            Tip: your guess doesn&apos;t have to be your best estimate of the
-            target. A strategic guess — like all 5s — can extract more
-            information from the clue you&apos;re hoping to receive.
-          </p>
+        <div className="space-y-2 mb-6">
+          <Accordion title="The basics" defaultOpen>
+            <p>
+              Guess the secret 5-digit number in 8 tries. Digits can
+              repeat — e.g.{" "}
+              <span className="font-mono text-foreground">74727</span> is a
+              valid target.
+            </p>
+            <p>
+              Unlimited mode adds a harder 6-digit variant with the same
+              8-tries budget. Toggle it in{" "}
+              <span className="text-foreground">Settings</span>.
+            </p>
+          </Accordion>
+
+          <Accordion title="Choosing clues">
+            <p>
+              After every guess you&apos;re offered{" "}
+              <strong className="text-foreground">two clue options</strong>.
+              Pick the one that will help you most given what the row
+              already tells you.
+            </p>
+            <p>
+              On round 1, friendly opener clues are marked with a{" "}
+              <span className="text-warn">⭐</span> in the chooser — those
+              are the ones most useful to play first.
+            </p>
+            <p>
+              A clue type can only be picked once per game — used types
+              won&apos;t reappear as future options.
+            </p>
+          </Accordion>
+
+          <Accordion title="Locks">
+            <p>
+              You start each game with one{" "}
+              <span className="text-foreground">🔒 lock</span>. Tap a cell
+              on the active row to pin a digit you&apos;re sure of. Correct
+              locks stay across guesses; wrong locks are spent.
+            </p>
+            <p>
+              You can also spend a lock to{" "}
+              <strong className="text-foreground">redraw</strong> the
+              offered clue pair, or pick{" "}
+              <strong className="text-foreground">Clue Reuse</strong>{" "}
+              (costs 1 🔒) to repeat a previously-used clue.
+            </p>
+            <p>
+              Advanced Unlimited starts with zero locks — you can still
+              earn them via Extra Lock during the game.
+            </p>
+          </Accordion>
+
+          <Accordion title="Tips & strategy">
+            <p>
+              Your guess doesn&apos;t have to be your best estimate of the
+              target. A strategic guess — like all 5s — often extracts more
+              information from the clue you&apos;re hoping to receive.
+            </p>
+            <p>
+              Tap a clue&apos;s name on a resolved row to see exactly how
+              its result was computed against your guess.
+            </p>
+          </Accordion>
         </div>
 
         <h3 className="text-sm uppercase tracking-wider text-muted mb-3">
@@ -142,5 +170,39 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Native <details>/<summary> accordion with project-styled chrome.
+ *  Browsers handle the open/close state and keyboard interaction
+ *  natively; we only style it. The chevron rotates via the
+ *  [open] attribute selector. */
+function Accordion({
+  title,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group bg-surface-2/50 rounded-lg border border-border overflow-hidden"
+    >
+      <summary className="flex items-center justify-between cursor-pointer select-none px-3 py-2 text-sm font-semibold text-foreground hover:bg-surface-2 list-none [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <span
+          aria-hidden
+          className="text-muted text-xs transition-transform group-open:rotate-90"
+        >
+          ▶
+        </span>
+      </summary>
+      <div className="px-3 pb-3 pt-1 text-sm text-muted leading-relaxed space-y-2">
+        {children}
+      </div>
+    </details>
   );
 }
