@@ -54,15 +54,20 @@ body {
   overscroll-behavior: none;
 }
 
-/* Both html and body fill at least the viewport so the dark background
-   paints the full screen on short pages and grows with content on long
-   ones. Setting min-height on html (not just body) makes background
-   propagation reliable across browsers — without it, on some desktop
-   layouts the html box collapsed shorter than the viewport and the
-   area below body's box painted as the browser default. */
-html,
+/* Make html fill the viewport (height: 100%, anchored to the
+   initial containing block) so its background paints edge-to-edge.
+   Body then uses min-height to grow with content but never shrinks
+   below the viewport. The `dvh` line is a progressive enhancement
+   for browsers that compute the dynamic viewport — it falls back to
+   `100vh` when unsupported. Without these, on some desktop layouts
+   body's box collapsed shorter than the viewport and the area below
+   it painted as the browser default. */
+html {
+  height: 100%;
+}
 body {
-  min-height: 100vh;
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 /* Keyboard focus ring. The site runs on a dark background where the default
