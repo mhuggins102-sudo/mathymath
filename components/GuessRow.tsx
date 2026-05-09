@@ -304,18 +304,19 @@ export function subLabelFor(
       return { text: `${symbol} ${own}`, className };
     }
     case "sumDelta": {
-      // Sum Delta carries the exact signed distance; show the player's
-      // own sum on ties and the delta (with explicit sign) otherwise.
+      // Show the target's digit sum prominently, with the signed delta
+      // from the player's guess in parentheses. e.g. "15 (−10)" means
+      // the target's digit sum is 15 and the player's guess summed to
+      // 25. On a perfect tie we drop the parenthetical.
+      const own = computeDigitSum(guess);
+      const target = own + result.delta;
       if (result.delta === 0) {
-        const own = computeDigitSum(guess);
-        return { text: `= ${own}`, className: "text-good" };
+        return { text: `${target}`, className: "text-good" };
       }
-      if (result.delta > 0) {
-        return { text: `↑ +${result.delta}`, className: "text-warn" };
-      }
+      const sign = result.delta > 0 ? "+" : "−";
       return {
-        text: `↓ −${Math.abs(result.delta)}`,
-        className: "text-bad",
+        text: `${target} (${sign}${Math.abs(result.delta)})`,
+        className: result.delta > 0 ? "text-warn" : "text-bad",
       };
     }
     case "parityMask": {
@@ -349,22 +350,23 @@ export function subLabelFor(
     case "totalDeviation":
       return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit": {
-      // Show every pick the player made, with ✓ for in-target (green)
+      // Show every pick the player made, with ✓ for in-target (yellow)
       // and ✗ for the wrong one (red — always the last, by
       // construction). Per-pick colors via the `parts` channel so the
       // checks and the cross don't share a single dominant color.
+      // Yellow on hits matches Digit Overlap's "shared info" hue.
       if (result.picks.length === 0)
         return { text: "no picks", className: "text-muted" };
       const parts = result.picks.map((p) => ({
         text: `${p.digit}${p.present ? "✓" : "✗"}`,
-        className: p.present ? "text-good" : "text-bad",
+        className: p.present ? "text-warn" : "text-bad",
       }));
       const text = parts.map((p) => p.text).join(" ");
       const lastWrong =
         result.picks[result.picks.length - 1].present === false;
       return {
         text,
-        className: lastWrong ? "text-bad" : "text-good",
+        className: lastWrong ? "text-bad" : "text-warn",
         parts,
       };
     }
@@ -620,12 +622,19 @@ export function GuessRow({
 
   const labelSlot = (() => {
     // Preselected-clues mode: when an upcomingClue is pinned to this
-    // row but it hasn't resolved yet, show just the clue NAME (no
-    // result subtext, no popover button — the player isn't supposed
-    // to peek at behavior before triggering it).
+    // row but it hasn't resolved yet, show the clue NAME as a button
+    // that opens a popover with the clue's description (the same text
+    // the in-game chooser shows). Once resolved, the row falls
+    // through to the standard interactive explainer below.
     if (!result && upcomingClue) {
       return (
-        <div className="flex flex-col justify-center text-left min-w-0 h-full">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={`Show description: ${upcomingClue.name}`}
+          className="w-full h-full flex flex-col justify-center text-left min-w-0 rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
+        >
           <span
             className={`text-[12px] sm:text-[13px] truncate leading-tight ${
               nextUp
@@ -635,7 +644,7 @@ export function GuessRow({
           >
             {upcomingClue.name}
           </span>
-        </div>
+        </button>
       );
     }
     if (pending && !result)
@@ -719,6 +728,17 @@ export function GuessRow({
             {meta.name}
           </p>
           <p>{explanation}</p>
+        </div>
+      )}
+      {expanded && !result && upcomingClue && (
+        <div
+          role="tooltip"
+          className="mx-1 mt-1 mb-1 bg-surface-2 rounded-md border border-border px-3 py-2 text-[11px] leading-snug text-muted"
+        >
+          <p className="text-[9px] uppercase tracking-wider text-muted mb-1">
+            {upcomingClue.name}
+          </p>
+          <p>{upcomingClue.description}</p>
         </div>
       )}
     </div>

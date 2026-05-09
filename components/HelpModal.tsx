@@ -1,6 +1,7 @@
 "use client";
 
 import { CLUES } from "@/lib/game/clues/registry";
+import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
 import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
 import { GuessRow } from "./GuessRow";
 import { ClueLegend } from "./ClueLegend";
@@ -27,8 +28,8 @@ const EXAMPLE_TARGET = "47628";
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
   return (
-    <Modal open={open} onClose={onClose} titleId="help-modal-title" variant="full">
-      <div className="max-w-md mx-auto p-4 pb-24">
+    <Modal open={open} onClose={onClose} titleId="help-modal-title" variant="overlay">
+      <div className="bg-surface rounded-xl border border-border shadow-2xl p-4">
         <div className="flex justify-between items-center mb-4">
           <h2 id="help-modal-title" className="text-xl font-semibold">
             How to play
@@ -52,27 +53,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           <p>
             After each guess you&apos;ll be offered{" "}
             <strong className="text-foreground">two clue options</strong>.
-            Pick the one that will help you most. The first pair is always
-            drawn so that at least one option is from the round-1 curated
-            set: Digit Overlap, Elimination, Divisible By, Contains Digit,
-            Higher or Lower, Within 2, Oracle, or Thermometer. Cards come
-            in three flavors:
+            Pick the one that will help you most. On round 1, friendly
+            opener clues are marked with a{" "}
+            <span className="text-warn">⭐</span> in the chooser — these are
+            the ones most useful to play first.
           </p>
-          <ul className="list-disc list-inside space-y-1 pl-1">
-            <li>
-              <span className="text-accent">Positional</span> — colors each
-              cell to show how close your digit is at that slot.
-            </li>
-            <li>
-              <span className="text-warn">Compositional</span> — tells you
-              something about the target number as a whole.
-            </li>
-            <li>
-              <span className="text-good">Special</span> — changes the rules
-              instead of giving info (e.g. grants an extra lock or lets you
-              re-use a previous clue).
-            </li>
-          </ul>
           <p>
             You start each game with one{" "}
             <span className="text-foreground">🔒 lock</span> (Advanced
@@ -104,52 +89,56 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
         </h3>
 
         <div className="space-y-3">
-          {CLUES.map((clue) => {
-            const { guess, result } = clue.example(EXAMPLE_TARGET);
-            return (
-              <div
-                key={clue.id}
-                className="bg-surface rounded-lg border border-border p-3"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-sm inline-flex items-center gap-1.5">
-                    {clue.name}
-                    {/* Lock-cost badge for cost-bearing clues so the price
-                        is visible in the help reference card too, not only
-                        in the in-game chooser. Currently only Clue Reuse
-                        has a cost. */}
-                    {clue.id === CLUE_REUSE_CLUE_ID && (
-                      <span className="text-[10px] font-normal text-muted">
-                        🔒×{CLUE_REUSE_COST}
+          {[...CLUES]
+            // Curated round-1 clues bubble to the top so a new player
+            // sees the friendly openers first. The rest preserve the
+            // registry's existing order.
+            .sort((a, b) => {
+              const ar = ROUND1_CURATED_CLUE_IDS.has(a.id) ? 0 : 1;
+              const br = ROUND1_CURATED_CLUE_IDS.has(b.id) ? 0 : 1;
+              return ar - br;
+            })
+            .map((clue) => {
+              const { guess, result } = clue.example(EXAMPLE_TARGET);
+              const isCurated = ROUND1_CURATED_CLUE_IDS.has(clue.id);
+              return (
+                <div
+                  key={clue.id}
+                  className="bg-surface rounded-lg border border-border p-3"
+                >
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="font-semibold text-sm inline-flex items-center gap-1.5">
+                      {clue.name}
+                      {clue.id === CLUE_REUSE_CLUE_ID && (
+                        <span className="text-[10px] font-normal text-muted">
+                          🔒×{CLUE_REUSE_COST}
+                        </span>
+                      )}
+                    </span>
+                    {isCurated && (
+                      <span
+                        className="text-warn text-sm shrink-0"
+                        title="Curated turn-1 clue"
+                        aria-label="Curated turn-1 clue"
+                      >
+                        ⭐
                       </span>
                     )}
-                  </span>
-                  <span
-                    className={`text-[10px] uppercase px-2 py-0.5 rounded ${
-                      clue.category === "positional"
-                        ? "bg-accent/20 text-accent"
-                        : clue.category === "compositional"
-                        ? "bg-warn/20 text-warn"
-                        : "bg-good/20 text-good"
-                    }`}
-                  >
-                    {clue.category}
-                  </span>
+                  </div>
+                  <p className="text-xs text-muted mb-2 leading-relaxed">
+                    {clue.description}
+                  </p>
+                  {clue.legend && <ClueLegend entries={clue.legend} />}
+                  <div className="scale-90 origin-left mt-2">
+                    <GuessRow
+                      guess={guess}
+                      digits={guess.length}
+                      result={result}
+                    />
+                  </div>
                 </div>
-                <p className="text-xs text-muted mb-2 leading-relaxed">
-                  {clue.description}
-                </p>
-                {clue.legend && <ClueLegend entries={clue.legend} />}
-                <div className="scale-90 origin-left mt-2">
-                  <GuessRow
-                    guess={guess}
-                    digits={guess.length}
-                    result={result}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </Modal>
