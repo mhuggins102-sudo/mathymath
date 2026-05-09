@@ -60,6 +60,39 @@ function newSession(): Session {
   };
 }
 
+/** If the URL carries a shared puzzle (?t=…&s=…), reconstruct that
+ *  exact session so the recipient plays the same target with the
+ *  same seed-driven clue order. Returns null when no valid params
+ *  are present so the caller can fall back to a fresh random session. */
+function sessionFromUrl(): Session | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get("t");
+  const s = params.get("s");
+  if (!t || !s) return null;
+  if (!/^[0-9]{5,6}$/.test(t)) return null;
+  return {
+    target: t,
+    seed: s,
+    digits: t.length,
+    advancedMode: params.get("adv") === "1",
+    preselectedClues: params.get("pre") === "1",
+  };
+}
+
+/** Build a shareable URL for the given session. Encodes target, seed,
+ *  and the two ruleset flags so the link reconstructs the same clue
+ *  offerings. Defaults (advancedMode=false / preselectedClues=false)
+ *  are omitted to keep the URL tidy. */
+function buildShareUrl(session: Session): string {
+  const url = new URL(window.location.origin + "/unlimited");
+  url.searchParams.set("t", session.target);
+  url.searchParams.set("s", session.seed);
+  if (session.advancedMode) url.searchParams.set("adv", "1");
+  if (session.preselectedClues) url.searchParams.set("pre", "1");
+  return url.toString();
+}
+
 export default function UnlimitedPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -67,9 +100,9 @@ export default function UnlimitedPage() {
   const [statsOpen, setStatsOpen] = useState(false);
 
   // Hydrate the saved mode preference on first paint and start the
-  // first session against it.
+  // first session against it. A shared-puzzle URL takes precedence.
   useEffect(() => {
-    setSession(newSession());
+    setSession(sessionFromUrl() ?? newSession());
   }, []);
 
   if (!session) {
@@ -80,7 +113,14 @@ export default function UnlimitedPage() {
     );
   }
 
-  const onNew = () => setSession(newSession());
+  const onNew = () => {
+    // Strip any share params from the URL so a refresh after the new
+    // puzzle doesn't restore the shared puzzle the player just left.
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    setSession(newSession());
+  };
 
   return (
     <>
@@ -106,7 +146,11 @@ export default function UnlimitedPage() {
         context="unlimited"
         onSettingsCommit={onNew}
       />
-      <LifetimeStatsModal open={statsOpen} onClose={() => setStatsOpen(false)} />
+      <LifetimeStatsModal
+        open={statsOpen}
+        onClose={() => setStatsOpen(false)}
+        mode="unlimited"
+      />
     </>
   );
 }
@@ -363,13 +407,16 @@ function UnlimitedGame({
               >
                 {statusMessage}
               </p>
-              <button
-                type="button"
-                onClick={onNew}
-                className="bg-accent/80 text-background font-semibold px-6 py-2 rounded-lg active:scale-95"
-              >
-                New puzzle
-              </button>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={onNew}
+                  className="bg-accent/80 text-background font-semibold px-6 py-2 rounded-lg active:scale-95"
+                >
+                  New puzzle
+                </button>
+                <ShareButton session={session} />
+              </div>
               <p className="text-xs text-muted">
                 Tap 📊 above to see your unlimited stats.
               </p>
@@ -378,6 +425,52 @@ function UnlimitedGame({
         </div>
       </div>
     </main>
+  );
+}
+
+/** End-of-game share control. Encodes target/seed/flags into a URL
+ *  the recipient can open to play the same puzzle (same target, same
+ *  clue offerings via seed). Uses navigator.share when available
+ *  (mobile) and falls back to clipboard with a brief "Copied!"
+ *  acknowledgement on desktop. */
+function ShareButton({ session }: { session: Session }) {
+  const [feedback, setFeedback] = useState<"copied" | null>(null);
+
+  const handleShare = async () => {
+    const url = buildShareUrl(session);
+    const nav = typeof navigator !== "undefined" ? navigator : null;
+    if (nav?.share) {
+      try {
+        await nav.share({
+          url,
+          title: "mathymath",
+          text: "Try this mathymath puzzle:",
+        });
+        return;
+      } catch {
+        // User cancelled the share sheet — fall through to clipboard.
+      }
+    }
+    try {
+      await nav?.clipboard?.writeText(url);
+      setFeedback("copied");
+      window.setTimeout(() => setFeedback(null), 1800);
+    } catch {
+      // Clipboard blocked (e.g., insecure context). Surface the URL via
+      // a prompt as a last-ditch fallback so the player can still copy it.
+      window.prompt("Copy this puzzle link:", url);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      className="bg-surface-2 border border-border text-foreground font-semibold px-4 py-2 rounded-lg active:scale-95 inline-flex items-center gap-2"
+      aria-label="Share this puzzle"
+    >
+      {feedback === "copied" ? "Copied!" : "Share"}
+    </button>
   );
 }
 
