@@ -345,15 +345,17 @@ export function subLabelFor(
       return { text: `${result.value} off`, className: "text-accent" };
     case "containsDigit": {
       // Show every pick the player made, color-coded:
-      //   ✓✓ (green) — exact-slot match
+      //   ✓ (green)  — exact-slot match
       //   ✓ (yellow) — digit present elsewhere in target
       //   ✗ (red)    — digit absent (round ender)
-      // Per-pick colors travel via `parts` so the marks don't
-      // collapse into one dominant color.
+      // Color alone differentiates exact from present — the mark
+      // stays a single check in both cases. Per-pick colors travel
+      // via `parts` so the marks don't collapse into one dominant
+      // color.
       if (result.picks.length === 0)
         return { text: "no picks", className: "text-muted" };
       const parts = result.picks.map((p) => {
-        const mark = p.exact ? "✓✓" : p.present ? "✓" : "✗";
+        const mark = p.present ? "✓" : "✗";
         const className = p.exact
           ? "text-good"
           : p.present

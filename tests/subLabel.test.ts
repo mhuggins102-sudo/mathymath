@@ -123,8 +123,9 @@ describe("subLabelFor — other clues unchanged", () => {
       className: "text-bad",
       parts: [{ text: "7✗", className: "text-bad" }],
     });
-    // Mixed sequence: yellow + green (exact) + red. Summary class
-    // follows the LAST pick (red here).
+    // Mixed sequence: yellow + green (exact) + red. The mark stays
+    // a single ✓ for both yellow and green — color alone separates
+    // them. Summary class follows the LAST pick (red here).
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
@@ -135,11 +136,11 @@ describe("subLabelFor — other clues unchanged", () => {
         ],
       }),
     ).toEqual({
-      text: "4✓ 4✓✓ 6✗",
+      text: "4✓ 4✓ 6✗",
       className: "text-bad",
       parts: [
         { text: "4✓", className: "text-warn" },
-        { text: "4✓✓", className: "text-good" },
+        { text: "4✓", className: "text-good" },
         { text: "6✗", className: "text-bad" },
       ],
     });
