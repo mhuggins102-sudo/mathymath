@@ -19,36 +19,73 @@ interface SettingsDrawerProps {
    *  interactive: "daily" disables every Unlimited-only toggle since
    *  the daily puzzle uses fixed rules. */
   context?: SettingsContext;
-  /** Optional hook the Unlimited page passes so toggling the digit
-   *  mode (5 ↔ 6) restarts the in-progress game in the new mode.
-   *  Other contexts (home, daily) leave it unset; the change is
-   *  persisted but only takes effect on the next new game. */
-  onDigitModeChange?: (mode: UnlimitedMode) => void;
+  /** Fires once on close if the player toggled any setting that
+   *  warrants restarting the in-progress game (digit mode, advanced
+   *  rules, preselected clues). Pure cosmetic settings like Color
+   *  blind palette or Clue descriptions don't trigger it. Only
+   *  passed by the Unlimited page; home/daily callers leave it
+   *  unset (the saved value still persists for next-game). */
+  onSettingsCommit?: () => void;
 }
 
 export function SettingsDrawer({
   open,
   onClose,
   context = "home",
-  onDigitModeChange,
+  onSettingsCommit,
 }: SettingsDrawerProps) {
   const { settings, setSetting } = useSettings();
   const [digitMode, setDigitMode] = useState<UnlimitedMode>("5");
 
-  // Hydrate digit mode from localStorage once the drawer can read window.
-  // Re-hydrate on each open so changes from another tab show up too.
+  // Snapshot the restart-warranting values when the drawer opens so we
+  // can compare on close to know if anything material changed. The
+  // snapshot is captured AFTER hydration via the same `open` effect
+  // that reads loadUnlimitedMode, so it always reflects the player's
+  // saved values, not the SSR defaults.
+  const initialRef = useRef<{
+    digitMode: UnlimitedMode;
+    advancedMode: boolean;
+    preselectedClues: boolean;
+  } | null>(null);
+
   useEffect(() => {
-    if (open) setDigitMode(loadUnlimitedMode());
+    if (open) {
+      const mode = loadUnlimitedMode();
+      setDigitMode(mode);
+      initialRef.current = {
+        digitMode: mode,
+        advancedMode: settings.advancedMode,
+        preselectedClues: settings.preselectedClues,
+      };
+    }
+    // settings is omitted intentionally — the snapshot must capture the
+    // values that were active at open time, not chase live changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handleDigitMode = useCallback(
-    (next: UnlimitedMode) => {
-      setDigitMode(next);
-      saveUnlimitedMode(next);
-      onDigitModeChange?.(next);
-    },
-    [onDigitModeChange],
-  );
+  const handleClose = useCallback(() => {
+    const initial = initialRef.current;
+    const dirty =
+      !!initial &&
+      !!onSettingsCommit &&
+      (initial.digitMode !== digitMode ||
+        initial.advancedMode !== settings.advancedMode ||
+        initial.preselectedClues !== settings.preselectedClues);
+    initialRef.current = null;
+    onClose();
+    if (dirty) onSettingsCommit?.();
+  }, [
+    onClose,
+    onSettingsCommit,
+    digitMode,
+    settings.advancedMode,
+    settings.preselectedClues,
+  ]);
+
+  const handleDigitMode = useCallback((next: UnlimitedMode) => {
+    setDigitMode(next);
+    saveUnlimitedMode(next);
+  }, []);
 
   const handleReset = useCallback(() => {
     const ok = window.confirm(
@@ -62,8 +99,8 @@ export function SettingsDrawer({
   const unlimitedDisabled = context === "daily";
 
   return (
-    <Modal open={open} onClose={onClose} titleId="settings-title" variant="full">
-      <div className="max-w-md mx-auto p-5 pb-24">
+    <Modal open={open} onClose={handleClose} titleId="settings-title" variant="overlay">
+      <div className="bg-surface rounded-xl border border-border shadow-2xl p-5">
         <div className="flex justify-between items-center mb-6">
           <h2 id="settings-title" className="text-xl font-semibold tracking-tight">
             Settings
@@ -71,7 +108,7 @@ export function SettingsDrawer({
           <button
             type="button"
             className="inline-flex items-center justify-center min-h-11 px-3 rounded-md text-muted hover:text-foreground active:bg-surface-2 text-sm"
-            onClick={onClose}
+            onClick={handleClose}
           >
             Close ✕
           </button>
@@ -79,7 +116,7 @@ export function SettingsDrawer({
 
         <section className="bg-surface-2/50 rounded-xl border border-border divide-y divide-border/50">
           <BinaryRow
-            label="Game length"
+            label="Number length"
             optionA={{ value: "5", text: "5-digit" }}
             optionB={{ value: "6", text: "6-digit" }}
             value={digitMode}

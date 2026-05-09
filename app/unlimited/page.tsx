@@ -80,39 +80,48 @@ export default function UnlimitedPage() {
     );
   }
 
+  const onNew = () => setSession(newSession());
+
   return (
-    <UnlimitedGame
-      // key forces a full remount (fresh reducer state, fresh effects) on "New puzzle"
-      key={session.seed}
-      session={session}
-      onNew={() => setSession(newSession())}
-      helpOpen={helpOpen}
-      setHelpOpen={setHelpOpen}
-      settingsOpen={settingsOpen}
-      setSettingsOpen={setSettingsOpen}
-      statsOpen={statsOpen}
-      setStatsOpen={setStatsOpen}
-    />
+    <>
+      <UnlimitedGame
+        // key forces a full remount (fresh reducer state, fresh effects) on "New puzzle"
+        key={session.seed}
+        session={session}
+        onNew={onNew}
+        setHelpOpen={setHelpOpen}
+        setSettingsOpen={setSettingsOpen}
+        setStatsOpen={setStatsOpen}
+      />
+      {/* Modals live ABOVE the keyed game so a session-restart triggered
+          from the drawer (digit mode change, advanced toggle, etc.) does
+          NOT remount the drawer mid-interaction. Keeping the drawer's
+          state stable across session swaps avoids the visual jitter that
+          comes from useSettings re-hydrating from defaults on each
+          remount. */}
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <SettingsDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        context="unlimited"
+        onSettingsCommit={onNew}
+      />
+      <LifetimeStatsModal open={statsOpen} onClose={() => setStatsOpen(false)} />
+    </>
   );
 }
 
 function UnlimitedGame({
   session,
   onNew,
-  helpOpen,
   setHelpOpen,
-  settingsOpen,
   setSettingsOpen,
-  statsOpen,
   setStatsOpen,
 }: {
   session: Session;
   onNew: () => void;
-  helpOpen: boolean;
   setHelpOpen: (v: boolean) => void;
-  settingsOpen: boolean;
   setSettingsOpen: (v: boolean) => void;
-  statsOpen: boolean;
   setStatsOpen: (v: boolean) => void;
 }) {
   const maxGuesses = maxGuessesForDigits(session.digits);
@@ -192,6 +201,15 @@ function UnlimitedGame({
         </Link>
         <h1 className="text-sm uppercase tracking-wider text-muted">Unlimited</h1>
         <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition"
+            onClick={onNew}
+            aria-label="Restart with a new puzzle"
+            title="Restart"
+          >
+            <RestartIcon />
+          </button>
           <button
             type="button"
             className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition"
@@ -359,22 +377,26 @@ function UnlimitedGame({
           )}
         </div>
       </div>
-
-      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <SettingsDrawer
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        context="unlimited"
-        onDigitModeChange={onNew}
-      />
-      <LifetimeStatsModal
-        open={statsOpen}
-        onClose={() => setStatsOpen(false)}
-        mode="unlimited"
-      />
     </main>
   );
 }
 
-/** Three-way segmented control for picking the unlimited variant.
- *  Mode "mix" rerolls between 5 and 6 each new puzzle (50% / 50%). */
+/** Inline SVG restart icon (Heroicons "arrow-path"). The broken-circle-
+ *  with-arrow shape reads as "restart / reload" across platforms. */
+function RestartIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-5 h-5"
+      aria-hidden
+    >
+      <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+    </svg>
+  );
+}
+

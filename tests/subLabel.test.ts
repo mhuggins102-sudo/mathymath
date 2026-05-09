@@ -76,29 +76,31 @@ describe("subLabelFor — cmp clues show symbol + player's own value", () => {
   });
 });
 
-describe("subLabelFor — Sum Delta uses exact delta (Option B)", () => {
-  it("equal: shows player's own sum", () => {
+describe("subLabelFor — Digit Sum shows target sum + signed delta", () => {
+  it("equal: shows just the target sum (= player's own)", () => {
     expect(subLabelFor("12345", { kind: "sumDelta", delta: 0 })).toEqual({
-      text: "= 15",
+      text: "15",
       className: "text-good",
     });
   });
-  it("positive delta: up-arrow + signed number", () => {
+  it("positive delta: '<targetSum> (+n)'", () => {
+    // 11111 sums to 5; delta +7 → target sum 12.
     expect(subLabelFor("11111", { kind: "sumDelta", delta: 7 })).toEqual({
-      text: "↑ +7",
+      text: "12 (+7)",
       className: "text-warn",
     });
   });
-  it("negative delta: down-arrow + signed number", () => {
+  it("negative delta: '<targetSum> (−n)'", () => {
+    // 99999 sums to 45; delta -12 → target sum 33.
     expect(subLabelFor("99999", { kind: "sumDelta", delta: -12 })).toEqual({
-      text: "↓ −12",
+      text: "33 (−12)",
       className: "text-bad",
     });
   });
 });
 
 describe("subLabelFor — other clues unchanged", () => {
-  it("Contains Digit (multi-pick sequence, per-pick green/red parts)", () => {
+  it("Contains Digit (multi-pick sequence, per-pick yellow/red parts)", () => {
     expect(
       subLabelFor("11111", {
         kind: "containsDigit",
@@ -106,8 +108,8 @@ describe("subLabelFor — other clues unchanged", () => {
       }),
     ).toEqual({
       text: "7✓",
-      className: "text-good",
-      parts: [{ text: "7✓", className: "text-good" }],
+      className: "text-warn",
+      parts: [{ text: "7✓", className: "text-warn" }],
     });
     expect(
       subLabelFor("11111", {
@@ -132,8 +134,8 @@ describe("subLabelFor — other clues unchanged", () => {
       text: "4✓ 4✓ 6✗",
       className: "text-bad",
       parts: [
-        { text: "4✓", className: "text-good" },
-        { text: "4✓", className: "text-good" },
+        { text: "4✓", className: "text-warn" },
+        { text: "4✓", className: "text-warn" },
         { text: "6✗", className: "text-bad" },
       ],
     });
