@@ -82,6 +82,40 @@ describe("deriveCertainDigits", () => {
     ).toEqual([null, null, "9", null, null]);
   });
 
+  it("captures Contains Digit greens (exact picks lock the slot)", () => {
+    // Two picks: slot 1 → green, slot 3 → yellow. Only the green
+    // promotes to certainty; yellow does not pin a slot.
+    const r: ClueResult = {
+      kind: "containsDigit",
+      picks: [
+        { slot: 1, digit: 7, present: true, exact: true },
+        { slot: 3, digit: 4, present: true, exact: false },
+      ],
+    };
+    expect(
+      deriveCertainDigits(
+        [{ guess: "27849", clueId: "containsDigit", result: r }],
+        DIGITS,
+      ),
+    ).toEqual([null, "7", null, null, null]);
+  });
+
+  it("Contains Digit reds and yellows reveal nothing", () => {
+    const r: ClueResult = {
+      kind: "containsDigit",
+      picks: [
+        { slot: 0, digit: 5, present: true, exact: false },
+        { slot: 1, digit: 6, present: false, exact: false },
+      ],
+    };
+    expect(
+      deriveCertainDigits(
+        [{ guess: "56000", clueId: "containsDigit", result: r }],
+        DIGITS,
+      ),
+    ).toEqual([null, null, null, null, null]);
+  });
+
   it("accumulates knowledge across guesses", () => {
     const history = [
       {

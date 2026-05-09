@@ -3,12 +3,14 @@ import type { LockRecord } from "./locks";
 
 /**
  * "Certain" digits: slots whose target value the player can know with
- * certainty. Four sources reveal per-slot certainty:
+ * certainty. Sources of per-slot certainty:
  *
  *   - Bullseyes: every slot where hits[i] === true (the player's
  *     guess[i] is literally the target digit at that slot).
  *   - Higher or Lower: slots where cmp[i] === "eq" (same mechanism).
  *   - Oracle: the revealed slot, with its digit.
+ *   - Contains Digit: any green (exact) pick — the player tested a
+ *     specific slot and learned the digit there matches the target.
  *   - Correctly-resolved locks from past guesses: if the player locked
  *     `digit` at `slot` and it resolved correct, target[slot] = digit.
  *
@@ -17,7 +19,9 @@ import type { LockRecord } from "./locks";
  * Within-2's `exact` flag or Thermometer's tier 0 indicates a precise
  * match, those reveals are intentionally NOT promoted to certainty so
  * neither clue effectively bundles a free Bullseye. Compositional
- * clues never reveal a specific slot.
+ * clues never reveal a specific slot (Contains Digit's exact picks
+ * are the exception — they explicitly TEST a slot, so the green
+ * outcome is a per-slot reveal, on par with Oracle).
  *
  * The returned array has length `digits`; entries are the known digit
  * (single char "0".."9") or null for slots that remain uncertain.
@@ -50,6 +54,13 @@ export function deriveCertainDigits(
         case "oracle":
           if (r.slot >= 0 && r.slot < digits) {
             out[r.slot] = String(r.digit);
+          }
+          break;
+        case "containsDigit":
+          for (const p of r.picks) {
+            if (p.exact && p.slot >= 0 && p.slot < digits) {
+              out[p.slot] = String(p.digit);
+            }
           }
           break;
         default:
