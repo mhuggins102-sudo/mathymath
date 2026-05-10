@@ -133,7 +133,16 @@ export function SettingsDrawer({
             onChange={(v) => setSetting("advancedMode", v === "hard")}
             disabled={unlimitedDisabled}
             disabledHint={unlimitedDisabled ? "Daily uses Normal rules." : undefined}
-            info="Normal: pair 1 always includes a curated round-1 clue (Digit Overlap, Elimination, Odd or Even, Contains Digit, Higher or Lower, Within 2, Oracle, or Thermometer); start with 1 lock. Hard: full deck shuffle (no curated turn-1 guarantee), start with 0 locks, and Clue Reuse is removed."
+            info={{
+              intro: "Hard mode is tougher than Normal:",
+              bullets: [
+                "Start with 0 locks instead of 1.",
+                "No guaranteed friendly opener clue on turn 1.",
+                "Clue Reuse is removed from the deck.",
+              ],
+              outro:
+                "Curated turn-1 clues in Normal are: Digit Overlap, Elimination, Odd or Even, Contains Digit, Higher or Lower, Within 2, Oracle, Thermometer.",
+            }}
           />
           <BinaryRow
             label="Clue selection"
@@ -181,6 +190,13 @@ export function SettingsDrawer({
   );
 }
 
+/** Structured info-popover body. Either a single paragraph (string)
+ *  or a richer block with intro, bulleted consequences, and an
+ *  optional trailing clarification. */
+type InfoBody =
+  | string
+  | { intro: string; bullets: string[]; outro?: string };
+
 /** Two-state binary toggle row: label on the left, segmented A/B
  *  control on the right, optional (i) info popover. Used for the
  *  enum-style settings (5/6-digit, Normal/Hard, Manual/Auto). */
@@ -199,7 +215,7 @@ function BinaryRow<T extends string>({
   optionB: { value: T; text: string };
   value: T;
   onChange: (v: T) => void;
-  info: string;
+  info: InfoBody;
   disabled?: boolean;
   disabledHint?: string;
 }) {
@@ -256,7 +272,7 @@ function ToggleRow({
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
-  info: string;
+  info: InfoBody;
   disabled?: boolean;
 }) {
   return (
@@ -293,7 +309,7 @@ function InfoPopover({
   disabledHint,
 }: {
   label: string;
-  body: string;
+  body: InfoBody;
   disabledHint?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -334,7 +350,21 @@ function InfoPopover({
       </button>
       {open && (
         <div className="absolute left-0 top-6 z-30 w-64 max-w-[calc(100vw-2rem)] bg-surface-2 border border-border rounded-lg shadow-lg p-3 text-[11px] text-muted leading-relaxed">
-          <p>{body}</p>
+          {typeof body === "string" ? (
+            <p>{body}</p>
+          ) : (
+            <>
+              <p>{body.intro}</p>
+              <ul className="mt-1.5 space-y-1 list-disc list-outside pl-4">
+                {body.bullets.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
+              </ul>
+              {body.outro && (
+                <p className="mt-1.5 text-foreground/70">{body.outro}</p>
+              )}
+            </>
+          )}
           {disabledHint && (
             <p className="mt-1 italic text-foreground/70">{disabledHint}</p>
           )}

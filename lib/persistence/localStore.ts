@@ -157,6 +157,26 @@ export function loadUnlimitedMode(): UnlimitedMode {
   return parsed.success ? parsed.data : "5";
 }
 
+// Has-seen-tutorial flag drives the first-run Help auto-open on the
+// home screen. Set the very first time the home page loads (after the
+// auto-open fires) so subsequent visits don't pop the modal again.
+
+const TUTORIAL_SEEN_KEY = "tutorialSeen";
+
+export function hasSeenTutorial(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(STORAGE_PREFIX + TUTORIAL_SEEN_KEY) === "1";
+}
+
+export function markTutorialSeen(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + TUTORIAL_SEEN_KEY, "1");
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function saveUnlimitedMode(mode: UnlimitedMode): void {
   if (typeof window === "undefined") return;
   try {

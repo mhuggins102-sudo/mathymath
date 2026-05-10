@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HelpModal } from "./HelpModal";
 import { LifetimeStatsModal } from "./LifetimeStatsModal";
+import { hasSeenTutorial, markTutorialSeen } from "@/lib/persistence/localStore";
 
 /**
  * Top-right icon cluster on the home screen: lifetime stats and
@@ -10,10 +11,23 @@ import { LifetimeStatsModal } from "./LifetimeStatsModal";
  * home screen next to the Unlimited button (since most settings are
  * Unlimited-specific anyway). The cluster aligns with the right edge
  * of the centered `max-w-md` content column.
+ *
+ * First-run UX: the very first time a player lands here (no
+ * tutorialSeen flag in localStorage), the Help modal auto-opens after
+ * a beat so a brand-new player gets oriented. We mark it seen on first
+ * mount regardless of what the player does — closing or ignoring still
+ * counts as "seen" so we don't keep popping the modal up.
  */
 export function HomeHeaderIcons() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    if (!hasSeenTutorial()) {
+      setHelpOpen(true);
+      markTutorialSeen();
+    }
+  }, []);
 
   const btn =
     "inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition text-base";

@@ -44,7 +44,7 @@ import type {
   ClueComputeContext,
 } from "@/lib/game/clues/types";
 import { directionRuns } from "@/lib/game/clues/upsAndDowns";
-import { medianValue } from "@/lib/game/clues/median";
+import { medianValue } from "@/lib/game/clues/statSummary";
 
 const DIGITS = 5;
 
@@ -171,26 +171,41 @@ function targetMatchesResult(
       }
       return true;
     }
-    case "parityBalance": {
-      const t = evenCount(target);
-      const g = evenCount(guess);
-      if (result.cmp === "eq") return t === g;
-      if (result.cmp === "gt") return t > g;
-      return t < g;
+    case "statSummary": {
+      const checkCmp = (
+        t: number,
+        g: number,
+        cmp: "lt" | "eq" | "gt",
+      ): boolean => {
+        if (cmp === "eq") return t === g;
+        if (cmp === "gt") return t > g;
+        return t < g;
+      };
+      if (
+        !checkCmp(medianValue(target), medianValue(guess), result.medianCmp)
+      )
+        return false;
+      if (!checkCmp(digitRange(target), digitRange(guess), result.rangeCmp))
+        return false;
+      return true;
     }
-    case "primeCount": {
-      const t = primeCount(target);
-      const g = primeCount(guess);
-      if (result.cmp === "eq") return t === g;
-      if (result.cmp === "gt") return t > g;
-      return t < g;
-    }
-    case "rangeCompare": {
-      const t = digitRange(target);
-      const g = digitRange(guess);
-      if (result.cmp === "eq") return t === g;
-      if (result.cmp === "gt") return t > g;
-      return t < g;
+    case "digitClass": {
+      const checkCmp = (
+        t: number,
+        g: number,
+        cmp: "lt" | "eq" | "gt",
+      ): boolean => {
+        if (cmp === "eq") return t === g;
+        if (cmp === "gt") return t > g;
+        return t < g;
+      };
+      if (!checkCmp(evenCount(target), evenCount(guess), result.evenCmp))
+        return false;
+      if (!checkCmp(primeCount(target), primeCount(guess), result.primeCmp))
+        return false;
+      if (!checkCmp(diceCount(target), diceCount(guess), result.diceCmp))
+        return false;
+      return true;
     }
     case "containsDigit": {
       // Multiset-aware: the n-th time the player picks digit X, the
@@ -206,13 +221,6 @@ function targetMatchesResult(
     }
     case "distinctDigits":
       return new Set(target).size === result.count;
-    case "median": {
-      const t = medianValue(target);
-      const g = medianValue(guess);
-      if (result.cmp === "eq") return t === g;
-      if (result.cmp === "gt") return t > g;
-      return t < g;
-    }
     case "divisibleBy": {
       // Recompute the intersection of (target ÷ d, guess ÷ d) for d in 2-9.
       const targetDivisors = DIVISIBLE_BY_DIVISORS.filter(
@@ -234,13 +242,6 @@ function targetMatchesResult(
     }
     case "totalDeviation":
       return totalDeviation(guess, target) === result.value;
-    case "diceCount": {
-      const t = diceCount(target);
-      const g = diceCount(guess);
-      if (result.cmp === "eq") return t === g;
-      if (result.cmp === "gt") return t > g;
-      return t < g;
-    }
     case "upsAndDowns": {
       const t = directionRuns(target);
       const g = directionRuns(guess);
@@ -702,12 +703,10 @@ function renderResult(result: ClueResult): string {
       return `delta=${result.delta >= 0 ? "+" : ""}${result.delta}`;
     case "digitOverlap":
       return "overlap=[" + result.mask.map((m) => (m ? "Y" : "·")).join("") + "]";
-    case "parityBalance":
-      return `target ${result.cmp} guess`;
-    case "primeCount":
-      return `target ${result.cmp} guess`;
-    case "rangeCompare":
-      return `target ${result.cmp} guess`;
+    case "statSummary":
+      return `medianCmp=${result.medianCmp} rangeCmp=${result.rangeCmp}`;
+    case "digitClass":
+      return `evenCmp=${result.evenCmp} primeCmp=${result.primeCmp} diceCmp=${result.diceCmp}`;
     case "containsDigit":
       return (
         "picks=[" +
@@ -716,15 +715,11 @@ function renderResult(result: ClueResult): string {
       );
     case "distinctDigits":
       return `count=${result.count}`;
-    case "median":
-      return `target ${result.cmp} guess`;
     case "divisibleBy":
       if (result.divisors.length > 0) return `shared=${result.divisors.join(",")}`;
       return result.targetHasAny ? "no shared divisor" : "no divisor 2-9";
     case "totalDeviation":
       return `value=${result.value}`;
-    case "diceCount":
-      return `target ${result.cmp} guess`;
     case "upsAndDowns":
       return `target ${result.cmp} guess`;
     case "bullseyeTrend":

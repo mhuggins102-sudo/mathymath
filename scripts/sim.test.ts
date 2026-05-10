@@ -85,24 +85,18 @@ function resultKey(r: ClueResult): string {
       return `SD:${r.delta}`;
     case "digitOverlap":
       return "DO:" + r.mask.map((m) => (m ? "1" : "0")).join("");
-    case "parityBalance":
-      return `PB:${r.cmp}`;
-    case "primeCount":
-      return `PC:${r.cmp}`;
-    case "rangeCompare":
-      return `RC:${r.cmp}`;
+    case "statSummary":
+      return `SS:${r.medianCmp},${r.rangeCmp}`;
+    case "digitClass":
+      return `DCL:${r.evenCmp},${r.primeCmp},${r.diceCmp}`;
     case "containsDigit":
       return `CD:${r.picks.map((p) => `${p.digit}${p.present ? "y" : "n"}${p.exact ? "x" : ""}`).join(",")}`;
     case "distinctDigits":
       return `DD:${r.count}`;
-    case "median":
-      return `M:${r.cmp}`;
     case "divisibleBy":
       return `DB:${r.divisors.join(",")}:${r.targetHasAny ? 1 : 0}`;
     case "totalDeviation":
       return `TD:${r.value}`;
-    case "diceCount":
-      return `DC:${r.cmp}`;
     case "upsAndDowns":
       return `UD:${r.cmp}`;
     case "bullseyeTrend":
