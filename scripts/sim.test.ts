@@ -86,7 +86,7 @@ function resultKey(r: ClueResult): string {
     case "digitOverlap":
       return "DO:" + r.mask.map((m) => (m ? "1" : "0")).join("");
     case "statSummary":
-      return `SS:${r.medianCmp},${r.rangeCmp}`;
+      return `SS:${r.medianCmp},${r.minCmp},${r.maxCmp}`;
     case "digitClass":
       return `DCL:${r.evenCmp},${r.primeCmp},${r.diceCmp}`;
     case "containsDigit":

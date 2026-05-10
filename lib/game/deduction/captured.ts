@@ -16,9 +16,21 @@ function _medianValue(s: string): number {
   if (n % 2 === 1) return sorted[(n - 1) / 2];
   return (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
 }
-function _digitRange(s: string): number {
-  const ds = [...s].map(Number);
-  return Math.max(...ds) - Math.min(...ds);
+function _digitMin(s: string): number {
+  let m = Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d < m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+function _digitMax(s: string): number {
+  let m = -Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d > m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
 }
 function _evenCount(s: string): number {
   let n = 0;
@@ -179,9 +191,10 @@ function migrateResult(target: string, g: RawGuess): RawGuess {
       };
     }
   }
-  // Retired 2026-05-10: Median + Digit Range merged into Stat Summary.
-  // Each old row supplies one of the two cmps; we recompute both from
-  // (guess, target) and replace.
+  // Retired 2026-05-10: Median + Digit Range merged into Stat Summary
+  // (initially as median+range, then reshaped to median+min+max). Old
+  // rows supply at most one of the cmps; we recompute the new richer
+  // result from (guess, target) and replace.
   const cidStr = g.clueId as string;
   if (cidStr === "median" || cidStr === "rangeCompare") {
     return {
@@ -190,9 +203,26 @@ function migrateResult(target: string, g: RawGuess): RawGuess {
       result: {
         kind: "statSummary",
         medianCmp: _cmpOf(_medianValue(target), _medianValue(g.guess)),
-        rangeCmp: _cmpOf(_digitRange(target), _digitRange(g.guess)),
+        minCmp: _cmpOf(_digitMin(target), _digitMin(g.guess)),
+        maxCmp: _cmpOf(_digitMax(target), _digitMax(g.guess)),
       } as ClueResult,
     };
+  }
+  // Mid-2026 the new clue had a brief `rangeCmp` shape; promote those
+  // captures to the current min/max shape by recomputing.
+  if (cidStr === "statSummary") {
+    const r = g.result as Record<string, unknown>;
+    if (r && r.kind === "statSummary" && "rangeCmp" in r && !("minCmp" in r)) {
+      return {
+        ...g,
+        result: {
+          kind: "statSummary",
+          medianCmp: _cmpOf(_medianValue(target), _medianValue(g.guess)),
+          minCmp: _cmpOf(_digitMin(target), _digitMin(g.guess)),
+          maxCmp: _cmpOf(_digitMax(target), _digitMax(g.guess)),
+        } as ClueResult,
+      };
+    }
   }
   // Retired 2026-05-10: Even / Prime / Dice Count merged into Digit Class.
   if (

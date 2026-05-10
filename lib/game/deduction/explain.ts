@@ -31,9 +31,21 @@ function diceDigitCount(s: string): number {
   }
   return n;
 }
-function digitRange(s: string): number {
-  const ds = [...s].map(Number);
-  return Math.max(...ds) - Math.min(...ds);
+function digitMin(s: string): number {
+  let m = Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d < m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+function digitMax(s: string): number {
+  let m = -Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d > m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
 }
 function totalDeviation(a: string, b: string): number {
   let v = 0;
@@ -171,21 +183,24 @@ function explainViolation(
       return null;
     }
     case "statSummary": {
-      // Combined median + range cmp. Reject the candidate target if
-      // EITHER axis disagrees with the recorded result.
+      // Three-axis box-and-whisker cmp: median, min, max. Reject the
+      // candidate target if ANY axis disagrees with the recorded result.
+      const cmpDir = (t: number, g: number): "lt" | "eq" | "gt" =>
+        t === g ? "eq" : t > g ? "gt" : "lt";
       const tm = medianValue(wrongGuess);
       const gm = medianValue(historyGuess);
-      const gotMedian: "lt" | "eq" | "gt" =
-        tm === gm ? "eq" : tm > gm ? "gt" : "lt";
-      if (gotMedian !== result.medianCmp) {
+      if (cmpDir(tm, gm) !== result.medianCmp) {
         return `${name} said the target's median is ${CMP_LABEL[result.medianCmp]} ${gm} — your guess has median ${tm}.`;
       }
-      const tr = digitRange(wrongGuess);
-      const gr = digitRange(historyGuess);
-      const gotRange: "lt" | "eq" | "gt" =
-        tr === gr ? "eq" : tr > gr ? "gt" : "lt";
-      if (gotRange !== result.rangeCmp) {
-        return `${name} said the target's digit range is ${CMP_LABEL[result.rangeCmp]} ${gr} — your guess has range ${tr}.`;
+      const tmin = digitMin(wrongGuess);
+      const gmin = digitMin(historyGuess);
+      if (cmpDir(tmin, gmin) !== result.minCmp) {
+        return `${name} said the target's smallest digit is ${CMP_LABEL[result.minCmp]} ${gmin} — your guess has min ${tmin}.`;
+      }
+      const tmax = digitMax(wrongGuess);
+      const gmax = digitMax(historyGuess);
+      if (cmpDir(tmax, gmax) !== result.maxCmp) {
+        return `${name} said the target's largest digit is ${CMP_LABEL[result.maxCmp]} ${gmax} — your guess has max ${tmax}.`;
       }
       return null;
     }

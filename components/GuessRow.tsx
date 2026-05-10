@@ -189,9 +189,22 @@ function cellStatesActive(
 // on the player's own guess so we can show the implied bound next to
 // the direction symbol, e.g. "> 3" for "target has more than your 3".
 
-function computeRange(s: string): number {
-  const ds = [...s].map(Number);
-  return Math.max(...ds) - Math.min(...ds);
+function computeMin(s: string): number {
+  let m = Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d < m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+
+function computeMax(s: string): number {
+  let m = -Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d > m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
 }
 
 function computeEvenCount(s: string): number {
@@ -288,19 +301,26 @@ export function subLabelFor(
       };
     }
     case "statSummary": {
-      // Two side-by-side reads: median cmp + range cmp. Each part keeps
-      // its own color so the player can see at a glance which axis
-      // matched and which differs.
-      const m = formatMedian(computeMedian(guess));
-      const r = computeRange(guess);
+      // Box-and-whisker reads: median, min, max. Each chip keeps its
+      // own color so the player can see at a glance which axis matched
+      // and which differs. Three full-word labels (Med / Min / Max)
+      // beat single letters here — readability outweighs the few
+      // pixels saved.
+      const med = formatMedian(computeMedian(guess));
+      const mn = computeMin(guess);
+      const mx = computeMax(guess);
       const parts = [
         {
-          text: `M${cmpSymbol(result.medianCmp)}${m}`,
+          text: `Med${cmpSymbol(result.medianCmp)}${med}`,
           className: cmpClassName(result.medianCmp),
         },
         {
-          text: `R${cmpSymbol(result.rangeCmp)}${r}`,
-          className: cmpClassName(result.rangeCmp),
+          text: `Min${cmpSymbol(result.minCmp)}${mn}`,
+          className: cmpClassName(result.minCmp),
+        },
+        {
+          text: `Max${cmpSymbol(result.maxCmp)}${mx}`,
+          className: cmpClassName(result.maxCmp),
         },
       ];
       return { text: parts.map((p) => p.text).join(" "), className: "", parts };

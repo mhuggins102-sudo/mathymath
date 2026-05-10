@@ -181,12 +181,14 @@ function targetMatchesResult(
         if (cmp === "gt") return t > g;
         return t < g;
       };
+      const dMin = (s: string): number => Math.min(...[...s].map(Number));
+      const dMax = (s: string): number => Math.max(...[...s].map(Number));
       if (
         !checkCmp(medianValue(target), medianValue(guess), result.medianCmp)
       )
         return false;
-      if (!checkCmp(digitRange(target), digitRange(guess), result.rangeCmp))
-        return false;
+      if (!checkCmp(dMin(target), dMin(guess), result.minCmp)) return false;
+      if (!checkCmp(dMax(target), dMax(guess), result.maxCmp)) return false;
       return true;
     }
     case "digitClass": {
@@ -704,7 +706,7 @@ function renderResult(result: ClueResult): string {
     case "digitOverlap":
       return "overlap=[" + result.mask.map((m) => (m ? "Y" : "·")).join("") + "]";
     case "statSummary":
-      return `medianCmp=${result.medianCmp} rangeCmp=${result.rangeCmp}`;
+      return `medianCmp=${result.medianCmp} minCmp=${result.minCmp} maxCmp=${result.maxCmp}`;
     case "digitClass":
       return `evenCmp=${result.evenCmp} primeCmp=${result.primeCmp} diceCmp=${result.diceCmp}`;
     case "containsDigit":
