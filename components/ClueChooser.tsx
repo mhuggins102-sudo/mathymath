@@ -17,10 +17,6 @@ interface ClueChooserProps {
    *  with an empty budget. Optional — falls back to "always allowed"
    *  for callers that don't track locks. */
   locksAvailable?: number;
-  /** True only on the first round of a game. Clues in the curated
-   *  round-1 set get a small ⭐ in the top-right corner so the player
-   *  can spot the friendly opener. */
-  isRound1?: boolean;
 }
 
 /**
@@ -34,7 +30,6 @@ export function ClueChooser({
   onRedraw,
   canRedraw,
   locksAvailable,
-  isRound1,
 }: ClueChooserProps) {
   const { settings, hydrated } = useSettings();
   // Don't render the description block until useSettings has read
@@ -59,8 +54,12 @@ export function ClueChooser({
             locksAvailable !== undefined &&
             locksAvailable < CLUE_REUSE_COST;
           const disabled = lockUnaffordable;
-          const showStar =
-            !!isRound1 && ROUND1_CURATED_CLUE_IDS.has(clue.id);
+          // Curated round-1 clues are flagged with a star EVERY time
+          // they appear in the chooser (not just on round 1) so the
+          // visual cue is consistent and the player can learn which
+          // clues are designed as friendly openers — useful info even
+          // when picking them on later rounds.
+          const showStar = ROUND1_CURATED_CLUE_IDS.has(clue.id);
           return (
             <button
               key={clue.id}

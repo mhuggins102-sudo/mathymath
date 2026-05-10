@@ -47,8 +47,8 @@ export const statSummaryClue: Clue<{
   weight: 1.0,
   legend: [
     { state: "match", label: "same" },
-    { state: "warm", label: "target higher / wider" },
-    { state: "cold", label: "target lower / narrower" },
+    { state: "warm", label: "target higher" },
+    { state: "cold", label: "target lower" },
   ],
   compute(guess, target) {
     return {
