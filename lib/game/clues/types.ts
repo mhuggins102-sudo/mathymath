@@ -31,9 +31,8 @@ export type ClueResult =
   // Compositional
   | { kind: "sumDelta"; delta: number } // target - guess
   | { kind: "digitOverlap"; mask: boolean[] }
-  | { kind: "parityBalance"; cmp: Cmp }
-  | { kind: "primeCount"; cmp: Cmp }
-  | { kind: "rangeCompare"; cmp: Cmp }
+  | { kind: "statSummary"; medianCmp: Cmp; rangeCmp: Cmp }
+  | { kind: "digitClass"; evenCmp: Cmp; primeCmp: Cmp; diceCmp: Cmp }
   | {
       kind: "containsDigit";
       picks: {
@@ -50,10 +49,8 @@ export type ClueResult =
       }[];
     }
   | { kind: "distinctDigits"; count: number; sharedRepeated: boolean[] }
-  | { kind: "median"; cmp: Cmp }
   | { kind: "divisibleBy"; divisors: number[]; targetHasAny: boolean }
   | { kind: "totalDeviation"; value: number }
-  | { kind: "diceCount"; cmp: Cmp }
   | { kind: "upsAndDowns"; cmp: Cmp }
   | { kind: "bullseyeTrend"; delta: number }
   | { kind: "elimination"; mask: boolean[] }

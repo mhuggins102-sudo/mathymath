@@ -1,6 +1,6 @@
 import { getClueById } from "@/lib/game/clues/registry";
 import type { ClueResult } from "@/lib/game/clues/types";
-import { medianValue } from "@/lib/game/clues/median";
+import { medianValue } from "@/lib/game/clues/statSummary";
 import { directionRuns } from "@/lib/game/clues/upsAndDowns";
 import type { DeductionPuzzle } from "./puzzles";
 
@@ -170,29 +170,49 @@ function explainViolation(
       }
       return null;
     }
-    case "parityBalance": {
-      const t = evenCount(wrongGuess);
-      const g = evenCount(historyGuess);
-      const got: "lt" | "eq" | "gt" =
-        t === g ? "eq" : t > g ? "gt" : "lt";
-      if (got === result.cmp) return null;
-      return `${name} said the target's even-digit count is ${CMP_LABEL[result.cmp]} ${g} — your guess has ${t} even.`;
+    case "statSummary": {
+      // Combined median + range cmp. Reject the candidate target if
+      // EITHER axis disagrees with the recorded result.
+      const tm = medianValue(wrongGuess);
+      const gm = medianValue(historyGuess);
+      const gotMedian: "lt" | "eq" | "gt" =
+        tm === gm ? "eq" : tm > gm ? "gt" : "lt";
+      if (gotMedian !== result.medianCmp) {
+        return `${name} said the target's median is ${CMP_LABEL[result.medianCmp]} ${gm} — your guess has median ${tm}.`;
+      }
+      const tr = digitRange(wrongGuess);
+      const gr = digitRange(historyGuess);
+      const gotRange: "lt" | "eq" | "gt" =
+        tr === gr ? "eq" : tr > gr ? "gt" : "lt";
+      if (gotRange !== result.rangeCmp) {
+        return `${name} said the target's digit range is ${CMP_LABEL[result.rangeCmp]} ${gr} — your guess has range ${tr}.`;
+      }
+      return null;
     }
-    case "primeCount": {
-      const t = primeDigitCount(wrongGuess);
-      const g = primeDigitCount(historyGuess);
-      const got: "lt" | "eq" | "gt" =
-        t === g ? "eq" : t > g ? "gt" : "lt";
-      if (got === result.cmp) return null;
-      return `${name} said the target's prime-digit count is ${CMP_LABEL[result.cmp]} ${g} — your guess has ${t} prime.`;
-    }
-    case "rangeCompare": {
-      const t = digitRange(wrongGuess);
-      const g = digitRange(historyGuess);
-      const got: "lt" | "eq" | "gt" =
-        t === g ? "eq" : t > g ? "gt" : "lt";
-      if (got === result.cmp) return null;
-      return `${name} said the target's digit range (max−min) is ${CMP_LABEL[result.cmp]} ${g} — your guess has range ${t}.`;
+    case "digitClass": {
+      // Three counts: even / prime / dice. Reject if any axis disagrees.
+      const te = evenCount(wrongGuess);
+      const ge = evenCount(historyGuess);
+      const gotEven: "lt" | "eq" | "gt" =
+        te === ge ? "eq" : te > ge ? "gt" : "lt";
+      if (gotEven !== result.evenCmp) {
+        return `${name} said the target's even-digit count is ${CMP_LABEL[result.evenCmp]} ${ge} — your guess has ${te} even.`;
+      }
+      const tp = primeDigitCount(wrongGuess);
+      const gp = primeDigitCount(historyGuess);
+      const gotPrime: "lt" | "eq" | "gt" =
+        tp === gp ? "eq" : tp > gp ? "gt" : "lt";
+      if (gotPrime !== result.primeCmp) {
+        return `${name} said the target's prime-digit count is ${CMP_LABEL[result.primeCmp]} ${gp} — your guess has ${tp} prime.`;
+      }
+      const td = diceDigitCount(wrongGuess);
+      const gd = diceDigitCount(historyGuess);
+      const gotDice: "lt" | "eq" | "gt" =
+        td === gd ? "eq" : td > gd ? "gt" : "lt";
+      if (gotDice !== result.diceCmp) {
+        return `${name} said the target's dice-digit count (1-6) is ${CMP_LABEL[result.diceCmp]} ${gd} — your guess has ${td} in 1-6.`;
+      }
+      return null;
     }
     case "containsDigit": {
       // Slot-based picks: each pick is { slot, digit, present, exact }.
@@ -224,14 +244,6 @@ function explainViolation(
       if (got === result.count) return null;
       return `${name} said the target uses ${result.count} distinct digit${result.count === 1 ? "" : "s"} — your guess uses ${got}.`;
     }
-    case "median": {
-      const t = medianValue(wrongGuess);
-      const g = medianValue(historyGuess);
-      const got: "lt" | "eq" | "gt" =
-        t === g ? "eq" : t > g ? "gt" : "lt";
-      if (got === result.cmp) return null;
-      return `${name} said the target's median digit is ${CMP_LABEL[result.cmp]} ${g} — your guess has median ${t}.`;
-    }
     case "divisibleBy": {
       // Recompute target's 2-9 divisors against the hypothesized
       // wrongGuess and intersect with historyGuess's divisors. The
@@ -258,14 +270,6 @@ function explainViolation(
       const got = totalDeviation(historyGuess, wrongGuess);
       if (got === result.value) return null;
       return `${name} said the per-slot deviation from ${historyGuess} should sum to ${result.value} — your guess sums to ${got}.`;
-    }
-    case "diceCount": {
-      const t = diceDigitCount(wrongGuess);
-      const g = diceDigitCount(historyGuess);
-      const got: "lt" | "eq" | "gt" =
-        t === g ? "eq" : t > g ? "gt" : "lt";
-      if (got === result.cmp) return null;
-      return `${name} said the target's dice-digit count (1–6) is ${CMP_LABEL[result.cmp]} ${g} — your guess has ${t} in 1–6.`;
     }
     case "upsAndDowns": {
       const t = directionRuns(wrongGuess);

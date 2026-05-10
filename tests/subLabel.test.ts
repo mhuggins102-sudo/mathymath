@@ -3,57 +3,56 @@ import { subLabelFor } from "@/components/GuessRow";
 import { isOracleWinRow } from "@/components/GuessGrid";
 
 describe("subLabelFor — cmp clues show symbol + player's own value", () => {
-  it("Digit Range (rangeCompare)", () => {
-    // guess "12345": max=5, min=1, range=4.
-    expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "eq" })).toEqual({
-      text: "= 4",
-      className: "text-good",
+  it("Stat Summary — median + range cmps with per-part coloring", () => {
+    // guess "12345": median=3, range=4.
+    expect(
+      subLabelFor("12345", {
+        kind: "statSummary",
+        medianCmp: "eq",
+        rangeCmp: "gt",
+      }),
+    ).toEqual({
+      text: "M=3 R>4",
+      className: "",
+      parts: [
+        { text: "M=3", className: "text-good" },
+        { text: "R>4", className: "text-warn" },
+      ],
     });
-    expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "gt" })).toEqual({
-      text: "> 4",
-      className: "text-warn",
-    });
-    expect(subLabelFor("12345", { kind: "rangeCompare", cmp: "lt" })).toEqual({
-      text: "< 4",
-      className: "text-bad",
-    });
-  });
-
-  it("Parity Balance", () => {
-    // guess "24680": 5 evens.
-    expect(subLabelFor("24680", { kind: "parityBalance", cmp: "eq" })).toEqual({
-      text: "= 5",
-      className: "text-good",
-    });
-    expect(subLabelFor("13579", { kind: "parityBalance", cmp: "gt" })).toEqual({
-      text: "> 0",
-      className: "text-warn",
-    });
-  });
-
-  it("Prime Count", () => {
-    // guess "23579": primes are 2,3,5,7 → 4.
-    expect(subLabelFor("23579", { kind: "primeCount", cmp: "eq" })).toEqual({
-      text: "= 4",
-      className: "text-good",
-    });
-    expect(subLabelFor("14680", { kind: "primeCount", cmp: "lt" })).toEqual({
-      // no prime digits in 14680 → 0
-      text: "< 0",
-      className: "text-bad",
+    // guess "99111": sorted [1,1,1,9,9] → median 1, range 8. Both lt.
+    expect(
+      subLabelFor("99111", {
+        kind: "statSummary",
+        medianCmp: "lt",
+        rangeCmp: "lt",
+      }),
+    ).toEqual({
+      text: "M<1 R<8",
+      className: "",
+      parts: [
+        { text: "M<1", className: "text-bad" },
+        { text: "R<8", className: "text-bad" },
+      ],
     });
   });
 
-  it("Median", () => {
-    // guess "12345" sorted = [1,2,3,4,5], median (floor(5/2)=2) → 3.
-    expect(subLabelFor("12345", { kind: "median", cmp: "eq" })).toEqual({
-      text: "= 3",
-      className: "text-good",
-    });
-    expect(subLabelFor("99111", { kind: "median", cmp: "gt" })).toEqual({
-      // sorted [1,1,1,9,9] → median index 2 → 1
-      text: "> 1",
-      className: "text-warn",
+  it("Digit Class — even / prime / dice cmps", () => {
+    // guess "24680": evens=5, primes=1 (2), dice=3 (2,4,6).
+    expect(
+      subLabelFor("24680", {
+        kind: "digitClass",
+        evenCmp: "eq",
+        primeCmp: "gt",
+        diceCmp: "lt",
+      }),
+    ).toEqual({
+      text: "E=5 P>1 D<3",
+      className: "",
+      parts: [
+        { text: "E=5", className: "text-good" },
+        { text: "P>1", className: "text-warn" },
+        { text: "D<3", className: "text-bad" },
+      ],
     });
   });
 

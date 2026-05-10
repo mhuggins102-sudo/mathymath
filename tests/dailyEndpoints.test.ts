@@ -448,16 +448,14 @@ describe("POST /api/daily/[date]/choose-clue", () => {
           "thermometer",
           "sumDelta",
           "digitOverlap",
-          "parityBalance",
-          "primeCount",
-          "rangeCompare",
+          "statSummary",
+          "digitClass",
           "containsDigit",
           "distinctDigits",
-          "median",
           "divisibleBy",
           "totalDeviation",
         ] as string[]
-      ).find((id) => !offered.has(id as never)) ?? "median";
+      ).find((id) => !offered.has(id as never)) ?? "statSummary";
     const res = await chooseClue(
       mockRequest({
         history: [],
