@@ -5,7 +5,7 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
 import { useKeyboardInput } from "@/lib/hooks/useKeyboardInput";
-import { maxGuessesForDigits } from "@/lib/game/stateMachine";
+import { maxGuessesFor } from "@/lib/game/stateMachine";
 import type { ClueId } from "@/lib/game/clues/types";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
@@ -202,7 +202,10 @@ function UnlimitedGame({
   shareLinkInvalid: boolean;
   onDismissShareLinkInvalid: () => void;
 }) {
-  const maxGuesses = maxGuessesForDigits(session.digits);
+  const maxGuesses = maxGuessesFor({
+    digits: session.digits,
+    advancedMode: session.advancedMode,
+  });
   const {
     state,
     input,

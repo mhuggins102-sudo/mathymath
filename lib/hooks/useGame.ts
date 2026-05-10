@@ -204,10 +204,17 @@ export function useGame(config: UseGameConfig): UseGameResult {
       state.status === "won",
       state.guesses.length,
       state.digits,
+      state.advancedMode ? "hard" : "normal",
     );
     statsRecordedRef.current = true;
     setUnlimitedStats(updated);
-  }, [state.status, state.guesses.length, state.digits, config.trackStats]);
+  }, [
+    state.status,
+    state.guesses.length,
+    state.digits,
+    state.advancedMode,
+    config.trackStats,
+  ]);
 
   // ----- Input + lock state ------------------------------------------------
   //

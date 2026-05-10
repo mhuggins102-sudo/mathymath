@@ -137,11 +137,12 @@ export function SettingsDrawer({
               intro: "Hard mode is tougher than Normal:",
               bullets: [
                 "Start with 0 locks instead of 1.",
+                "7 guesses instead of 8.",
                 "No guaranteed friendly opener clue on turn 1.",
                 "Clue Reuse is removed from the deck.",
               ],
               outro:
-                "Curated turn-1 clues in Normal are: Digit Overlap, Elimination, Odd or Even, Contains Digit, Higher or Lower, Within 2, Oracle, Thermometer.",
+                "Curated turn-1 clues in Normal are: Digit Overlap, Elimination, Odd or Even, Total Deviation, Higher or Lower, Within 2, Oracle, Thermometer.",
             }}
           />
           <BinaryRow
