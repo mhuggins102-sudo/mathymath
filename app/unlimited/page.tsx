@@ -5,7 +5,6 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
 import { useKeyboardInput } from "@/lib/hooks/useKeyboardInput";
-import { useSettings } from "@/lib/hooks/useSettings";
 import { maxGuessesForDigits } from "@/lib/game/stateMachine";
 import type { ClueId } from "@/lib/game/clues/types";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
@@ -21,7 +20,6 @@ import { ResourceBalance } from "@/components/ResourceBalance";
 import { loadSettings } from "@/lib/settings";
 import {
   loadUnlimitedMode,
-  saveUnlimitedMode,
   type UnlimitedMode,
 } from "@/lib/persistence/localStore";
 
@@ -204,7 +202,6 @@ function UnlimitedGame({
   shareLinkInvalid: boolean;
   onDismissShareLinkInvalid: () => void;
 }) {
-  const { settings, setSetting } = useSettings();
   const maxGuesses = maxGuessesForDigits(session.digits);
   const {
     state,
@@ -318,21 +315,6 @@ function UnlimitedGame({
         </div>
       </header>
 
-      <ModeStrip
-        digitMode={session.digits === 6 ? "6" : "5"}
-        onDigitMode={(m) => {
-          if ((m === "6" ? 6 : 5) === session.digits) return;
-          saveUnlimitedMode(m);
-          onNew();
-        }}
-        preselectedClues={settings.preselectedClues}
-        onPreselectedClues={(v) => {
-          if (v === settings.preselectedClues) return;
-          setSetting("preselectedClues", v);
-          onNew();
-        }}
-      />
-
       {shareLinkInvalid && (
         <div
           role="status"
@@ -398,7 +380,6 @@ function UnlimitedGame({
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
                 locksAvailable={locksAvailable}
-                isRound1={state.guesses.length === 0}
               />
               <ResourceBalance
                 lockBalance={hintLocks}
@@ -606,89 +587,6 @@ function LockBanner({
     >
       <span aria-hidden>🔒</span>
       <span>{text}</span>
-    </div>
-  );
-}
-
-/**
- * Compact session-mode toggles below the header. Surfaces the two
- * settings most worth toggling between games — number length and
- * clue selection — without making the player open the settings
- * drawer to discover them. Toggling triggers an immediate restart so
- * the new mode takes effect against a fresh puzzle (matches the
- * settings-drawer behavior, which restarts on close-with-changes).
- */
-function ModeStrip({
-  digitMode,
-  onDigitMode,
-  preselectedClues,
-  onPreselectedClues,
-}: {
-  digitMode: UnlimitedMode;
-  onDigitMode: (m: UnlimitedMode) => void;
-  preselectedClues: boolean;
-  onPreselectedClues: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-center gap-2 mb-3 text-[10px] uppercase tracking-wider">
-      <Segmented
-        label="Number length"
-        options={[
-          { value: "5", text: "5-digit" },
-          { value: "6", text: "6-digit" },
-        ]}
-        value={digitMode}
-        onChange={onDigitMode}
-      />
-      <Segmented
-        label="Clue selection"
-        options={[
-          { value: "manual", text: "Manual" },
-          { value: "auto", text: "Auto" },
-        ]}
-        value={preselectedClues ? "auto" : "manual"}
-        onChange={(v) => onPreselectedClues(v === "auto")}
-      />
-    </div>
-  );
-}
-
-function Segmented<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: T; text: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="grid grid-cols-2 gap-0.5 bg-surface-2 rounded-md p-0.5 text-[11px] font-semibold"
-    >
-      {options.map((opt) => {
-        const selected = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => onChange(opt.value)}
-            className={`px-2.5 py-1 rounded transition ${
-              selected
-                ? "bg-accent/80 text-background"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            {opt.text}
-          </button>
-        );
-      })}
     </div>
   );
 }

@@ -363,7 +363,6 @@ export function DailyGame({
                   options={state.pendingGuess.options}
                   onChoose={chooseClue}
                   locksAvailable={locksAvailable}
-                  isRound1={state.guesses.length === 0}
                 />
                 <ResourceBalance
                   lockBalance={hintLocks}
