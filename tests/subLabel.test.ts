@@ -3,35 +3,41 @@ import { subLabelFor } from "@/components/GuessRow";
 import { isOracleWinRow } from "@/components/GuessGrid";
 
 describe("subLabelFor — cmp clues show symbol + player's own value", () => {
-  it("Stat Summary — median + range cmps with per-part coloring", () => {
-    // guess "12345": median=3, range=4.
+  it("Stat Summary — median + min + max cmps with per-part coloring", () => {
+    // guess "12345": median=3, min=1, max=5. Mixed cmps to verify each
+    // chip renders its own value and class independently.
     expect(
       subLabelFor("12345", {
         kind: "statSummary",
         medianCmp: "eq",
-        rangeCmp: "gt",
+        minCmp: "gt",
+        maxCmp: "lt",
       }),
     ).toEqual({
-      text: "M=3 R>4",
+      text: "Med=3 Min>1 Max<5",
       className: "",
       parts: [
-        { text: "M=3", className: "text-good" },
-        { text: "R>4", className: "text-warn" },
+        { text: "Med=3", className: "text-good" },
+        { text: "Min>1", className: "text-warn" },
+        { text: "Max<5", className: "text-bad" },
       ],
     });
-    // guess "99111": sorted [1,1,1,9,9] → median 1, range 8. Both lt.
+    // guess "99111": sorted [1,1,1,9,9] → median=1, min=1, max=9.
+    // Three identical lt-cmps still produce three distinct chips.
     expect(
       subLabelFor("99111", {
         kind: "statSummary",
         medianCmp: "lt",
-        rangeCmp: "lt",
+        minCmp: "lt",
+        maxCmp: "lt",
       }),
     ).toEqual({
-      text: "M<1 R<8",
+      text: "Med<1 Min<1 Max<9",
       className: "",
       parts: [
-        { text: "M<1", className: "text-bad" },
-        { text: "R<8", className: "text-bad" },
+        { text: "Med<1", className: "text-bad" },
+        { text: "Min<1", className: "text-bad" },
+        { text: "Max<9", className: "text-bad" },
       ],
     });
   });

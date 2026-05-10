@@ -31,7 +31,7 @@ export type ClueResult =
   // Compositional
   | { kind: "sumDelta"; delta: number } // target - guess
   | { kind: "digitOverlap"; mask: boolean[] }
-  | { kind: "statSummary"; medianCmp: Cmp; rangeCmp: Cmp }
+  | { kind: "statSummary"; medianCmp: Cmp; minCmp: Cmp; maxCmp: Cmp }
   | { kind: "digitClass"; evenCmp: Cmp; primeCmp: Cmp; diceCmp: Cmp }
   | {
       kind: "containsDigit";

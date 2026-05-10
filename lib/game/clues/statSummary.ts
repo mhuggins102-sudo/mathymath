@@ -18,9 +18,22 @@ export function formatMedian(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-export function digitRange(s: string): number {
-  const ds = [...s].map(Number);
-  return Math.max(...ds) - Math.min(...ds);
+export function digitMin(s: string): number {
+  let m = Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d < m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+
+export function digitMax(s: string): number {
+  let m = -Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d > m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
 }
 
 function cmpOf(t: number, g: number): Cmp {
@@ -28,22 +41,25 @@ function cmpOf(t: number, g: number): Cmp {
 }
 
 /**
- * Stat Summary — the box-and-whisker compositional clue. Returns two
- * comparisons: the target's median digit vs the guess's, and the
- * target's digit range (max−min) vs the guess's. Replaces the
- * standalone Median and Digit Range clues with a single richer card
- * (3×3 = 9 outcomes per round vs each clue's 3 outcomes alone).
+ * Stat Summary — the box-and-whisker compositional clue. Returns three
+ * comparisons against your guess: median digit (the box's center),
+ * smallest digit (lower whisker), and largest digit (upper whisker).
+ * Replaces the standalone Median and Digit Range clues with one richer
+ * card (3³ = 27 outcomes) — and trades the old "range" axis for two
+ * independently-varying endpoints, which empirically slice the
+ * candidate space better than the derived range.
  */
 export const statSummaryClue: Clue<{
   kind: "statSummary";
   medianCmp: Cmp;
-  rangeCmp: Cmp;
+  minCmp: Cmp;
+  maxCmp: Cmp;
 }> = {
   id: "statSummary",
   name: "Stat Summary",
   category: "compositional",
   description:
-    "Two-line summary: how the target's median digit and digit range (max−min) compare to your guess's.",
+    "Box-and-whisker comparison: how the target's median, smallest, and largest digits compare to your guess's.",
   weight: 1.0,
   legend: [
     { state: "match", label: "same" },
@@ -54,7 +70,8 @@ export const statSummaryClue: Clue<{
     return {
       kind: "statSummary",
       medianCmp: cmpOf(medianValue(target), medianValue(guess)),
-      rangeCmp: cmpOf(digitRange(target), digitRange(guess)),
+      minCmp: cmpOf(digitMin(target), digitMin(guess)),
+      maxCmp: cmpOf(digitMax(target), digitMax(guess)),
     };
   },
   example(target) {
@@ -62,20 +79,18 @@ export const statSummaryClue: Clue<{
     return { guess, result: this.compute(guess, target) };
   },
   explain(guess, result) {
-    const m = formatMedian(medianValue(guess));
-    const r = digitRange(guess);
-    const mPart =
-      result.medianCmp === "eq"
-        ? `Median = ${m} (same).`
-        : result.medianCmp === "gt"
-          ? `Median > ${m}.`
-          : `Median < ${m}.`;
-    const rPart =
-      result.rangeCmp === "eq"
-        ? `Range = ${r} (same).`
-        : result.rangeCmp === "gt"
-          ? `Range > ${r}.`
-          : `Range < ${r}.`;
-    return `${mPart} ${rPart}`;
+    const med = formatMedian(medianValue(guess));
+    const mn = digitMin(guess);
+    const mx = digitMax(guess);
+    const part = (label: string, cmp: Cmp, own: string | number): string => {
+      if (cmp === "eq") return `${label} = ${own} (same)`;
+      if (cmp === "gt") return `${label} > ${own}`;
+      return `${label} < ${own}`;
+    };
+    return [
+      part("Median", result.medianCmp, med),
+      part("Min", result.minCmp, mn),
+      part("Max", result.maxCmp, mx),
+    ].join(" · ");
   },
 };

@@ -433,12 +433,24 @@ describe("Elimination", () => {
   });
 });
 
-describe("Stat Summary — median + range cmps in one card", () => {
-  it("range cmp tracks digit spread (max-min)", () => {
-    // guess 12532 range = 5-1 = 4; target 51903 range = 9-0 = 9 → gt.
-    expect(statSummaryClue.compute("12532", "51903").rangeCmp).toBe("gt");
-    expect(statSummaryClue.compute("12345", "56789").rangeCmp).toBe("eq");
-    expect(statSummaryClue.compute("19000", "12345").rangeCmp).toBe("lt");
+describe("Stat Summary — median + min + max cmps in one card", () => {
+  it("min cmp tracks the smallest digit", () => {
+    // guess 12532 min=1; target 51903 min=0 → target lt → lt.
+    expect(statSummaryClue.compute("12532", "51903").minCmp).toBe("lt");
+    // guess 12345 min=1; target 56789 min=5 → target gt → gt.
+    expect(statSummaryClue.compute("12345", "56789").minCmp).toBe("gt");
+    // guess 19000 min=0; target 12345 min=1 → target gt → gt.
+    expect(statSummaryClue.compute("19000", "12345").minCmp).toBe("gt");
+    // Equal min (both 0).
+    expect(statSummaryClue.compute("19000", "30450").minCmp).toBe("eq");
+  });
+  it("max cmp tracks the largest digit", () => {
+    // guess 12345 max=5; target 56789 max=9 → gt.
+    expect(statSummaryClue.compute("12345", "56789").maxCmp).toBe("gt");
+    // guess 19000 max=9; target 12345 max=5 → lt.
+    expect(statSummaryClue.compute("19000", "12345").maxCmp).toBe("lt");
+    // Equal max (both 5).
+    expect(statSummaryClue.compute("12345", "54321").maxCmp).toBe("eq");
   });
   it("median cmp tracks the sorted-middle digit (5-digit, integer median)", () => {
     expect(statSummaryClue.compute("12345", "54321").medianCmp).toBe("eq");
@@ -452,12 +464,14 @@ describe("Stat Summary — median + range cmps in one card", () => {
     expect(statSummaryClue.compute("123458", "023479").medianCmp).toBe("eq");
     expect(statSummaryClue.compute("345678", "012134").medianCmp).toBe("lt");
   });
-  it("returns both cmps independently", () => {
-    // 12345 → median 3, range 4. 47628 → median 6, range 6 (8-2).
-    // Target 47628 has higher median AND wider range than guess 12345.
+  it("returns all three cmps independently", () => {
+    // guess 12345: min=1, median=3, max=5.
+    // target 47628: min=2, median=6, max=8.
+    // → all three target stats are higher → all gt.
     const r = statSummaryClue.compute("12345", "47628");
     expect(r.medianCmp).toBe("gt");
-    expect(r.rangeCmp).toBe("gt");
+    expect(r.minCmp).toBe("gt");
+    expect(r.maxCmp).toBe("gt");
   });
 });
 
@@ -599,10 +613,12 @@ describe("6-digit length sanity", () => {
     expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(2);
   });
   it("Stat Summary / Digit Class / total deviation: scale with length", () => {
-    // Stat Summary — range cmp: target 247628 → max 8 - min 2 = 6;
-    // guess 555555 → 0. target wider → gt.
+    // Stat Summary — target 247628 sorted [2,2,4,6,7,8]: min=2, max=8.
+    // Guess 555555: min=5, max=5. Target min lt guess (2<5) AND target
+    // max gt guess (8>5) — fully exercises both new axes at length 6.
     const stat6 = statSummaryClue.compute(guess6, target6);
-    expect(stat6.rangeCmp).toBe("gt");
+    expect(stat6.minCmp).toBe("lt");
+    expect(stat6.maxCmp).toBe("gt");
     // Digit Class — target 247628 has 4 evens (2,4,6,2,8), 3 primes
     // (2,7,2), 4 dice digits (2,4,6,2). Guess 555555 has 0 evens,
     // 6 primes, 6 dice digits.
