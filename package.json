@@ -10,10 +10,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sim": "RUN_SIM=1 vitest run scripts/sim.test.ts --reporter=verbose",
-    "puzzleSim": "RUN_PUZZLE_SIM=1 vitest run scripts/puzzleSim.test.ts --reporter=verbose"
+    "puzzleSim": "RUN_PUZZLE_SIM=1 vitest run scripts/puzzleSim.test.ts --reporter=verbose",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare preview",
+    "deploy:cf": "opennextjs-cloudflare deploy"
   },
   "dependencies": {
-    "next": "16.2.3",
+    "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "uuid": "^13.0.0",
@@ -21,6 +24,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.10",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -32,7 +36,8 @@
     "happy-dom": "^20.9.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "wrangler": "^4.92.0"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
