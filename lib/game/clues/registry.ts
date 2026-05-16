@@ -7,15 +7,12 @@ import { oracleClue } from "./oracle";
 import { thermometerClue } from "./thermometer";
 import { sumDeltaClue } from "./sumDelta";
 import { digitOverlapClue } from "./digitOverlap";
-import { parityBalanceClue } from "./parityBalance";
-import { primeCountClue } from "./primeCount";
-import { rangeCompareClue } from "./rangeCompare";
+import { statSummaryClue } from "./statSummary";
+import { digitClassClue } from "./digitClass";
 import { containsDigitClue } from "./containsDigit";
 import { distinctDigitsClue } from "./distinctDigits";
-import { medianClue } from "./median";
 import { divisibleByClue } from "./divisibleBy";
 import { totalDeviationClue } from "./totalDeviation";
-import { diceCountClue } from "./diceCount";
 import { upsAndDownsClue } from "./upsAndDowns";
 import { bullseyeTrendClue } from "./bullseyeTrend";
 import { eliminationClue } from "./elimination";
@@ -32,6 +29,11 @@ import { clueReuseClue } from "./clueReuse";
 //     intersection size) was strictly dominated by Echo (same algorithm,
 //     mask vs. count). Echo was renamed to Digit Overlap and the count-
 //     style clue dropped.
+// Retired 2026-05-10 (low empirical info per pick under greedy-AI sim):
+//   - medianClue, rangeCompareClue → merged into statSummaryClue
+//     (one card returns both medianCmp and rangeCmp; box-and-whisker feel).
+//   - parityBalanceClue, primeCountClue, diceCountClue → merged into
+//     digitClassClue (one card returns evenCmp, primeCmp, diceCmp).
 // totalDeviationClue was briefly retired (overlaps thermometer) but put
 // back: the collapsed-to-a-number feel is different from thermometer's
 // per-slot heat grid and the chooser rhythm benefits from having it.
@@ -44,15 +46,12 @@ export const CLUES: readonly Clue[] = [
   thermometerClue,
   sumDeltaClue,
   digitOverlapClue,
-  parityBalanceClue,
-  primeCountClue,
-  rangeCompareClue,
+  statSummaryClue,
+  digitClassClue,
   containsDigitClue,
   distinctDigitsClue,
-  medianClue,
   divisibleByClue,
   totalDeviationClue,
-  diceCountClue,
   upsAndDownsClue,
   bullseyeTrendClue,
   eliminationClue,

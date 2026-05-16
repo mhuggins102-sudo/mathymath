@@ -2,24 +2,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  combinedUnlimitedStats,
   dailyHistoryStats,
   loadDailyHistory,
   loadUnlimitedStats,
+  sliceUnlimitedStats,
   type DailyHistoryStats,
   type PerDigitStats,
   type PersonalStats,
+  type StatsDifficulty,
 } from "@/lib/persistence/localStore";
 import {
   DEFAULT_MAX_GUESSES,
-  maxGuessesForDigits,
+  HARD_MAX_GUESSES,
 } from "@/lib/game/stateMachine";
 import { Modal } from "./Modal";
 
 export type StatsMode = "daily" | "unlimited" | "both";
 
-/** Filter for the unlimited block when stats are split per digit count. */
-type UnlimitedFilter = "all" | "5" | "6";
+/** Filter for the unlimited block: digit count + difficulty mode. */
+type DigitFilter = "all" | "5" | "6";
+type DifficultyFilter = "all" | StatsDifficulty;
 
 interface LifetimeStatsModalProps {
   open: boolean;
@@ -36,8 +38,9 @@ export function LifetimeStatsModal({
 }: LifetimeStatsModalProps) {
   const [daily, setDaily] = useState<DailyHistoryStats | null>(null);
   const [unlimited, setUnlimited] = useState<PersonalStats | null>(null);
-  const [unlimitedFilter, setUnlimitedFilter] =
-    useState<UnlimitedFilter>("all");
+  const [digitFilter, setDigitFilter] = useState<DigitFilter>("all");
+  const [difficultyFilter, setDifficultyFilter] =
+    useState<DifficultyFilter>("all");
 
   useEffect(() => {
     if (!open) return;
@@ -55,10 +58,12 @@ export function LifetimeStatsModal({
   const titleId = `stats-title-${mode}`;
 
   // Resolve which slice of the unlimited stats to render based on the
-  // toggle. "All" combines 5- and 6-digit; "5" / "6" pick one bucket.
-  // The chart's max-guesses cap also flexes per filter so the 5-digit
-  // view doesn't render an empty 8th row. Streaks come from the same
-  // slice so a "5-digit" view shows the streak of 5-digit-only games.
+  // two filter rows. "All" combines on either axis. The chart's
+  // max-guesses cap depends on difficulty: Hard games cap at 7 guesses
+  // (a Hard distribution shows row 7 as the last bar). When difficulty
+  // is "all" we use the looser Normal cap (8) so Normal wins fit; if
+  // the slice is purely Hard the chart trims to 7. Streaks pass through
+  // from the matching bucket(s) via sliceUnlimitedStats.
   const unlimitedView: {
     stats: PerDigitStats;
     maxGuesses: number;
@@ -72,26 +77,17 @@ export function LifetimeStatsModal({
           currentStreak: 0,
           bestStreak: 0,
         },
-        maxGuesses: maxGuessesForDigits(5),
+        maxGuesses: DEFAULT_MAX_GUESSES,
       };
     }
-    if (unlimitedFilter === "5") {
-      return {
-        stats: unlimited.byDigits["5"],
-        maxGuesses: maxGuessesForDigits(5),
-      };
-    }
-    if (unlimitedFilter === "6") {
-      return {
-        stats: unlimited.byDigits["6"],
-        maxGuesses: maxGuessesForDigits(6),
-      };
-    }
-    return {
-      stats: combinedUnlimitedStats(unlimited),
-      maxGuesses: maxGuessesForDigits(6),
-    };
-  }, [unlimited, unlimitedFilter]);
+    const stats = sliceUnlimitedStats(unlimited, {
+      digit: digitFilter,
+      difficulty: difficultyFilter,
+    });
+    const maxGuesses =
+      difficultyFilter === "hard" ? HARD_MAX_GUESSES : DEFAULT_MAX_GUESSES;
+    return { stats, maxGuesses };
+  }, [unlimited, digitFilter, difficultyFilter]);
 
   const content = (
     <>
@@ -131,10 +127,28 @@ export function LifetimeStatsModal({
             distribution={unlimitedView.stats.distribution}
             maxGuesses={unlimitedView.maxGuesses}
             header={
-              <UnlimitedFilterToggle
-                value={unlimitedFilter}
-                onChange={setUnlimitedFilter}
-              />
+              <div className="space-y-1.5 mb-3">
+                <FilterRow<DigitFilter>
+                  ariaLabel="Unlimited stats — number length filter"
+                  options={[
+                    { v: "all", label: "All" },
+                    { v: "5", label: "5-digit" },
+                    { v: "6", label: "6-digit" },
+                  ]}
+                  value={digitFilter}
+                  onChange={setDigitFilter}
+                />
+                <FilterRow<DifficultyFilter>
+                  ariaLabel="Unlimited stats — difficulty filter"
+                  options={[
+                    { v: "all", label: "All" },
+                    { v: "normal", label: "Normal" },
+                    { v: "hard", label: "Hard" },
+                  ]}
+                  value={difficultyFilter}
+                  onChange={setDifficultyFilter}
+                />
+              </div>
             }
           />
         )}
@@ -155,23 +169,24 @@ export function LifetimeStatsModal({
   );
 }
 
-function UnlimitedFilterToggle({
+/** Generic 3-option segmented filter. Used for both the digit-count
+ *  and the difficulty-mode rows in the unlimited stats block. */
+function FilterRow<T extends string>({
+  ariaLabel,
+  options,
   value,
   onChange,
 }: {
-  value: UnlimitedFilter;
-  onChange: (next: UnlimitedFilter) => void;
+  ariaLabel: string;
+  options: { v: T; label: string }[];
+  value: T;
+  onChange: (next: T) => void;
 }) {
-  const options: { v: UnlimitedFilter; label: string }[] = [
-    { v: "all", label: "All" },
-    { v: "5", label: "5-digit" },
-    { v: "6", label: "6-digit" },
-  ];
   return (
     <div
       role="radiogroup"
-      aria-label="Unlimited stats filter"
-      className="grid grid-cols-3 gap-1 bg-surface rounded-md p-1 mb-3"
+      aria-label={ariaLabel}
+      className="grid grid-cols-3 gap-1 bg-surface rounded-md p-1"
     >
       {options.map((opt) => {
         const selected = value === opt.v;

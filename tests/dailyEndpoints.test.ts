@@ -243,15 +243,24 @@ describe("POST /api/daily/[date]/submit-guess", () => {
     expect(r2SubmitRes.status).toBe(200);
     const r2SubmitBody = await r2SubmitRes.json();
     const r2OfferedIds = r2SubmitBody.options as string[];
-    // Pick the first offered clue, then commit it via choose-clue.
-    const r2Pick = r2OfferedIds[0];
-    // Skip clues that need a parameter — they'd require extra wiring.
+    // Skip clues that would distract from what this test exercises:
+    //   - paramKind clues need extra wiring (slot picks / reuse target),
+    //   - extraLock has no result payload to assert on,
+    //   - clueReuse is gated on lock budget which the prior round's
+    //     redraw already drained — picking it here would 409 with
+    //     "clue_reuse_no_budget" and that's not what we're testing.
     const safeIdx = r2OfferedIds.findIndex((id) => {
       const c = getClueById(id as never);
-      return !c.paramKind && c.id !== "extraLock";
+      return !c.paramKind && c.id !== "extraLock" && c.id !== "clueReuse";
     });
-    const pickIdx = safeIdx >= 0 ? safeIdx : 0;
-    const r2ChosenId = r2OfferedIds[pickIdx] ?? r2Pick;
+    // If no info clue is offered (deck shapes where r2 is e.g.
+    // [clueReuse, containsDigit]), prefer the first non-clueReuse so
+    // we don't trip the lock-budget gate (clueReuse costs 1 lock and
+    // the prior round's redraw already drained the budget). Last-
+    // ditch fallback is the first offered id.
+    const nonReuseIdx = r2OfferedIds.findIndex((id) => id !== "clueReuse");
+    const pickIdx = safeIdx >= 0 ? safeIdx : nonReuseIdx >= 0 ? nonReuseIdx : 0;
+    const r2ChosenId = r2OfferedIds[pickIdx] ?? r2OfferedIds[0];
     const r2ResolveRes = await chooseClue(
       mockRequest({
         history: [g1],
@@ -262,7 +271,12 @@ describe("POST /api/daily/[date]/submit-guess", () => {
     );
     expect(r2ResolveRes.status).toBe(200);
     const r2ResolveBody = await r2ResolveRes.json();
-    expect(["continue", "won"]).toContain(r2ResolveBody.kind);
+    // "continue" / "won" are the resolved-clue kinds; "needs-pick" is
+    // the partial-state response when the chosen clue is Contains
+    // Digit and a slot pick is required. All three are acceptable —
+    // the test is only verifying that round-2 choose-clue accepts the
+    // clue (doesn't 409 on clue_not_offered).
+    expect(["continue", "won", "needs-pick"]).toContain(r2ResolveBody.kind);
   });
 });
 
@@ -448,16 +462,14 @@ describe("POST /api/daily/[date]/choose-clue", () => {
           "thermometer",
           "sumDelta",
           "digitOverlap",
-          "parityBalance",
-          "primeCount",
-          "rangeCompare",
+          "statSummary",
+          "digitClass",
           "containsDigit",
           "distinctDigits",
-          "median",
           "divisibleBy",
           "totalDeviation",
         ] as string[]
-      ).find((id) => !offered.has(id as never)) ?? "median";
+      ).find((id) => !offered.has(id as never)) ?? "statSummary";
     const res = await chooseClue(
       mockRequest({
         history: [],

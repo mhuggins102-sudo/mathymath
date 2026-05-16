@@ -1,126 +1,55 @@
 /**
- * Greedy-info solver simulation, runnable under vitest.
+ * Player-chooser simulator.
  *
- * Models a "smart player" who:
- *   1. Submits any plausible remaining target as a guess (first-candidate
- *      heuristic — cheap, and a floor on performance).
- *   2. Is offered two clues by the real clueSelector (same path / weight
- *      logic as the app).
- *   3. Picks the clue that most reduces the remaining candidate set, using
- *      the expected-bucket-size heuristic (Σ|b|² / N).
- *   4. Applies the received clue result and loops.
+ * Plays N games of Regular-mode 5-digit puzzles. Each game:
+ *   1. Submits any plausible remaining target as the next guess
+ *      (first-candidate heuristic — keeps the simulation cheap and is
+ *      a lower bound on what a smart player would do).
+ *   2. Asks the real `pickTwoClues(seed, chosen)` for the round's
+ *      offered pair (matches the live deck because advancedMode
+ *      defaults to false).
+ *   3. Picks the clue that minimizes expected remaining candidates
+ *      (Σ |bucket|² / N). Ties: take the option offered first.
+ *   4. Applies the result and loops.
+ *
+ * The AI consults nothing about the clues except the sliced bucket
+ * sizes it computes against its own candidate set — no `weight`, no
+ * curated list, no hand-picked rankings. All over/under-powered
+ * verdicts come from observed play.
  *
  * Invoke:
- *   pnpm sim        # defaults: N=2000, budget=8
- *   SIM_N=5000 SIM_BUDGET=7 pnpm sim
- *
- * Output is whatever vitest streams to stdout via console.log.
+ *   pnpm sim                         # defaults: N=2000, BUDGET=8
+ *   SIM_N=5000 SIM_BUDGET=8 pnpm sim
  */
 import { describe, it, expect } from "vitest";
 import { CLUES, getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
-import { seededRng } from "@/lib/game/seededRng";
+import { knownSlotsFromHistory } from "@/lib/game/certain";
 import {
   generateDailyTarget,
   isDegenerateTarget,
 } from "@/lib/game/targetGenerator";
-import type { Clue, ClueId, ClueResult } from "@/lib/game/clues/types";
+import type {
+  Clue,
+  ClueId,
+  ClueResult,
+  ClueComputeContext,
+} from "@/lib/game/clues/types";
 
 const DIGITS = 5;
 
-/** "deck" scheme: strict P+P on top, rest shuffled, poof-discard
- *  (both cards in a pair are removed from the pool each round, so
- *  offered-but-unpicked cards never come back).
- *
- *  Seeds are derived from the game seed so two players on the same
- *  puzzle see the same deck — daily fairness is preserved. */
-function buildDeck(seed: string): ClueId[] {
-  const positional = CLUES.filter((c) => c.category === "positional");
-  const other = CLUES.filter((c) => c.category !== "positional");
+// Meta cards that don't reveal target info. The greedy AI doesn't
+// model the lock economy, so its scores for these cards are not
+// meaningful as a verdict on their design value — they're flagged in
+// the report and excluded from the empirical over/under-powered call.
+const META_CLUE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
+  "extraLock",
+  "clueReuse",
+]);
 
-  const rngP = seededRng(`deckP:${seed}`);
-  const shuffledP = fisherYates(
-    positional.map((c) => c.id),
-    rngP,
-  );
-  // Top two cards of the final deck are positional (strict pair-1
-  // guarantee). The rest of the positional deck merges with the
-  // "other" deck and gets its own shuffle.
-  const topPP = shuffledP.slice(0, 2);
-  const remainingP = shuffledP.slice(2);
-
-  const rngRest = seededRng(`deckRest:${seed}`);
-  const rest = fisherYates(
-    [...remainingP, ...other.map((c) => c.id)],
-    rngRest,
-  );
-
-  return [...topPP, ...rest];
-}
-
-function fisherYates<T>(arr: readonly T[], rng: () => number): T[] {
-  const out = arr.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
-type Scheme = "current" | "deck" | "deck_1p1c";
-
-/** Build the deck for a scheme variant that guarantees the first pair
- *  is exactly 1 positional + 1 compositional/special, shuffled within
- *  the pair. The rest of the deck is 5 remaining positional + 10
- *  remaining compositional/special, shuffled together. */
-function buildDeck1P1C(seed: string): ClueId[] {
-  const positional = CLUES.filter((c) => c.category === "positional");
-  const other = CLUES.filter((c) => c.category !== "positional");
-
-  const rngP = seededRng(`deck1p1cP:${seed}`);
-  const shuffledP = fisherYates(
-    positional.map((c) => c.id),
-    rngP,
-  );
-  const rngC = seededRng(`deck1p1cC:${seed}`);
-  const shuffledC = fisherYates(
-    other.map((c) => c.id),
-    rngC,
-  );
-
-  // Pair 1 = the two top cards (one from each deck) shuffled within
-  // the pair so the order is random even though composition is fixed.
-  const rngPair = seededRng(`deck1p1cPair:${seed}`);
-  const pair1 = fisherYates([shuffledP[0], shuffledC[0]], rngPair);
-
-  const rngRest = seededRng(`deck1p1cRest:${seed}`);
-  const rest = fisherYates(
-    [...shuffledP.slice(1), ...shuffledC.slice(1)],
-    rngRest,
-  );
-
-  return [...pair1, ...rest];
-}
-
-function pairFor(
-  scheme: Scheme,
-  seed: string,
-  chosenClueIds: readonly ClueId[],
-  roundIndex: number,
-  deck: ClueId[] | null,
-): [Clue, Clue] {
-  if (scheme === "current") {
-    return pickTwoClues(seed, chosenClueIds);
-  }
-  // deck* schemes: read positions (roundIndex*2, roundIndex*2+1) of
-  // the pre-built deck. Fall back to the last two ids if we ran off
-  // the end (shouldn't happen — deck has 17, budget ≤ 8 → max 14 draws).
-  const base = roundIndex * 2;
-  const d = deck!;
-  const aId = d[base] ?? d[d.length - 2];
-  const bId = d[base + 1] ?? d[d.length - 1];
-  return [getClueById(aId), getClueById(bId)];
-}
+// ---------------------------------------------------------------------------
+// Candidate pool
+// ---------------------------------------------------------------------------
 
 function allCandidates(): string[] {
   const out: string[] = [];
@@ -130,8 +59,13 @@ function allCandidates(): string[] {
   }
   return out;
 }
-
 const ALL = allCandidates();
+
+// ---------------------------------------------------------------------------
+// Result keying — collapse a ClueResult to a string so we can bucket
+// candidates by "produces the same result". Bucket sizes drive the
+// greedy info heuristic and the post-result candidate filter.
+// ---------------------------------------------------------------------------
 
 function resultKey(r: ClueResult): string {
   switch (r.kind) {
@@ -151,24 +85,18 @@ function resultKey(r: ClueResult): string {
       return `SD:${r.delta}`;
     case "digitOverlap":
       return "DO:" + r.mask.map((m) => (m ? "1" : "0")).join("");
-    case "parityBalance":
-      return `PB:${r.cmp}`;
-    case "primeCount":
-      return `PC:${r.cmp}`;
-    case "rangeCompare":
-      return `RC:${r.cmp}`;
+    case "statSummary":
+      return `SS:${r.medianCmp},${r.minCmp},${r.maxCmp}`;
+    case "digitClass":
+      return `DCL:${r.evenCmp},${r.primeCmp},${r.diceCmp}`;
     case "containsDigit":
-      return `CD:${r.picks.map((p) => `${p.digit}${p.present ? "y" : "n"}`).join(",")}`;
+      return `CD:${r.picks.map((p) => `${p.digit}${p.present ? "y" : "n"}${p.exact ? "x" : ""}`).join(",")}`;
     case "distinctDigits":
       return `DD:${r.count}`;
-    case "median":
-      return `M:${r.cmp}`;
     case "divisibleBy":
       return `DB:${r.divisors.join(",")}:${r.targetHasAny ? 1 : 0}`;
     case "totalDeviation":
       return `TD:${r.value}`;
-    case "diceCount":
-      return `DC:${r.cmp}`;
     case "upsAndDowns":
       return `UD:${r.cmp}`;
     case "bullseyeTrend":
@@ -182,97 +110,184 @@ function resultKey(r: ClueResult): string {
   }
 }
 
-function expectedRemaining(
+// ---------------------------------------------------------------------------
+// Greedy scoring + candidate filtering
+// ---------------------------------------------------------------------------
+
+interface SimHistoryEntry {
+  guess: string;
+  clueId: ClueId;
+  result: ClueResult;
+}
+
+function buildContext(
+  history: readonly SimHistoryEntry[],
+): ClueComputeContext {
+  const knownSlots = knownSlotsFromHistory(history, DIGITS);
+  return {
+    knownSlots,
+    priorResults: history.map((h) => h.result),
+    priorGuesses: history.map((h) => h.guess),
+  };
+}
+
+/** For every candidate target t, compute clueId(guess, t) under the
+ *  current context, bucket by resultKey, and return Σ |b|² / N — the
+ *  expected remaining-pool size if we picked this clue and saw a
+ *  uniformly-random outcome. Lower is better. */
+function expectedRemainingForClue(
   candidates: readonly string[],
   guess: string,
   clueId: ClueId,
+  context: ClueComputeContext,
 ): number {
   const clue = getClueById(clueId);
   const buckets = new Map<string, number>();
   for (const t of candidates) {
-    const r = clue.compute(guess, t);
+    const r = clue.compute(guess, t, context);
     const k = resultKey(r);
     buckets.set(k, (buckets.get(k) ?? 0) + 1);
   }
   let sum = 0;
   for (const v of buckets.values()) sum += v * v;
-  return sum / candidates.length;
+  return sum / Math.max(1, candidates.length);
 }
 
+interface ReuseScore {
+  /** Best prior clue to reuse (lowest expected-remaining). */
+  reusedId: ClueId | null;
+  /** Expected remaining if we reuse `reusedId`. Equals candidates.length
+   *  when there's no prior clue to reuse. */
+  expectedRemaining: number;
+}
+
+/** Models clueReuse: pick the prior clue that, applied to the current
+ *  guess, minimizes expected remaining candidates. With no priors,
+ *  reuse is information-empty (returns N). */
+function scoreClueReuse(
+  candidates: readonly string[],
+  guess: string,
+  context: ClueComputeContext,
+  priorPicks: readonly ClueId[],
+): ReuseScore {
+  let best: ReuseScore = {
+    reusedId: null,
+    expectedRemaining: candidates.length,
+  };
+  const seen = new Set<ClueId>();
+  for (const id of priorPicks) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (id === "clueReuse" || id === "extraLock") continue;
+    const e = expectedRemainingForClue(candidates, guess, id, context);
+    if (e < best.expectedRemaining) {
+      best = { reusedId: id, expectedRemaining: e };
+    }
+  }
+  return best;
+}
+
+/** Score for a candidate clue option in the chooser. For info clues
+ *  this is just expectedRemainingForClue. For meta clues:
+ *    - extraLock: bucket of N (no info gained).
+ *    - clueReuse: scoreClueReuse over the AI's prior picks. */
+function scoreOption(
+  candidates: readonly string[],
+  guess: string,
+  clueId: ClueId,
+  context: ClueComputeContext,
+  priorPicks: readonly ClueId[],
+): { expectedRemaining: number; reusedId?: ClueId } {
+  if (clueId === "extraLock") {
+    return { expectedRemaining: candidates.length };
+  }
+  if (clueId === "clueReuse") {
+    const r = scoreClueReuse(candidates, guess, context, priorPicks);
+    return {
+      expectedRemaining: r.expectedRemaining,
+      reusedId: r.reusedId ?? undefined,
+    };
+  }
+  return {
+    expectedRemaining: expectedRemainingForClue(
+      candidates,
+      guess,
+      clueId,
+      context,
+    ),
+  };
+}
+
+/** Filter candidates against an observed result. For info clues, keep
+ *  candidates whose recomputed resultKey matches. For meta clues:
+ *    - extraLock: no information, no filter.
+ *    - clueReuse: should never reach here — caller resolves reuse to
+ *      the underlying clue and filters by that clue's resultKey. */
 function filterByResult(
   candidates: readonly string[],
   guess: string,
   clueId: ClueId,
   result: ClueResult,
+  context: ClueComputeContext,
 ): string[] {
+  if (clueId === "extraLock") return candidates.slice();
   const clue = getClueById(clueId);
   const key = resultKey(result);
   const out: string[] = [];
   for (const t of candidates) {
-    if (resultKey(clue.compute(guess, t)) === key) out.push(t);
+    if (resultKey(clue.compute(guess, t, context)) === key) out.push(t);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// One game
+// ---------------------------------------------------------------------------
+
+interface DecisionRecord {
+  /** 1-indexed round number (chooser decisions only). */
+  round: number;
+  pickedId: ClueId;
+  otherId: ClueId;
+  /** When pickedId is "clueReuse", the underlying clue actually applied. */
+  pickedReusedId?: ClueId;
+  /** When otherId is "clueReuse", the best reuse target at evaluation. */
+  otherReusedId?: ClueId;
+  pickedExp: number;
+  otherExp: number;
+  /** log2(before / max(after, 1)). Empirical bits gained on this pick. */
+  bitsGained: number;
+  candidatesBefore: number;
+  candidatesAfter: number;
 }
 
 interface SimStats {
   won: boolean;
   guessCount: number;
   cluePicks: ClueId[];
-  reductionsByClue: Map<ClueId, number[]>;
-  /** Set of clue ids that were OFFERED (shown in a pair) this game,
-   *  regardless of whether they were picked. */
-  cluesOffered: Set<ClueId>;
-  /** Categories of the two clues offered on pair 1, in order. */
-  pair1Categories: [
-    "positional" | "compositional" | "special",
-    "positional" | "compositional" | "special",
-  ] | null;
-  /** Category of the clue the solver picked on pair 1 (null if game
-   *  ended before pair 1 was offered — rare). Used to answer "is the
-   *  P card always picked when pair 1 is mixed?". */
-  pair1Picked: "positional" | "compositional" | "special" | null;
-  /** For each chooser decision in this game: details about the two
-   *  offered clues vs. which one the greedy solver picked. */
-  decisions: Array<{
-    pickedWeight: number;
-    otherWeight: number;
-    /** Expected remaining candidate count for the chosen clue. */
-    pickedExp: number;
-    /** Expected remaining candidate count for the option NOT chosen. */
-    otherExp: number;
-  }>;
+  decisions: DecisionRecord[];
+  /** Categories of the two clues offered on pair 1, in order. Null if
+   *  the game ended before pair 1 was offered (rare). */
+  pair1Categories:
+    | ["positional" | "compositional" | "special", "positional" | "compositional" | "special"]
+    | null;
+  pair1PickedCategory: "positional" | "compositional" | "special" | null;
+  /** Set of clue ids that were OFFERED in this game. */
+  offeredIds: Set<ClueId>;
 }
 
-function playOne(
-  target: string,
-  seed: string,
-  budget: number,
-  strategy: "greedy" | "weight",
-  scheme: Scheme,
-): SimStats {
+function playOne(target: string, seed: string, budget: number): SimStats {
   let candidates = ALL.slice();
-  const chosen: ClueId[] = [];
-  const deck =
-    scheme === "deck"
-      ? buildDeck(seed)
-      : scheme === "deck_1p1c"
-        ? buildDeck1P1C(seed)
-        : null;
+  const history: SimHistoryEntry[] = [];
   const stats: SimStats = {
     won: false,
     guessCount: 0,
     cluePicks: [],
-    reductionsByClue: new Map(),
-    cluesOffered: new Set(),
-    pair1Categories: null,
-    pair1Picked: null,
     decisions: [],
+    pair1Categories: null,
+    pair1PickedCategory: null,
+    offeredIds: new Set(),
   };
-
-  // Track how many chooser decisions we've made so far — drives which
-  // slice of the deck we draw from in the "deck" scheme. (Not the same
-  // as guessIndex because an exact-match win skips the chooser.)
-  let roundIndex = 0;
 
   for (let g = 0; g < budget; g++) {
     const guess = candidates[0] ?? ALL[0];
@@ -284,311 +299,371 @@ function playOne(
     }
     if (g + 1 >= budget) return stats;
 
-    const options = pairFor(scheme, seed, chosen, roundIndex, deck);
-    roundIndex++;
-    stats.cluesOffered.add(options[0].id);
-    stats.cluesOffered.add(options[1].id);
+    const chosenSoFar = stats.cluePicks;
+    const options = pickTwoClues(seed, chosenSoFar);
+    stats.offeredIds.add(options[0].id);
+    stats.offeredIds.add(options[1].id);
     if (stats.pair1Categories === null) {
       stats.pair1Categories = [options[0].category, options[1].category];
     }
-    const e0 = expectedRemaining(candidates, guess, options[0].id);
-    const e1 = expectedRemaining(candidates, guess, options[1].id);
 
-    // Strategy determines the pick; the off-strategy metrics (pickedExp /
-    // otherExp / weight comparison) are still recorded for reporting.
-    let pickedIdx: 0 | 1;
-    if (strategy === "greedy") {
-      pickedIdx = e0 <= e1 ? 0 : 1;
-    } else {
-      // "weight" strategy: always take the lower-weight option. On ties,
-      // fall back to whichever the selector offered first (options[0]).
-      if (options[0].weight < options[1].weight) pickedIdx = 0;
-      else if (options[1].weight < options[0].weight) pickedIdx = 1;
-      else pickedIdx = 0;
-    }
+    const ctx = buildContext(history);
+    const score0 = scoreOption(candidates, guess, options[0].id, ctx, chosenSoFar);
+    const score1 = scoreOption(candidates, guess, options[1].id, ctx, chosenSoFar);
 
+    // Greedy: lower expected remaining wins. Tie → first offered (index 0).
+    const pickedIdx: 0 | 1 =
+      score0.expectedRemaining <= score1.expectedRemaining ? 0 : 1;
     const pick = options[pickedIdx];
     const other = options[1 - pickedIdx];
-    const pickedExp = pickedIdx === 0 ? e0 : e1;
-    const otherExp = pickedIdx === 0 ? e1 : e0;
-    chosen.push(pick.id);
-    stats.cluePicks.push(pick.id);
-    if (stats.pair1Picked === null && stats.pair1Categories !== null) {
-      stats.pair1Picked = pick.category;
-    }
-    stats.decisions.push({
-      pickedWeight: pick.weight,
-      otherWeight: other.weight,
-      pickedExp,
-      otherExp,
-    });
+    const pickedScore = pickedIdx === 0 ? score0 : score1;
+    const otherScore = pickedIdx === 0 ? score1 : score0;
 
-    const result = pick.compute(guess, target);
+    if (stats.pair1PickedCategory === null) {
+      stats.pair1PickedCategory = pick.category;
+    }
+
+    // Resolve the picked clue. clueReuse swaps in the best-prior clue's
+    // compute; extraLock returns its flat result and the candidate set
+    // is unchanged.
+    let appliedClue: Clue;
+    let appliedClueId: ClueId;
+    if (pick.id === "clueReuse" && pickedScore.reusedId) {
+      appliedClueId = pickedScore.reusedId;
+      appliedClue = getClueById(appliedClueId);
+    } else if (pick.id === "clueReuse") {
+      // No prior clue to reuse — fall back to extraLock's empty result.
+      // The AI shouldn't reach this in a well-formed game, but the deck
+      // can still offer clueReuse on an early round if the curated
+      // protections relax (they don't — but defense in depth).
+      appliedClueId = "extraLock";
+      appliedClue = getClueById("extraLock");
+    } else {
+      appliedClueId = pick.id;
+      appliedClue = pick;
+    }
+
+    const result = appliedClue.compute(guess, target, ctx);
     const before = candidates.length;
-    candidates = filterByResult(candidates, guess, pick.id, result);
-    const ratio = candidates.length / Math.max(1, before);
-    const arr = stats.reductionsByClue.get(pick.id) ?? [];
-    arr.push(ratio);
-    stats.reductionsByClue.set(pick.id, arr);
+    if (pick.id === "extraLock") {
+      // No filter; candidate set unchanged.
+    } else {
+      candidates = filterByResult(candidates, guess, appliedClueId, result, ctx);
+    }
+    const after = candidates.length;
+    const bits = Math.log2(Math.max(1, before) / Math.max(1, after));
+
+    stats.cluePicks.push(pick.id);
+    history.push({ guess, clueId: pick.id, result });
+
+    stats.decisions.push({
+      round: stats.decisions.length + 1,
+      pickedId: pick.id,
+      otherId: other.id,
+      pickedReusedId: pickedScore.reusedId,
+      otherReusedId: otherScore.reusedId,
+      pickedExp: pickedScore.expectedRemaining,
+      otherExp: otherScore.expectedRemaining,
+      bitsGained: bits,
+      candidatesBefore: before,
+      candidatesAfter: after,
+    });
   }
   return stats;
 }
 
-// Gated: only runs when RUN_SIM=1 (set by the `pnpm sim` script). The
-// default `pnpm test` picks up this file but the guard skips it so the
-// regular test run stays fast.
+// ---------------------------------------------------------------------------
+// Reporting helpers
+// ---------------------------------------------------------------------------
+
+function median(arr: readonly number[]): number {
+  if (arr.length === 0) return NaN;
+  const s = arr.slice().sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 === 0 ? (s[mid - 1] + s[mid]) / 2 : s[mid];
+}
+
+function quartile(arr: readonly number[], q: number): number {
+  if (arr.length === 0) return NaN;
+  const s = arr.slice().sort((a, b) => a - b);
+  const idx = Math.max(
+    0,
+    Math.min(s.length - 1, Math.floor(q * (s.length - 1))),
+  );
+  return s[idx];
+}
+
+function bar(n: number, max: number, width = 40): string {
+  if (max <= 0) return "";
+  return "█".repeat(Math.round((n / max) * width));
+}
+
+// ---------------------------------------------------------------------------
+// Main test (gated on RUN_SIM=1, set by `pnpm sim`)
+// ---------------------------------------------------------------------------
+
 const runSim = process.env.RUN_SIM === "1";
 
-describe.skipIf(!runSim)("greedy-info simulation", () => {
+describe.skipIf(!runSim)("player-chooser simulation", () => {
   it(
-    "measures win rate, guess distribution, and per-clue usefulness",
+    "5-digit Regular mode, AI picks one of two offered clues each round",
     { timeout: 600_000 },
     () => {
       const N = Number(process.env.SIM_N ?? 2000);
-      const BUDGET = Number(process.env.SIM_BUDGET ?? 7);
-      const strategyEnv = (process.env.SIM_STRATEGY ?? "greedy").toLowerCase();
-      if (strategyEnv !== "greedy" && strategyEnv !== "weight") {
-        throw new Error(
-          `SIM_STRATEGY must be "greedy" or "weight"; got ${strategyEnv}`,
-        );
-      }
-      const strategy = strategyEnv as "greedy" | "weight";
-      const schemeEnv = (process.env.SIM_SCHEME ?? "current").toLowerCase();
-      if (
-        schemeEnv !== "current" &&
-        schemeEnv !== "deck" &&
-        schemeEnv !== "deck_1p1c"
-      ) {
-        throw new Error(
-          `SIM_SCHEME must be "current" | "deck" | "deck_1p1c"; got ${schemeEnv}`,
-        );
-      }
-      const scheme = schemeEnv as Scheme;
+      const BUDGET = Number(process.env.SIM_BUDGET ?? 8);
+
       console.log(
-        `\nSimulating ${N} daily puzzles  budget=${BUDGET}  strategy=${strategy}  scheme=${scheme}`,
+        `\nSimulating ${N} games  digits=5  budget=${BUDGET}  mode=Regular  strategy=greedy info-gain`,
       );
-      if (strategy === "weight") {
-        console.log(
-          "  (always picks the lower-weight option; ties → first offered)",
-        );
-      } else {
-        console.log(
-          "  (greedy: picks whichever option most reduces the candidate set)",
-        );
-      }
-      if (scheme === "deck") {
-        console.log(
-          "  (deck: strict P+P on top, rest shuffled; offered-but-unpicked cards are discarded permanently)",
-        );
-      } else if (scheme === "deck_1p1c") {
-        console.log(
-          "  (deck_1p1c: top pair = exactly 1P+1CS shuffled; rest shuffled; poof)",
-        );
-      } else {
-        console.log(
-          "  (current: weighted random pair from not-yet-chosen pool; unpicked cards can reappear)",
-        );
-      }
       console.log(
-        `Candidate pool after degenerate filter: ${ALL.length} / 100000`,
+        `Candidate pool after degenerate filter: ${ALL.length} / ${10 ** DIGITS}`,
       );
 
-      const runStats: SimStats[] = [];
-      const globalReductions = new Map<ClueId, number[]>();
-      const pickCount = new Map<ClueId, number>();
+      const games: SimStats[] = [];
       const offeredCount = new Map<ClueId, number>();
+      const pickCount = new Map<ClueId, number>();
+      const bitsPerPick = new Map<ClueId, number[]>();
+      // Round-when-picked histogram: clueId → array of round indices.
+      const roundsPickedAt = new Map<ClueId, number[]>();
+      // For clueReuse picks, sub-attribution to the actually-reused id.
+      const reuseAppliedTo = new Map<ClueId, number>();
+      // Sequence counter (first 3 picks).
+      const seq3Count = new Map<string, number>();
 
       for (let i = 0; i < N; i++) {
         const date = `sim-${i}`;
         const target = generateDailyTarget(date, DIGITS);
-        const r = playOne(target, date, BUDGET, strategy, scheme);
-        runStats.push(r);
-        for (const id of r.cluePicks) {
-          pickCount.set(id, (pickCount.get(id) ?? 0) + 1);
-        }
-        for (const id of r.cluesOffered) {
+        const r = playOne(target, date, BUDGET);
+        games.push(r);
+        for (const id of r.offeredIds) {
           offeredCount.set(id, (offeredCount.get(id) ?? 0) + 1);
         }
-        for (const [id, ratios] of r.reductionsByClue) {
-          const cur = globalReductions.get(id) ?? [];
-          cur.push(...ratios);
-          globalReductions.set(id, cur);
+        for (const d of r.decisions) {
+          pickCount.set(d.pickedId, (pickCount.get(d.pickedId) ?? 0) + 1);
+          const arr = bitsPerPick.get(d.pickedId) ?? [];
+          arr.push(d.bitsGained);
+          bitsPerPick.set(d.pickedId, arr);
+          const rs = roundsPickedAt.get(d.pickedId) ?? [];
+          rs.push(d.round);
+          roundsPickedAt.set(d.pickedId, rs);
+          if (d.pickedId === "clueReuse" && d.pickedReusedId) {
+            reuseAppliedTo.set(
+              d.pickedReusedId,
+              (reuseAppliedTo.get(d.pickedReusedId) ?? 0) + 1,
+            );
+          }
+        }
+        const seq = r.cluePicks.slice(0, 3).join(" → ");
+        if (seq.length > 0) {
+          seq3Count.set(seq, (seq3Count.get(seq) ?? 0) + 1);
         }
       }
 
-      const wins = runStats.filter((r) => r.won);
+      // ---- Headline: histogram + win rate ------------------------------
+      const wins = games.filter((g) => g.won);
       const dist: Record<number, number> = {};
-      for (const r of wins) dist[r.guessCount] = (dist[r.guessCount] ?? 0) + 1;
-      const meanWins =
-        wins.reduce((s, r) => s + r.guessCount, 0) / Math.max(1, wins.length);
-
-      console.log("\n--- overall ---");
-      console.log(`win rate:        ${((wins.length / N) * 100).toFixed(1)}%`);
-      console.log(`mean (wins):     ${meanWins.toFixed(2)}`);
-      console.log("distribution:");
-      for (let g = 1; g <= BUDGET; g++) {
-        const n = dist[g] ?? 0;
-        const bar = "█".repeat(Math.round((n / N) * 40));
-        console.log(`  ${g}: ${String(n).padStart(5)} ${bar}`);
-      }
+      for (const g of wins) dist[g.guessCount] = (dist[g.guessCount] ?? 0) + 1;
       const losses = N - wins.length;
+      const meanWins =
+        wins.length === 0
+          ? 0
+          : wins.reduce((s, g) => s + g.guessCount, 0) / wins.length;
+
+      console.log("\n=== HISTOGRAM (guess count to win; ✕ = lost) ===");
+      console.log(`win rate: ${((wins.length / N) * 100).toFixed(1)}%   mean (wins): ${meanWins.toFixed(2)}`);
+      const maxBucket = Math.max(...Object.values(dist), losses, 1);
+      for (let k = 1; k <= BUDGET; k++) {
+        const n = dist[k] ?? 0;
+        const pct = ((n / N) * 100).toFixed(1).padStart(5);
+        console.log(
+          `  ${k}: ${String(n).padStart(5)}  ${pct}%  ${bar(n, maxBucket)}`,
+        );
+      }
       console.log(
-        `  ✕: ${String(losses).padStart(5)} ${"█".repeat(Math.round((losses / N) * 40))}`,
+        `  ✕: ${String(losses).padStart(5)}  ${((losses / N) * 100).toFixed(1).padStart(5)}%  ${bar(losses, maxBucket)}`,
       );
 
-      // Pair-1 composition — diagnostic for the "positional always on
-      // turn 1" property. Pair 1 can be 2P (two positional), 1P+1CS,
-      // or 0P (two compositional/special). The deck scheme should hit
-      // 2P on 100% of games; the current scheme hits it randomly.
+      // ---- Per-clue table ---------------------------------------------
+      console.log("\n=== PER-CLUE TABLE (sorted by avg bits per pick) ===");
+      console.log(
+        "  CAT NAME              OFFERED  PICK%   PICKS  AVGBITS  MEDBITS  TOTBITS  META",
+      );
+      const tableRows = CLUES.map((c) => {
+        const offered = offeredCount.get(c.id) ?? 0;
+        const picks = pickCount.get(c.id) ?? 0;
+        const bitsArr = bitsPerPick.get(c.id) ?? [];
+        const avgBits =
+          bitsArr.length > 0
+            ? bitsArr.reduce((s, x) => s + x, 0) / bitsArr.length
+            : 0;
+        const medBits = median(bitsArr);
+        const totBits = bitsArr.reduce((s, x) => s + x, 0);
+        return {
+          id: c.id,
+          name: c.name,
+          category: c.category,
+          offered,
+          picks,
+          pickRate: offered > 0 ? picks / offered : 0,
+          avgBits,
+          medBits: Number.isNaN(medBits) ? 0 : medBits,
+          totBits,
+          meta: META_CLUE_IDS.has(c.id),
+        };
+      }).sort((a, b) => b.avgBits - a.avgBits);
+
+      for (const r of tableRows) {
+        const cat =
+          r.category === "positional"
+            ? "P"
+            : r.category === "compositional"
+              ? "C"
+              : "S";
+        const offeredPct = `${((r.offered / N) * 100).toFixed(0)}%`.padStart(6);
+        const pickPct = `${(r.pickRate * 100).toFixed(1)}%`.padStart(6);
+        console.log(
+          `  [${cat}] ${r.name.padEnd(16)} ${offeredPct}  ${pickPct}  ${String(r.picks).padStart(5)}  ${r.avgBits.toFixed(2).padStart(6)}  ${r.medBits.toFixed(2).padStart(6)}  ${r.totBits.toFixed(0).padStart(6)}  ${r.meta ? "META" : ""}`,
+        );
+      }
+
+      // ---- Pair-1 composition -----------------------------------------
       let p1_2P = 0,
         p1_1P = 0,
         p1_0P = 0;
-      for (const r of runStats) {
-        if (!r.pair1Categories) continue;
-        const positionals = r.pair1Categories.filter(
-          (c) => c === "positional",
-        ).length;
-        if (positionals === 2) p1_2P++;
-        else if (positionals === 1) p1_1P++;
-        else p1_0P++;
+      let p1Mixed = 0,
+        p1MixedPickedP = 0;
+      for (const g of games) {
+        if (!g.pair1Categories) continue;
+        const ps = g.pair1Categories.filter((c) => c === "positional").length;
+        if (ps === 2) p1_2P++;
+        else if (ps === 1) {
+          p1_1P++;
+          p1Mixed++;
+          if (g.pair1PickedCategory === "positional") p1MixedPickedP++;
+        } else p1_0P++;
       }
-      console.log("\n--- pair-1 composition ---");
+      console.log("\n=== PAIR-1 COMPOSITION (curated round-1 set in effect) ===");
       console.log(
-        `  2 positional: ${p1_2P} / ${N} (${((p1_2P / N) * 100).toFixed(1)}%)`,
+        `  2 positional  : ${p1_2P} / ${N}  (${((p1_2P / N) * 100).toFixed(1)}%)`,
       );
       console.log(
-        `  1 positional: ${p1_1P} / ${N} (${((p1_1P / N) * 100).toFixed(1)}%)`,
+        `  1 positional  : ${p1_1P} / ${N}  (${((p1_1P / N) * 100).toFixed(1)}%)`,
       );
       console.log(
-        `  0 positional: ${p1_0P} / ${N} (${((p1_0P / N) * 100).toFixed(1)}%)`,
+        `  0 positional  : ${p1_0P} / ${N}  (${((p1_0P / N) * 100).toFixed(1)}%)`,
       );
-
-      // Pair-1 picked breakdown, restricted to mixed (1P+1CS) pairs —
-      // the interesting case. In deck_1p1c this is 100% of games, so
-      // the denominator matches N. In the current scheme it answers
-      // "when pair 1 was mixed, how often did the solver take the P?".
-      let mixedGames = 0;
-      let mixedPickedP = 0;
-      for (const r of runStats) {
-        if (!r.pair1Categories) continue;
-        const ps = r.pair1Categories.filter((c) => c === "positional").length;
-        if (ps !== 1) continue;
-        mixedGames += 1;
-        if (r.pair1Picked === "positional") mixedPickedP += 1;
-      }
-      if (mixedGames > 0) {
+      if (p1Mixed > 0) {
         console.log(
-          `  mixed pair 1 (1P+1CS): solver picked P in ${mixedPickedP}/${mixedGames} (${((mixedPickedP / mixedGames) * 100).toFixed(1)}%)`,
+          `  on mixed pair 1 (1P+1other), AI picked the positional in ${p1MixedPickedP} / ${p1Mixed}  (${((p1MixedPickedP / p1Mixed) * 100).toFixed(1)}%)`,
         );
       }
 
-      console.log(
-        "\n--- per-clue (offered rate, picks, avg remaining after pick) ---",
-      );
-      const clueLines = CLUES.map((c) => {
-        const picks = pickCount.get(c.id) ?? 0;
-        const offered = offeredCount.get(c.id) ?? 0;
-        const rs = globalReductions.get(c.id) ?? [];
-        const avgRatio =
-          rs.length === 0 ? null : rs.reduce((s, x) => s + x, 0) / rs.length;
-        return {
-          name: c.name,
-          id: c.id,
-          weight: c.weight,
-          category: c.category,
-          picks,
-          offered,
-          avgRatio,
-        };
-      });
-      clueLines.sort((a, b) => b.picks - a.picks);
-      for (const row of clueLines) {
-        const ratioStr =
-          row.avgRatio === null
-            ? "    —"
-            : `${(row.avgRatio * 100).toFixed(1)}%`.padStart(6);
-        const cat =
-          row.category === "positional"
-            ? "P"
-            : row.category === "compositional"
-              ? "C"
-              : "S";
-        const offeredPct = `${((row.offered / N) * 100).toFixed(0)}%`.padStart(
-          4,
-        );
-        console.log(
-          `  [${cat}] ${row.name.padEnd(16)} w=${row.weight.toFixed(1)}  offered=${offeredPct}  picks=${String(row.picks).padStart(5)}  remaining=${ratioStr}`,
-        );
-      }
-
-      // --- chooser meaningfulness ---
-      //
-      // For every decision the solver made, compare:
-      //   - the WEIGHT of the picked vs the unpicked option. A lower
-      //     weight = rarer = designed-as-stronger. If the solver usually
-      //     picks the lower-weight clue, the weight ranking is agreeing
-      //     with real info value in-context.
-      //   - the expected-remaining RATIO between the two. Close to 1.0
-      //     means the two options are near-equally informative (the
-      //     decision has texture); close to 0 means one crushes the
-      //     other (the choice is obvious).
-      let decisionsTotal = 0;
-      let lowerWeightPicked = 0;
-      let equalWeight = 0;
-      const closenessBuckets = {
-        "obvious (≤25%)": 0,
-        "strong (25-50%)": 0,
-        "lean (50-75%)": 0,
-        "close (75-100%]": 0,
-        "equal (ties)": 0,
-      };
-      for (const r of runStats) {
-        for (const d of r.decisions) {
-          decisionsTotal += 1;
-          if (d.pickedWeight === d.otherWeight) equalWeight += 1;
-          else if (d.pickedWeight < d.otherWeight) lowerWeightPicked += 1;
-          // closeness = smaller expected / larger expected
-          const minE = Math.min(d.pickedExp, d.otherExp);
-          const maxE = Math.max(d.pickedExp, d.otherExp);
-          if (maxE === 0) {
-            closenessBuckets["equal (ties)"] += 1;
-          } else {
-            const c = minE / maxE;
-            if (c === 1) closenessBuckets["equal (ties)"] += 1;
-            else if (c <= 0.25) closenessBuckets["obvious (≤25%)"] += 1;
-            else if (c <= 0.5) closenessBuckets["strong (25-50%)"] += 1;
-            else if (c <= 0.75) closenessBuckets["lean (50-75%)"] += 1;
-            else closenessBuckets["close (75-100%]"] += 1;
-          }
+      // ---- Per-round mean bits gained ---------------------------------
+      console.log("\n=== INFO-GAIN BY ROUND (mean bits gained on the pick) ===");
+      const roundBits = new Map<number, number[]>();
+      for (const g of games) {
+        for (const d of g.decisions) {
+          const arr = roundBits.get(d.round) ?? [];
+          arr.push(d.bitsGained);
+          roundBits.set(d.round, arr);
         }
       }
-      console.log("\n--- chooser meaningfulness ---");
-      console.log(`total decisions:         ${decisionsTotal}`);
-      const nonTie = decisionsTotal - equalWeight;
-      console.log(
-        `lower-weight option picked: ${lowerWeightPicked} / ${nonTie} non-tie (${(
-          (lowerWeightPicked / Math.max(1, nonTie)) *
-          100
-        ).toFixed(1)}%)`,
-      );
-      console.log(`equal-weight decisions:  ${equalWeight}`);
-      console.log(
-        "\n  Expected-remaining ratio (min/max) distribution:",
-      );
-      console.log(
-        "    (lower = one option crushes the other; higher = real call)",
-      );
-      for (const [label, count] of Object.entries(closenessBuckets)) {
-        const pct = ((count / Math.max(1, decisionsTotal)) * 100).toFixed(1);
-        const bar = "█".repeat(Math.round((count / decisionsTotal) * 40));
+      const maxRound = Math.max(...roundBits.keys(), 1);
+      for (let r = 1; r <= maxRound; r++) {
+        const arr = roundBits.get(r) ?? [];
+        if (arr.length === 0) continue;
+        const m = arr.reduce((s, x) => s + x, 0) / arr.length;
+        const med = median(arr);
         console.log(
-          `    ${label.padEnd(18)}  ${String(count).padStart(5)}  ${pct.padStart(5)}%  ${bar}`,
+          `  round ${r}: n=${String(arr.length).padStart(5)}  mean=${m.toFixed(2)}  median=${med.toFixed(2)}  ${bar(Math.round(m * 5), 100, 30)}`,
         );
       }
 
-      // Smoke assertion: with a real solver, we should not be winning 0%
-      // and we should not be winning 100% (either would suggest a broken
-      // clue pipeline or a degenerate sim).
+      // ---- Round-when-picked per clue ---------------------------------
+      console.log("\n=== ROUND-WHEN-PICKED HISTOGRAM (per clue, top 10 by total picks) ===");
+      const ridSorted = [...CLUES]
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          rounds: roundsPickedAt.get(c.id) ?? [],
+        }))
+        .sort((a, b) => b.rounds.length - a.rounds.length)
+        .slice(0, 10);
+      for (const row of ridSorted) {
+        if (row.rounds.length === 0) continue;
+        const counts: number[] = new Array(BUDGET + 1).fill(0);
+        for (const r of row.rounds) counts[r] = (counts[r] ?? 0) + 1;
+        const segs = counts
+          .map((n, i) =>
+            n > 0 ? `r${i}:${n}` : null,
+          )
+          .filter((v): v is string => v !== null && !v.startsWith("r0:"));
+        console.log(
+          `  ${row.name.padEnd(16)} (${row.rounds.length} picks):  ${segs.join("  ")}`,
+        );
+      }
+
+      // ---- Top first-3 pick sequences ---------------------------------
+      console.log("\n=== TOP FIRST-3 PICK SEQUENCES ===");
+      const seqs = [...seq3Count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+      for (const [seq, n] of seqs) {
+        const pct = ((n / N) * 100).toFixed(1);
+        console.log(`  ${String(n).padStart(4)}  ${pct.padStart(5)}%   ${seq}`);
+      }
+
+      // ---- clueReuse sub-attribution ----------------------------------
+      const reuseRows = [...reuseAppliedTo.entries()].sort(
+        (a, b) => b[1] - a[1],
+      );
+      if (reuseRows.length > 0) {
+        console.log("\n=== clueReuse SUB-ATTRIBUTION (which clue the AI re-applied) ===");
+        for (const [id, n] of reuseRows) {
+          console.log(
+            `  ${getClueById(id).name.padEnd(16)} ${String(n).padStart(5)}`,
+          );
+        }
+      }
+
+      // ---- Over/underpowered verdict (info clues only) ----------------
+      const infoRows = tableRows.filter(
+        (r) => !r.meta && (r.picks > 0 || r.offered > 0),
+      );
+      const bitsArr = infoRows.map((r) => r.avgBits);
+      const pickRateArr = infoRows.map((r) => r.pickRate);
+      const bitsHi = quartile(bitsArr, 0.75);
+      const bitsLo = quartile(bitsArr, 0.25);
+      const pickHi = quartile(pickRateArr, 0.75);
+      const pickLo = quartile(pickRateArr, 0.25);
+
+      const overpowered = infoRows.filter(
+        (r) => r.avgBits >= bitsHi && r.pickRate >= pickHi,
+      );
+      const underpowered = infoRows.filter(
+        (r) => r.avgBits <= bitsLo && r.pickRate <= pickLo,
+      );
+      console.log("\n=== EMPIRICAL VERDICT (info clues only — meta cards excluded) ===");
+      console.log(
+        `  thresholds: avg-bits  Q1=${bitsLo.toFixed(2)}  Q3=${bitsHi.toFixed(2)};  pick-rate  Q1=${(pickLo * 100).toFixed(1)}%  Q3=${(pickHi * 100).toFixed(1)}%`,
+      );
+      console.log("  OVERPOWERED (top quartile on BOTH avg bits and pick rate):");
+      if (overpowered.length === 0) console.log("    (none)");
+      for (const r of overpowered) {
+        console.log(
+          `    ${r.name.padEnd(16)}  avgBits=${r.avgBits.toFixed(2)}  pickRate=${(r.pickRate * 100).toFixed(1)}%`,
+        );
+      }
+      console.log("  UNDERPOWERED (bottom quartile on BOTH avg bits and pick rate):");
+      if (underpowered.length === 0) console.log("    (none)");
+      for (const r of underpowered) {
+        console.log(
+          `    ${r.name.padEnd(16)}  avgBits=${r.avgBits.toFixed(2)}  pickRate=${(r.pickRate * 100).toFixed(1)}%`,
+        );
+      }
+      console.log(
+        "  meta cards (extraLock, clueReuse): skipped — value comes from the lock economy, which the greedy AI does not model.",
+      );
+
+      // Sanity: not 0% wins, not 100% wins.
       expect(wins.length / N).toBeGreaterThan(0.05);
       expect(wins.length / N).toBeLessThan(0.999);
     },

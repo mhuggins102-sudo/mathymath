@@ -8,17 +8,36 @@ import { deriveCertainDigits, knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
 export const DEFAULT_MAX_GUESSES = 7;
+/** Hard mode shares the same 7-turn budget as Regular — the difficulty
+ *  delta lives in its other handicaps (0 starting locks, no curated
+ *  opener, Clue Reuse removed). Kept as a separate constant so callers
+ *  using maxGuessesFor() still resolve mode-aware budgets cleanly. */
+export const HARD_MAX_GUESSES = 7;
 
-/** Per-digit-count guess budgets. Both 5- and 6-digit games get 7
- *  tries — the 6-digit puzzle is harder by design without an extended
- *  budget. Returns DEFAULT_MAX_GUESSES for any unlisted digit count. */
+/** Per-digit-count guess budgets for Regular mode. Both 5- and 6-digit
+ *  games get 7 tries — the 6-digit puzzle is harder by design without
+ *  an extended budget. Hard mode is handled separately by
+ *  maxGuessesFor(); this map is the Regular-mode lookup only. */
 export const MAX_GUESSES_BY_DIGITS: Readonly<Record<number, number>> = {
-  5: 7,
-  6: 7,
+  5: DEFAULT_MAX_GUESSES,
+  6: DEFAULT_MAX_GUESSES,
 };
 
+/** Regular-mode budget by digit count. Kept for backward compatibility
+ *  with daily callers (daily is always Regular). New callers that know
+ *  whether they're in Hard mode should prefer maxGuessesFor() below. */
 export function maxGuessesForDigits(digits: number): number {
   return MAX_GUESSES_BY_DIGITS[digits] ?? DEFAULT_MAX_GUESSES;
+}
+
+/** Mode-aware budget. Hard mode collapses to HARD_MAX_GUESSES regardless
+ *  of digit count; Regular mode falls back to the digit-count map. */
+export function maxGuessesFor(params: {
+  digits: number;
+  advancedMode: boolean;
+}): number {
+  if (params.advancedMode) return HARD_MAX_GUESSES;
+  return maxGuessesForDigits(params.digits);
 }
 
 export type GameStatus = "playing" | "won" | "lost";

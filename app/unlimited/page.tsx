@@ -5,7 +5,7 @@ import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
 import { useKeyboardInput } from "@/lib/hooks/useKeyboardInput";
-import { maxGuessesForDigits } from "@/lib/game/stateMachine";
+import { maxGuessesFor } from "@/lib/game/stateMachine";
 import type { ClueId } from "@/lib/game/clues/types";
 import { generateRandomTarget } from "@/lib/game/targetGenerator";
 import { GuessGrid } from "@/components/GuessGrid";
@@ -59,23 +59,38 @@ function newSession(): Session {
   };
 }
 
-/** If the URL carries a shared puzzle (?t=…&s=…), reconstruct that
- *  exact session so the recipient plays the same target with the
- *  same seed-driven clue order. Returns null when no valid params
- *  are present so the caller can fall back to a fresh random session. */
-function sessionFromUrl(): Session | null {
-  if (typeof window === "undefined") return null;
+/** Result of parsing a shared puzzle URL. `ok` carries the
+ *  reconstructed session; `invalid` signals that share params were
+ *  present but malformed (caller should surface an inline error
+ *  alongside the fresh fallback session). `none` means no share
+ *  params at all. */
+type SharedFromUrl =
+  | { kind: "ok"; session: Session }
+  | { kind: "invalid" }
+  | { kind: "none" };
+
+/** Parse share params from the current URL. Returns one of:
+ *  - "none": no share params present (start fresh, no message)
+ *  - "ok":   valid share params (use that session)
+ *  - "invalid": params present but malformed (start fresh AND show
+ *    an inline notice so the player knows the link was broken). */
+function sessionFromUrl(): SharedFromUrl {
+  if (typeof window === "undefined") return { kind: "none" };
   const params = new URLSearchParams(window.location.search);
   const t = params.get("t");
   const s = params.get("s");
-  if (!t || !s) return null;
-  if (!/^[0-9]{5,6}$/.test(t)) return null;
+  if (!t && !s) return { kind: "none" };
+  if (!t || !s) return { kind: "invalid" };
+  if (!/^[0-9]{5,6}$/.test(t)) return { kind: "invalid" };
   return {
-    target: t,
-    seed: s,
-    digits: t.length,
-    advancedMode: params.get("adv") === "1",
-    preselectedClues: params.get("pre") === "1",
+    kind: "ok",
+    session: {
+      target: t,
+      seed: s,
+      digits: t.length,
+      advancedMode: params.get("adv") === "1",
+      preselectedClues: params.get("pre") === "1",
+    },
   };
 }
 
@@ -97,11 +112,25 @@ export default function UnlimitedPage() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [shareLinkInvalid, setShareLinkInvalid] = useState(false);
 
   // Hydrate the saved mode preference on first paint and start the
-  // first session against it. A shared-puzzle URL takes precedence.
+  // first session against it. A shared-puzzle URL takes precedence;
+  // a malformed one surfaces an inline notice and falls back fresh.
   useEffect(() => {
-    setSession(sessionFromUrl() ?? newSession());
+    const parsed = sessionFromUrl();
+    if (parsed.kind === "ok") {
+      setSession(parsed.session);
+    } else {
+      if (parsed.kind === "invalid") {
+        setShareLinkInvalid(true);
+        // Strip the bad params so a refresh doesn't keep the warning.
+        if (typeof window !== "undefined" && window.location.search) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      }
+      setSession(newSession());
+    }
   }, []);
 
   if (!session) {
@@ -131,6 +160,8 @@ export default function UnlimitedPage() {
         setHelpOpen={setHelpOpen}
         setSettingsOpen={setSettingsOpen}
         setStatsOpen={setStatsOpen}
+        shareLinkInvalid={shareLinkInvalid}
+        onDismissShareLinkInvalid={() => setShareLinkInvalid(false)}
       />
       {/* Modals live ABOVE the keyed game so a session-restart triggered
           from the drawer (digit mode change, advanced toggle, etc.) does
@@ -160,14 +191,21 @@ function UnlimitedGame({
   setHelpOpen,
   setSettingsOpen,
   setStatsOpen,
+  shareLinkInvalid,
+  onDismissShareLinkInvalid,
 }: {
   session: Session;
   onNew: () => void;
   setHelpOpen: (v: boolean) => void;
   setSettingsOpen: (v: boolean) => void;
   setStatsOpen: (v: boolean) => void;
+  shareLinkInvalid: boolean;
+  onDismissShareLinkInvalid: () => void;
 }) {
-  const maxGuesses = maxGuessesForDigits(session.digits);
+  const maxGuesses = maxGuessesFor({
+    digits: session.digits,
+    advancedMode: session.advancedMode,
+  });
   const {
     state,
     input,
@@ -280,6 +318,23 @@ function UnlimitedGame({
         </div>
       </header>
 
+      {shareLinkInvalid && (
+        <div
+          role="status"
+          className="mb-2 flex items-start justify-between gap-2 rounded-md border border-bad/40 bg-bad/10 px-3 py-2 text-[12px] text-bad"
+        >
+          <span>That puzzle link wasn&apos;t valid — started a fresh game.</span>
+          <button
+            type="button"
+            onClick={onDismissShareLinkInvalid}
+            aria-label="Dismiss"
+            className="text-bad/80 hover:text-bad"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col">
         <GuessGrid
           state={{ ...state, maxGuesses }}
@@ -323,11 +378,11 @@ function UnlimitedGame({
                   line as the balance column) rather than as a full-
                   width button under the chooser cards. The chooser
                   itself just shows the two clue cards. */}
+              <RedrawToast redraws={state.pendingGuess.redraws} />
               <ClueChooser
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
                 locksAvailable={locksAvailable}
-                isRound1={state.guesses.length === 0}
               />
               <ResourceBalance
                 lockBalance={hintLocks}
@@ -349,6 +404,12 @@ function UnlimitedGame({
             </>
           ) : state.status === "playing" ? (
             <>
+              {lockMode && (
+                <LockBanner
+                  unlockMode={unlockMode}
+                  canCommit={canCommitPendingLock}
+                />
+              )}
               <Keypad
                 onDigit={appendDigit}
                 onBackspace={backspace}
@@ -467,6 +528,69 @@ function ShareButton({ session }: { session: Session }) {
     >
       {feedback === "copied" ? "Copied!" : "Share"}
     </button>
+  );
+}
+
+/**
+ * Brief acknowledgement chip that flashes above the chooser cards
+ * after a redraw fires. Without this the redraw is silent: a player
+ * who taps Redraw and immediately picks a clue might not realize
+ * they spent a lock. The chip self-dismisses after ~1.8s; a fresh
+ * redraw resets the countdown so chained redraws read as multiple
+ * pulses on a single chip.
+ */
+function RedrawToast({ redraws }: { redraws: number }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (redraws <= 0) return;
+    setVisible(true);
+    const t = window.setTimeout(() => setVisible(false), 1800);
+    return () => window.clearTimeout(t);
+  }, [redraws]);
+  if (!visible || redraws <= 0) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="w-full max-w-md mx-auto mb-2 flex items-center justify-center gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-1.5 text-[12px] font-medium text-warn pop"
+    >
+      <span aria-hidden>↻</span>
+      <span>
+        Redrawn — spent 🔒×1{redraws > 1 ? ` (×${redraws} this round)` : ""}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Lock-mode banner that sits directly above the keypad while the
+ * player is in the middle of locking a slot. Pulls the affordance
+ * into the eye's main scan path (the keypad area) so a small phone
+ * doesn't have to scroll the hint text — the existing
+ * ResourceBalance hint stays in place below as the longer-form
+ * reminder.
+ */
+function LockBanner({
+  unlockMode,
+  canCommit,
+}: {
+  unlockMode: boolean;
+  canCommit: boolean;
+}) {
+  const text = unlockMode
+    ? "Press Unlock to remove this lock"
+    : canCommit
+      ? "Press Lock to commit"
+      : "Pick a digit, then press Lock";
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="w-full max-w-md mx-auto mb-2 flex items-center justify-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-[12px] font-medium text-accent"
+    >
+      <span aria-hidden>🔒</span>
+      <span>{text}</span>
+    </div>
   );
 }
 

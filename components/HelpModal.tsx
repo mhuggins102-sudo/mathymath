@@ -30,13 +30,15 @@ interface HelpModalProps {
 const EXAMPLE_TARGET = "47628";
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
-  // Mutually-exclusive accordion state. "The basics" starts open;
-  // opening any other section closes the previous one, and clicking
-  // the open one again collapses everything. Reset on every
-  // modal-open so the player always lands on the same first section.
-  const [openSection, setOpenSection] = useState<AccordionId | null>("basics");
+  // Mutually-exclusive accordion state. All sections start collapsed
+  // so the modal opens to a clean overview the player can scan; they
+  // expand whichever section they want. Opening any other section
+  // closes the previous one, and clicking the open one again
+  // collapses everything. Reset on every modal-open so the player
+  // always lands on the same all-collapsed state.
+  const [openSection, setOpenSection] = useState<AccordionId | null>(null);
   useEffect(() => {
-    if (open) setOpenSection("basics");
+    if (open) setOpenSection(null);
   }, [open]);
   const toggleSection = (id: AccordionId) =>
     setOpenSection((cur) => (cur === id ? null : id));

@@ -185,6 +185,7 @@ describe("deriveCertainDigits", () => {
         result: {
           kind: "within2" as const,
           mask: [true, true, true, true, true],
+          exact: [false, false, false, false, false],
         },
       },
       {

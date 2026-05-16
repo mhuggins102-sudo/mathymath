@@ -207,6 +207,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       state.status === "won",
       state.guesses.length,
       state.digits,
+      state.advancedMode ? "hard" : "normal",
     );
     statsRecordedRef.current = true;
     setUnlimitedStats(updated);

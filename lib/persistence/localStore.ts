@@ -157,6 +157,26 @@ export function loadUnlimitedMode(): UnlimitedMode {
   return parsed.success ? parsed.data : "5";
 }
 
+// Has-seen-tutorial flag drives the first-run Help auto-open on the
+// home screen. Set the very first time the home page loads (after the
+// auto-open fires) so subsequent visits don't pop the modal again.
+
+const TUTORIAL_SEEN_KEY = "tutorialSeen";
+
+export function hasSeenTutorial(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(STORAGE_PREFIX + TUTORIAL_SEEN_KEY) === "1";
+}
+
+export function markTutorialSeen(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + TUTORIAL_SEEN_KEY, "1");
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function saveUnlimitedMode(mode: UnlimitedMode): void {
   if (typeof window === "undefined") return;
   try {
@@ -223,8 +243,30 @@ const personalStatsV3Schema = z.object({
   }),
 });
 
+/** v4 splits each per-digit bucket into Normal vs Hard so the stats UI
+ *  can filter on difficulty. v3 data migrates everything into the
+ *  `normal` slot — Hard mode existed before v4 but wasn't tracked
+ *  separately, so we lose that distinction for legacy plays. New
+ *  plays after the migration are tagged correctly. */
+const perDigitByModeSchema = z.object({
+  normal: perDigitStatsSchema,
+  hard: perDigitStatsSchema,
+});
+
+const personalStatsV4Schema = z.object({
+  version: z.literal(4),
+  currentStreak: z.number(),
+  bestStreak: z.number(),
+  byDigits: z.object({
+    "5": perDigitByModeSchema,
+    "6": perDigitByModeSchema,
+  }),
+});
+
 export type PerDigitStats = z.infer<typeof perDigitStatsSchema>;
-export type PersonalStats = z.infer<typeof personalStatsV3Schema>;
+export type PerDigitByMode = z.infer<typeof perDigitByModeSchema>;
+export type PersonalStats = z.infer<typeof personalStatsV4Schema>;
+export type StatsDifficulty = "normal" | "hard";
 
 const STATS_KEY_UNLIMITED = "stats:unlimited";
 
@@ -238,46 +280,75 @@ function emptyPerDigit(): PerDigitStats {
   };
 }
 
-function emptyStats(): PersonalStats {
-  return {
-    version: 3,
-    currentStreak: 0,
-    bestStreak: 0,
-    byDigits: { "5": emptyPerDigit(), "6": emptyPerDigit() },
-  };
+function emptyPerDigitByMode(): PerDigitByMode {
+  return { normal: emptyPerDigit(), hard: emptyPerDigit() };
 }
 
-/** v1 → v3: predates 6-digit; bucket everything as 5-digit and copy the
- *  global streaks into the 5-digit slot too (those games WERE the
- *  global streak at the time). */
-function migrateV1(v1: z.infer<typeof personalStatsV1Schema>): PersonalStats {
+function emptyStats(): PersonalStats {
   return {
-    version: 3,
-    currentStreak: v1.currentStreak,
-    bestStreak: v1.bestStreak,
+    version: 4,
+    currentStreak: 0,
+    bestStreak: 0,
     byDigits: {
-      "5": {
-        played: v1.played,
-        wins: v1.wins,
-        distribution: v1.distribution,
-        currentStreak: v1.currentStreak,
-        bestStreak: v1.bestStreak,
-      },
-      "6": emptyPerDigit(),
+      "5": emptyPerDigitByMode(),
+      "6": emptyPerDigitByMode(),
     },
   };
 }
 
-/** v2 → v3: keep global streaks; per-bucket streaks default to 0
- *  because the v2 schema didn't track them and we can't reconstruct. */
+/** v1 → v4: predates 6-digit AND difficulty split; bucket everything
+ *  into the 5-digit Normal slot, copy global streaks. */
+function migrateV1(v1: z.infer<typeof personalStatsV1Schema>): PersonalStats {
+  const slot: PerDigitStats = {
+    played: v1.played,
+    wins: v1.wins,
+    distribution: v1.distribution,
+    currentStreak: v1.currentStreak,
+    bestStreak: v1.bestStreak,
+  };
+  return {
+    version: 4,
+    currentStreak: v1.currentStreak,
+    bestStreak: v1.bestStreak,
+    byDigits: {
+      "5": { normal: slot, hard: emptyPerDigit() },
+      "6": emptyPerDigitByMode(),
+    },
+  };
+}
+
+/** v2 → v4: keep global streaks; per-bucket streaks default to 0;
+ *  legacy plays land in Normal (Hard wasn't separately tracked). */
 function migrateV2(v2: z.infer<typeof personalStatsV2Schema>): PersonalStats {
   return {
-    version: 3,
+    version: 4,
     currentStreak: v2.currentStreak,
     bestStreak: v2.bestStreak,
     byDigits: {
-      "5": { ...v2.byDigits["5"], currentStreak: 0, bestStreak: 0 },
-      "6": { ...v2.byDigits["6"], currentStreak: 0, bestStreak: 0 },
+      "5": {
+        normal: { ...v2.byDigits["5"], currentStreak: 0, bestStreak: 0 },
+        hard: emptyPerDigit(),
+      },
+      "6": {
+        normal: { ...v2.byDigits["6"], currentStreak: 0, bestStreak: 0 },
+        hard: emptyPerDigit(),
+      },
+    },
+  };
+}
+
+/** v3 → v4: keep streaks; legacy per-digit stats land in Normal. Old
+ *  Hard-mode plays counted in v3's per-digit bucket are not separable
+ *  retroactively, so they stay merged into Normal — acceptable since
+ *  Hard is a small minority of plays in practice. */
+function migrateV3(v3: z.infer<typeof personalStatsV3Schema>): PersonalStats {
+  return {
+    version: 4,
+    currentStreak: v3.currentStreak,
+    bestStreak: v3.bestStreak,
+    byDigits: {
+      "5": { normal: v3.byDigits["5"], hard: emptyPerDigit() },
+      "6": { normal: v3.byDigits["6"], hard: emptyPerDigit() },
     },
   };
 }
@@ -292,9 +363,11 @@ export function loadUnlimitedStats(): PersonalStats {
   } catch {
     return emptyStats();
   }
-  // Try v3, then v2, then v1, then give up.
+  // Try v4, then v3, v2, v1, then give up.
+  const asV4 = personalStatsV4Schema.safeParse(parsed);
+  if (asV4.success) return asV4.data;
   const asV3 = personalStatsV3Schema.safeParse(parsed);
-  if (asV3.success) return asV3.data;
+  if (asV3.success) return migrateV3(asV3.data);
   const asV2 = personalStatsV2Schema.safeParse(parsed);
   if (asV2.success) return migrateV2(asV2.data);
   const asV1 = personalStatsV1Schema.safeParse(parsed);
@@ -306,22 +379,22 @@ export function recordUnlimitedResult(
   won: boolean,
   guessCount: number,
   digits: number,
+  difficulty: StatsDifficulty,
 ): PersonalStats {
   const s = loadUnlimitedStats();
-  // Bucket by digit count. Anything outside the 5/6 keys we know about
-  // gets coerced to "5" so legacy callers don't silently drop data.
-  const key: "5" | "6" = digits === 6 ? "6" : "5";
-  const bucket = s.byDigits[key];
+  // Bucket by (digits, difficulty). Anything outside the 5/6 keys we
+  // know about gets coerced to "5" so legacy callers don't silently
+  // drop data.
+  const dKey: "5" | "6" = digits === 6 ? "6" : "5";
+  const bucket = s.byDigits[dKey][difficulty];
   bucket.played += 1;
   if (won) {
     bucket.wins += 1;
-    // Global streak: only the just-played bucket affects it (a 5-digit
-    // win still extends the overall streak even if it's a different
-    // length than the previous one).
+    // Global streak: any win extends the overall streak — players
+    // playing across digits/modes still get one cohesive streak number.
     s.currentStreak += 1;
     s.bestStreak = Math.max(s.bestStreak, s.currentStreak);
-    // Per-bucket streak: only the matching bucket extends — playing 6
-    // doesn't move the 5-digit streak in either direction.
+    // Per-bucket streak: only the exact (digits, mode) bucket extends.
     bucket.currentStreak += 1;
     bucket.bestStreak = Math.max(bucket.bestStreak, bucket.currentStreak);
     bucket.distribution[String(guessCount)] =
@@ -339,26 +412,51 @@ export function recordUnlimitedResult(
   return s;
 }
 
-/** Combined view across digit buckets. Used when the stats UI is set
- *  to "All": played / wins / distribution sum naturally; streaks use
- *  the *global* streaks from the parent record (streaks from
- *  separate buckets can't be added — a streak of 3 in 5-digit and a
- *  streak of 2 in 6-digit aren't a combined streak of 5). */
-export function combinedUnlimitedStats(s: PersonalStats): PerDigitStats {
+/** Combined view across selected digit and difficulty buckets. `digit`
+ *  / `difficulty` each accept "all" to combine both sides of that
+ *  axis. Streaks come from the global record when ANY axis is "all"
+ *  (cross-bucket streaks can't be summed). When both axes pin a single
+ *  bucket the per-bucket streaks pass through. */
+export function sliceUnlimitedStats(
+  s: PersonalStats,
+  opts: {
+    digit?: "all" | "5" | "6";
+    difficulty?: "all" | StatsDifficulty;
+  } = {},
+): PerDigitStats {
+  const digitOpt = opts.digit ?? "all";
+  const diffOpt = opts.difficulty ?? "all";
+  const digitKeys: ("5" | "6")[] = digitOpt === "all" ? ["5", "6"] : [digitOpt];
+  const diffKeys: StatsDifficulty[] =
+    diffOpt === "all" ? ["normal", "hard"] : [diffOpt];
+
+  // Single-bucket pass-through preserves the bucket's own streaks.
+  if (digitKeys.length === 1 && diffKeys.length === 1) {
+    return { ...s.byDigits[digitKeys[0]][diffKeys[0]] };
+  }
+
   const out: PerDigitStats = {
     ...emptyPerDigit(),
     currentStreak: s.currentStreak,
     bestStreak: s.bestStreak,
   };
-  for (const key of ["5", "6"] as const) {
-    const b = s.byDigits[key];
-    out.played += b.played;
-    out.wins += b.wins;
-    for (const [k, v] of Object.entries(b.distribution)) {
-      out.distribution[k] = (out.distribution[k] ?? 0) + v;
+  for (const d of digitKeys) {
+    for (const m of diffKeys) {
+      const b = s.byDigits[d][m];
+      out.played += b.played;
+      out.wins += b.wins;
+      for (const [k, v] of Object.entries(b.distribution)) {
+        out.distribution[k] = (out.distribution[k] ?? 0) + v;
+      }
     }
   }
   return out;
+}
+
+/** Backward-compat shim: combined view across both digit buckets in
+ *  Normal AND Hard. Equivalent to sliceUnlimitedStats(s, {}). */
+export function combinedUnlimitedStats(s: PersonalStats): PerDigitStats {
+  return sliceUnlimitedStats(s);
 }
 
 // --- Personal daily history ---

@@ -189,9 +189,22 @@ function cellStatesActive(
 // on the player's own guess so we can show the implied bound next to
 // the direction symbol, e.g. "> 3" for "target has more than your 3".
 
-function computeRange(s: string): number {
-  const ds = [...s].map(Number);
-  return Math.max(...ds) - Math.min(...ds);
+function computeMin(s: string): number {
+  let m = Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d < m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+
+function computeMax(s: string): number {
+  let m = -Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d > m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
 }
 
 function computeEvenCount(s: string): number {
@@ -215,6 +228,10 @@ function computeMedian(s: string): number {
   return (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
 }
 
+function formatMedian(v: number): string {
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
 function computeDiceCount(s: string): number {
   let n = 0;
   for (const ch of s) {
@@ -222,6 +239,13 @@ function computeDiceCount(s: string): number {
     if (d >= 1 && d <= 6) n++;
   }
   return n;
+}
+
+function cmpClassName(cmp: "lt" | "eq" | "gt"): string {
+  return cmp === "eq" ? "text-good" : cmp === "gt" ? "text-warn" : "text-bad";
+}
+function cmpSymbol(cmp: "lt" | "eq" | "gt"): string {
+  return cmp === "eq" ? "=" : cmp === "gt" ? ">" : "<";
 }
 
 function computeDirectionRuns(s: string): number {
@@ -269,33 +293,59 @@ export function subLabelFor(
   result: ClueResult,
 ): SubLabel | null {
   switch (result.kind) {
-    case "rangeCompare":
-    case "parityBalance":
-    case "primeCount":
-    case "median":
-    case "diceCount":
     case "upsAndDowns": {
-      const own =
-        result.kind === "rangeCompare"
-          ? computeRange(guess)
-          : result.kind === "parityBalance"
-          ? computeEvenCount(guess)
-          : result.kind === "primeCount"
-          ? computePrimeCount(guess)
-          : result.kind === "diceCount"
-          ? computeDiceCount(guess)
-          : result.kind === "upsAndDowns"
-          ? computeDirectionRuns(guess)
-          : computeMedian(guess);
-      const symbol =
-        result.cmp === "eq" ? "=" : result.cmp === "gt" ? ">" : "<";
-      const className =
-        result.cmp === "eq"
-          ? "text-good"
-          : result.cmp === "gt"
-          ? "text-warn"
-          : "text-bad";
-      return { text: `${symbol} ${own}`, className };
+      const own = computeDirectionRuns(guess);
+      return {
+        text: `${cmpSymbol(result.cmp)} ${own}`,
+        className: cmpClassName(result.cmp),
+      };
+    }
+    case "statSummary": {
+      // Box-and-whisker reads: median, min, max. Each chip keeps its
+      // own color so the player can see at a glance which axis matched
+      // and which differs. Three full-word labels (Med / Min / Max)
+      // beat single letters here — readability outweighs the few
+      // pixels saved.
+      const med = formatMedian(computeMedian(guess));
+      const mn = computeMin(guess);
+      const mx = computeMax(guess);
+      const parts = [
+        {
+          text: `Med${cmpSymbol(result.medianCmp)}${med}`,
+          className: cmpClassName(result.medianCmp),
+        },
+        {
+          text: `Min${cmpSymbol(result.minCmp)}${mn}`,
+          className: cmpClassName(result.minCmp),
+        },
+        {
+          text: `Max${cmpSymbol(result.maxCmp)}${mx}`,
+          className: cmpClassName(result.maxCmp),
+        },
+      ];
+      return { text: parts.map((p) => p.text).join(" "), className: "", parts };
+    }
+    case "digitClass": {
+      // Three counts: even / prime / dice. Same per-part coloring rule
+      // as Stat Summary above so the rendering stays consistent.
+      const e = computeEvenCount(guess);
+      const p = computePrimeCount(guess);
+      const d = computeDiceCount(guess);
+      const parts = [
+        {
+          text: `E${cmpSymbol(result.evenCmp)}${e}`,
+          className: cmpClassName(result.evenCmp),
+        },
+        {
+          text: `P${cmpSymbol(result.primeCmp)}${p}`,
+          className: cmpClassName(result.primeCmp),
+        },
+        {
+          text: `D${cmpSymbol(result.diceCmp)}${d}`,
+          className: cmpClassName(result.diceCmp),
+        },
+      ];
+      return { text: parts.map((p) => p.text).join(" "), className: "", parts };
     }
     case "sumDelta": {
       // Show the target's digit sum prominently, with the signed delta

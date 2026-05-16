@@ -7,15 +7,12 @@ import { oracleClue } from "@/lib/game/clues/oracle";
 import { thermometerClue } from "@/lib/game/clues/thermometer";
 import { sumDeltaClue } from "@/lib/game/clues/sumDelta";
 import { digitOverlapClue } from "@/lib/game/clues/digitOverlap";
-import { parityBalanceClue } from "@/lib/game/clues/parityBalance";
-import { primeCountClue } from "@/lib/game/clues/primeCount";
-import { rangeCompareClue } from "@/lib/game/clues/rangeCompare";
+import { statSummaryClue } from "@/lib/game/clues/statSummary";
+import { digitClassClue } from "@/lib/game/clues/digitClass";
 import { containsDigitClue } from "@/lib/game/clues/containsDigit";
 import { distinctDigitsClue } from "@/lib/game/clues/distinctDigits";
-import { medianClue } from "@/lib/game/clues/median";
 import { divisibleByClue } from "@/lib/game/clues/divisibleBy";
 import { totalDeviationClue } from "@/lib/game/clues/totalDeviation";
-import { diceCountClue } from "@/lib/game/clues/diceCount";
 import {
   directionRuns,
   upsAndDownsClue,
@@ -195,25 +192,34 @@ describe("Digit Sum", () => {
   });
 });
 
-describe("Parity Balance", () => {
-  it("compares even-digit counts", () => {
-    // target 02468 -> 5 evens; guess 24680 -> 5 evens => eq
-    expect(parityBalanceClue.compute("24680", "02468").cmp).toBe("eq");
-    // target 12345 -> 2 evens; guess 11111 -> 0 evens => target has more => gt
-    expect(parityBalanceClue.compute("11111", "12345").cmp).toBe("gt");
-    // target 11111 (0); guess 24680 (5) => lt
-    expect(parityBalanceClue.compute("24680", "11111").cmp).toBe("lt");
+describe("Digit Class — even / prime / dice cmps in one card", () => {
+  it("evens", () => {
+    // target 02468 (5 evens) vs guess 24680 (5 evens) → eq.
+    expect(digitClassClue.compute("24680", "02468").evenCmp).toBe("eq");
+    // target 12345 (2) > guess 11111 (0) → gt.
+    expect(digitClassClue.compute("11111", "12345").evenCmp).toBe("gt");
+    // target 11111 (0) < guess 24680 (5) → lt.
+    expect(digitClassClue.compute("24680", "11111").evenCmp).toBe("lt");
   });
-});
-
-describe("Prime Count", () => {
-  it("compares prime-digit counts", () => {
-    // target 23579 -> 4 primes; guess 12345 -> 3 primes (2,3,5) => target has more => gt
-    expect(primeCountClue.compute("12345", "23579").cmp).toBe("gt");
-    // target 23570 (4 primes); guess 23579 (4 primes) => eq
-    expect(primeCountClue.compute("23570", "23579").cmp).toBe("eq");
-    // target 11111 (0); guess 22222 (5) => lt
-    expect(primeCountClue.compute("22222", "11111").cmp).toBe("lt");
+  it("primes (2, 3, 5, 7)", () => {
+    // target 23579 (4) > guess 12345 (3: 2,3,5) → gt.
+    expect(digitClassClue.compute("12345", "23579").primeCmp).toBe("gt");
+    // target 23570 (4) = guess 23579 (4) → eq. (Two distinct guesses with
+    // the same prime-digit count.)
+    expect(digitClassClue.compute("23570", "23579").primeCmp).toBe("eq");
+    // target 11111 (0) < guess 22222 (5) → lt.
+    expect(digitClassClue.compute("22222", "11111").primeCmp).toBe("lt");
+  });
+  it("dice (1-6)", () => {
+    // target 47628 has 4 dice digits (4,6,2 and the 7,8 are not). guess
+    // 12345 has 5 dice digits → target lt guess → lt.
+    expect(digitClassClue.compute("12345", "47628").diceCmp).toBe("lt");
+    // target 00009 has 0 dice; guess 11111 has 5 → lt.
+    expect(digitClassClue.compute("11111", "00009").diceCmp).toBe("lt");
+    // target 12300 has 3 dice; guess 45600 has 3 → eq.
+    expect(digitClassClue.compute("45600", "12300").diceCmp).toBe("eq");
+    // target 11111 has 5 dice; guess 00000 has 0 → gt.
+    expect(digitClassClue.compute("00000", "11111").diceCmp).toBe("gt");
   });
 });
 
@@ -427,36 +433,45 @@ describe("Elimination", () => {
   });
 });
 
-describe("Digit Range (rangeCompare)", () => {
-  it("compares the spread (max-min) of digits", () => {
-    // guess 12532 range = 5-1 = 4; target 51903 range = 9-0 = 9 => target ↑
-    expect(rangeCompareClue.compute("12532", "51903").cmp).toBe("gt");
-    // both equal range
-    expect(rangeCompareClue.compute("12345", "56789").cmp).toBe("eq");
-    // guess wider than target
-    expect(rangeCompareClue.compute("19000", "12345").cmp).toBe("lt");
+describe("Stat Summary — median + min + max cmps in one card", () => {
+  it("min cmp tracks the smallest digit", () => {
+    // guess 12532 min=1; target 51903 min=0 → target lt → lt.
+    expect(statSummaryClue.compute("12532", "51903").minCmp).toBe("lt");
+    // guess 12345 min=1; target 56789 min=5 → target gt → gt.
+    expect(statSummaryClue.compute("12345", "56789").minCmp).toBe("gt");
+    // guess 19000 min=0; target 12345 min=1 → target gt → gt.
+    expect(statSummaryClue.compute("19000", "12345").minCmp).toBe("gt");
+    // Equal min (both 0).
+    expect(statSummaryClue.compute("19000", "30450").minCmp).toBe("eq");
   });
-});
-
-describe("Median", () => {
-  it("compares the sorted-middle digit (5-digit)", () => {
-    // guess 12345 median=3; target 54321 median=3 => eq
-    expect(medianClue.compute("12345", "54321").cmp).toBe("eq");
-    // guess 11111 median=1; target 99999 median=9 => target ↑
-    expect(medianClue.compute("11111", "99999").cmp).toBe("gt");
-    // guess 99999; target 11111 => target ↓
-    expect(medianClue.compute("99999", "11111").cmp).toBe("lt");
+  it("max cmp tracks the largest digit", () => {
+    // guess 12345 max=5; target 56789 max=9 → gt.
+    expect(statSummaryClue.compute("12345", "56789").maxCmp).toBe("gt");
+    // guess 19000 max=9; target 12345 max=5 → lt.
+    expect(statSummaryClue.compute("19000", "12345").maxCmp).toBe("lt");
+    // Equal max (both 5).
+    expect(statSummaryClue.compute("12345", "54321").maxCmp).toBe("eq");
   });
-  it("uses the average of the two middle sorted digits for even length (6-digit)", () => {
-    // sorted([1,2,3,4,8,9]) = [1,2,3,4,8,9]; median = (3+4)/2 = 3.5
-    // sorted([0,2,4,5,6,9]) = [0,2,4,5,6,9]; median = (4+5)/2 = 4.5
-    expect(medianClue.compute("123489", "024569").cmp).toBe("gt");
-    // Same median (both 3.5): sorted [1,2,3,4,5,8] vs [0,2,3,4,7,9].
-    // (3+4)/2 = 3.5 in both → eq.
-    expect(medianClue.compute("123458", "023479").cmp).toBe("eq");
-    // Target lower: target sorted [0,1,1,2,3,4] median=1.5; guess sorted
-    // [3,4,5,6,7,8] median=5.5 → lt.
-    expect(medianClue.compute("345678", "012134").cmp).toBe("lt");
+  it("median cmp tracks the sorted-middle digit (5-digit, integer median)", () => {
+    expect(statSummaryClue.compute("12345", "54321").medianCmp).toBe("eq");
+    expect(statSummaryClue.compute("11111", "99999").medianCmp).toBe("gt");
+    expect(statSummaryClue.compute("99999", "11111").medianCmp).toBe("lt");
+  });
+  it("median cmp uses the average of the two middle sorted digits for even length (6-digit)", () => {
+    // 123489 sorted [1,2,3,4,8,9] median (3+4)/2=3.5; 024569 sorted
+    // [0,2,4,5,6,9] median (4+5)/2=4.5 → gt.
+    expect(statSummaryClue.compute("123489", "024569").medianCmp).toBe("gt");
+    expect(statSummaryClue.compute("123458", "023479").medianCmp).toBe("eq");
+    expect(statSummaryClue.compute("345678", "012134").medianCmp).toBe("lt");
+  });
+  it("returns all three cmps independently", () => {
+    // guess 12345: min=1, median=3, max=5.
+    // target 47628: min=2, median=6, max=8.
+    // → all three target stats are higher → all gt.
+    const r = statSummaryClue.compute("12345", "47628");
+    expect(r.medianCmp).toBe("gt");
+    expect(r.minCmp).toBe("gt");
+    expect(r.maxCmp).toBe("gt");
   });
 });
 
@@ -532,20 +547,6 @@ describe("Ups and Downs", () => {
   });
 });
 
-describe("Dice Count", () => {
-  it("counts digits that are standard die values (1-6)", () => {
-    // cmp convention: target vs guess. target 47628 has 4,6,2 = 3 die
-    // values; guess 12345 has 1,2,3,4,5 = 5. 3 < 5 → lt.
-    expect(diceCountClue.compute("12345", "47628").cmp).toBe("lt");
-    // target 00009: 0 die values. guess 11111: 5 die values. 0 < 5 → lt
-    expect(diceCountClue.compute("11111", "00009").cmp).toBe("lt");
-    // target 12300: 1,2,3 = 3 die values. guess 45600: 4,5,6 = 3. eq.
-    expect(diceCountClue.compute("45600", "12300").cmp).toBe("eq");
-    // target 11111: 5 die values. guess 00000: 0 → gt
-    expect(diceCountClue.compute("00000", "11111").cmp).toBe("gt");
-  });
-});
-
 describe("Extra Lock (special)", () => {
   it("is in the special category with a flat result", () => {
     expect(extraLockClue.category).toBe("special");
@@ -611,15 +612,20 @@ describe("6-digit length sanity", () => {
     expect(distinctDigitsClue.compute(guess6, "012345").count).toBe(6);
     expect(distinctDigitsClue.compute(guess6, "111222").count).toBe(2);
   });
-  it("Range / parity / prime / dice / total deviation: scale with length", () => {
-    // Range: target 247628 → max 8 - min 2 = 6; guess 555555 → 0. target ↑.
-    expect(rangeCompareClue.compute(guess6, target6).cmp).toBe("gt");
-    // Even count: target 247628 → 4 (2,4,6,2,8); guess all 5s → 0.
-    expect(parityBalanceClue.compute(guess6, target6).cmp).toBe("gt");
-    // Prime count: target 247628 → primes are 2,7,2 = 3; guess 555555 → 6.
-    expect(primeCountClue.compute(guess6, target6).cmp).toBe("lt");
-    // Dice count (1-6): target 247628 → 2,4,6,2 = 4; guess 555555 → 6.
-    expect(diceCountClue.compute(guess6, target6).cmp).toBe("lt");
+  it("Stat Summary / Digit Class / total deviation: scale with length", () => {
+    // Stat Summary — target 247628 sorted [2,2,4,6,7,8]: min=2, max=8.
+    // Guess 555555: min=5, max=5. Target min lt guess (2<5) AND target
+    // max gt guess (8>5) — fully exercises both new axes at length 6.
+    const stat6 = statSummaryClue.compute(guess6, target6);
+    expect(stat6.minCmp).toBe("lt");
+    expect(stat6.maxCmp).toBe("gt");
+    // Digit Class — target 247628 has 4 evens (2,4,6,2,8), 3 primes
+    // (2,7,2), 4 dice digits (2,4,6,2). Guess 555555 has 0 evens,
+    // 6 primes, 6 dice digits.
+    const dc6 = digitClassClue.compute(guess6, target6);
+    expect(dc6.evenCmp).toBe("gt");
+    expect(dc6.primeCmp).toBe("lt");
+    expect(dc6.diceCmp).toBe("lt");
     // Total deviation max: 9*6 = 54.
     expect(totalDeviationClue.compute("000000", "999999").value).toBe(54);
   });
@@ -662,10 +668,10 @@ describe("6-digit length sanity", () => {
 });
 
 describe("Registry", () => {
-  it("has 22 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(22);
+  it("has 19 clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(19);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(22);
+    expect(ids.size).toBe(19);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }
@@ -677,7 +683,15 @@ describe("Registry", () => {
   });
   it("retired clues are gone", () => {
     const ids = new Set(CLUES.map((c) => c.id));
-    for (const retired of ["sumDirection", "maxDigit"]) {
+    for (const retired of [
+      "sumDirection",
+      "maxDigit",
+      "median",
+      "rangeCompare",
+      "parityBalance",
+      "primeCount",
+      "diceCount",
+    ]) {
       expect(ids.has(retired as never)).toBe(false);
     }
   });

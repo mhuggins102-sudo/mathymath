@@ -19,14 +19,18 @@ export function isPositionalClueId(id: string | undefined): boolean {
 
 /** Curated set of clues from which regular mode (and daily) guarantees
  *  pair 1 contains at least one. Hand-picked for round-1 friendliness:
- *  positional reveals (Higher/Lower, Within 2, Oracle, Thermometer)
- *  and the most legible compositional clues (Echo, Elimination,
- *  Divisible By, Contains Digit). Advanced mode ignores this list. */
+ *  the strongest positional reveals (Higher/Lower, Within 2, Oracle,
+ *  Thermometer, Odd or Even) plus the legible compositional anchors
+ *  (Digit Overlap, Elimination, Total Deviation). Adjusted 2026-05-10
+ *  after the player-chooser sim showed Total Deviation outperforming
+ *  Contains Digit on round-1 friendliness and info-per-pick — Contains
+ *  Digit's interactive multi-tap mechanic is also a heavier ask for
+ *  brand-new players. Advanced mode ignores this list. */
 export const ROUND1_CURATED_CLUE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
   "digitOverlap",
   "elimination",
   "parityMask",
-  "containsDigit",
+  "totalDeviation",
   "higherLower",
   "within2",
   "oracle",

@@ -1,7 +1,59 @@
-import type { ClueId, ClueResult } from "@/lib/game/clues/types";
+import type { Cmp, ClueId, ClueResult } from "@/lib/game/clues/types";
 import type { DeductionPuzzle } from "./puzzles";
 import puzzlesV1 from "@/scripts/captured-puzzles.json";
 import puzzlesV2 from "@/scripts/captured-puzzles-v2.json";
+
+// Helpers for migrating retired Median / Digit Range / Even Count /
+// Prime Count / Dice Count rows into Stat Summary / Digit Class. The
+// old rows carry one cmp; the new clues carry two or three. We have
+// (guess, target) on the captured puzzle, so we just recompute every
+// cmp from scratch — the single old cmp is implicitly correct and
+// gets folded into the richer result.
+function _medianValue(s: string): number {
+  const sorted = [...s].map(Number).sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n === 0) return 0;
+  if (n % 2 === 1) return sorted[(n - 1) / 2];
+  return (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+}
+function _digitMin(s: string): number {
+  let m = Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d < m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+function _digitMax(s: string): number {
+  let m = -Infinity;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d > m) m = d;
+  }
+  return Number.isFinite(m) ? m : 0;
+}
+function _evenCount(s: string): number {
+  let n = 0;
+  for (const ch of s) if (Number(ch) % 2 === 0) n++;
+  return n;
+}
+const _PRIMES = new Set([2, 3, 5, 7]);
+function _primeCount(s: string): number {
+  let n = 0;
+  for (const ch of s) if (_PRIMES.has(Number(ch))) n++;
+  return n;
+}
+function _diceCount(s: string): number {
+  let n = 0;
+  for (const ch of s) {
+    const d = Number(ch);
+    if (d >= 1 && d <= 6) n++;
+  }
+  return n;
+}
+function _cmpOf(t: number, g: number): Cmp {
+  return t === g ? "eq" : t > g ? "gt" : "lt";
+}
 
 interface RawGuess {
   guess: string;
@@ -138,6 +190,56 @@ function migrateResult(target: string, g: RawGuess): RawGuess {
         } as ClueResult,
       };
     }
+  }
+  // Retired 2026-05-10: Median + Digit Range merged into Stat Summary
+  // (initially as median+range, then reshaped to median+min+max). Old
+  // rows supply at most one of the cmps; we recompute the new richer
+  // result from (guess, target) and replace.
+  const cidStr = g.clueId as string;
+  if (cidStr === "median" || cidStr === "rangeCompare") {
+    return {
+      ...g,
+      clueId: "statSummary" as ClueId,
+      result: {
+        kind: "statSummary",
+        medianCmp: _cmpOf(_medianValue(target), _medianValue(g.guess)),
+        minCmp: _cmpOf(_digitMin(target), _digitMin(g.guess)),
+        maxCmp: _cmpOf(_digitMax(target), _digitMax(g.guess)),
+      } as ClueResult,
+    };
+  }
+  // Mid-2026 the new clue had a brief `rangeCmp` shape; promote those
+  // captures to the current min/max shape by recomputing.
+  if (cidStr === "statSummary") {
+    const r = g.result as Record<string, unknown>;
+    if (r && r.kind === "statSummary" && "rangeCmp" in r && !("minCmp" in r)) {
+      return {
+        ...g,
+        result: {
+          kind: "statSummary",
+          medianCmp: _cmpOf(_medianValue(target), _medianValue(g.guess)),
+          minCmp: _cmpOf(_digitMin(target), _digitMin(g.guess)),
+          maxCmp: _cmpOf(_digitMax(target), _digitMax(g.guess)),
+        } as ClueResult,
+      };
+    }
+  }
+  // Retired 2026-05-10: Even / Prime / Dice Count merged into Digit Class.
+  if (
+    cidStr === "parityBalance" ||
+    cidStr === "primeCount" ||
+    cidStr === "diceCount"
+  ) {
+    return {
+      ...g,
+      clueId: "digitClass" as ClueId,
+      result: {
+        kind: "digitClass",
+        evenCmp: _cmpOf(_evenCount(target), _evenCount(g.guess)),
+        primeCmp: _cmpOf(_primeCount(target), _primeCount(g.guess)),
+        diceCmp: _cmpOf(_diceCount(target), _diceCount(g.guess)),
+      } as ClueResult,
+    };
   }
   if (g.clueId === "parityMask") {
     if (Array.isArray((r as { matches?: unknown }).matches)) return g;
