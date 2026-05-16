@@ -57,16 +57,46 @@ at a Cloudflare D1 database.
    CF_D1_API_TOKEN=...           # API token with D1 read+write
    ```
 
-   On Cloudflare Pages, the two non-secret IDs (`CF_ACCOUNT_ID` and
-   `CF_D1_DATABASE_ID`) are declared in [`wrangler.toml`](./wrangler.toml)
-   under `[vars]` so they survive rebuilds. Fill in the placeholder
-   values there before deploying. `CF_D1_API_TOKEN` is a secret —
-   set it via the CF Pages dashboard's encrypted-variable type or
-   `wrangler pages secret put CF_D1_API_TOKEN`, NOT in `wrangler.toml`.
+   On Cloudflare Workers (via Workers Builds), the two non-secret IDs
+   (`CF_ACCOUNT_ID` and `CF_D1_DATABASE_ID`) live in
+   [`wrangler.toml`](./wrangler.toml) under `[vars]` so they survive
+   rebuilds. Fill in the placeholder values there before deploying.
+   `CF_D1_API_TOKEN` is a secret — set it via the CF dashboard's
+   encrypted-variable type or `wrangler secret put CF_D1_API_TOKEN`,
+   NOT in `wrangler.toml`.
 
 When all three are present, `getDailyStore()` returns the D1 adapter
 (`lib/api/dailyStoreD1.ts`); otherwise it falls back to the in-memory
 store, so tests and local dev keep working with no setup.
+
+## Deploy on Cloudflare Workers
+
+The app is set up to deploy as a Cloudflare Worker via
+[`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare).
+OpenNext adapts Next.js for the Workers runtime, producing
+`.open-next/worker.js` (the entry point) and `.open-next/assets/`
+(static files). `wrangler.toml` points to both.
+
+### Cloudflare Workers Builds settings
+
+Set these on the project in the Cloudflare dashboard:
+
+- **Build command**: `pnpm run build:cf`
+  (Equivalent to `pnpm exec opennextjs-cloudflare build`. Runs
+  `next build` internally then bundles the Worker.)
+- **Deploy command**: `npx wrangler deploy`
+  (Reads `wrangler.toml` and uploads the bundle.)
+
+If your project already had a deploy command set, leave it as
+`npx wrangler deploy`; just make sure the build command runs the
+OpenNext build first.
+
+### Local preview / deploy
+
+```bash
+pnpm run preview:cf   # build + preview the Worker locally
+pnpm run deploy:cf    # build + deploy in one step
+```
 
 ## Deploy on Vercel
 

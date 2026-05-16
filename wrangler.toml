@@ -1,27 +1,35 @@
-# Cloudflare Pages configuration.
+# Cloudflare Workers configuration for the Next.js app, deployed via
+# @opennextjs/cloudflare. The OpenNext build (`opennextjs-cloudflare
+# build`, see package.json's `build:cf` script) produces `.open-next/`
+# with `worker.js` (the entry point) and `assets/` (static files).
 #
 # `[vars]` declares non-secret build/runtime environment variables.
-# Cloudflare Pages reads this file at deploy time and surfaces the
-# values to your runtime via `process.env`. Variables declared here
+# Cloudflare Workers Builds reads this file at deploy time and surfaces
+# the values to the runtime via `process.env`. Variables declared here
 # survive rebuilds — that's the fix for the "Variables get wiped"
-# behavior in the dashboard.
+# behavior in the dashboard (CF's auto-applied framework template
+# re-stamps env vars on every build when there's no user-managed
+# wrangler.toml).
 #
 # IMPORTANT: Do NOT put secrets here. CF_D1_API_TOKEN is a credential
-# and must remain a Cloudflare Pages encrypted secret (set via the
-# dashboard's "Encrypted" variable type, or `wrangler pages secret put
+# and must remain a Cloudflare Workers encrypted secret (set via the
+# dashboard's "Encrypted" variable type, or `wrangler secret put
 # CF_D1_API_TOKEN`). Encrypted secrets are persisted server-side and
 # never appear in this file or in the repo.
-#
-# The two IDs below are NOT secrets — they identify the Cloudflare
-# account and D1 database. Anyone with them still needs the API token
-# to read or write data. They're fine to commit to a public repo, but
-# anyone forking the project will replace them with their own.
-#
-# Replace the placeholder values with the IDs from the Cloudflare
-# dashboard (or `wrangler d1 list` output) before deploying.
 
 name = "mathymath"
+main = ".open-next/worker.js"
 compatibility_date = "2025-05-01"
+# Workers needs nodejs_compat for Next.js's runtime + the D1 HTTP
+# client (uses node:crypto and friends).
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+# OpenNext puts hashed Next.js static assets under this directory. The
+# binding name `ASSETS` is what OpenNext's worker.js expects — don't
+# rename it without updating the OpenNext config.
+binding = "ASSETS"
+directory = ".open-next/assets"
 
 [vars]
 CF_ACCOUNT_ID = "REPLACE_WITH_YOUR_CLOUDFLARE_ACCOUNT_ID"
