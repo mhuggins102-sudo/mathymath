@@ -27,6 +27,9 @@ import {
   recordDailyResult,
   saveDailyPercentile,
 } from "@/lib/persistence/localStore";
+import { buildAchievementCtx } from "@/lib/achievements/buildCtx";
+import { runAchievementCheck } from "@/lib/achievements/check";
+import { pushAchievementToasts } from "@/lib/hooks/useAchievementToasts";
 
 interface DailyGameProps {
   date: string;
@@ -125,14 +128,36 @@ export function DailyGame({
 
   // Record this daily's result locally (first write wins per date). This
   // feeds the Lifetime Stats view on the home page — it's not shown on the
-  // daily end screen itself.
+  // daily end screen itself. Achievement detectors run right after so
+  // they observe the just-recorded totals (daily streak, total wins).
   useEffect(() => {
     if (!hydrated) return;
     if (state.status === "playing") return;
     if (personalRecordedRef.current) return;
     personalRecordedRef.current = true;
     recordDailyResult(date, state.guesses.length, state.status === "won");
-  }, [hydrated, state.status, state.guesses.length, date]);
+    if (state.revealedTarget) {
+      const ctx = buildAchievementCtx({
+        mode: "daily",
+        digits: state.digits,
+        status: state.status,
+        target: state.revealedTarget,
+        guesses: state.guesses,
+        // Daily is always normal mode (no advanced / no preselected).
+        advancedMode: false,
+        preselectedMode: false,
+      });
+      const unlocks = runAchievementCheck(ctx);
+      if (unlocks.length > 0) pushAchievementToasts(unlocks);
+    }
+  }, [
+    hydrated,
+    state.status,
+    state.guesses,
+    state.digits,
+    state.revealedTarget,
+    date,
+  ]);
 
   // Auto-open the results popup once when the game enters terminal state
   // (either on arrival for an already-played daily, or the moment the

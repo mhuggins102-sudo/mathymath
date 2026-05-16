@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AchievementsModal } from "./AchievementsModal";
 import { HelpModal } from "./HelpModal";
 import { LifetimeStatsModal } from "./LifetimeStatsModal";
 import { hasSeenTutorial, markTutorialSeen } from "@/lib/persistence/localStore";
 
 /**
- * Top-right icon cluster on the home screen: lifetime stats and
- * help. The settings button moved off this cluster and onto the
- * home screen next to the Unlimited button (since most settings are
- * Unlimited-specific anyway). The cluster aligns with the right edge
- * of the centered `max-w-md` content column.
+ * Top-right icon cluster on the home screen: achievements, lifetime
+ * stats, and help. The settings button moved off this cluster and onto
+ * the home screen next to the Unlimited button (since most settings
+ * are Unlimited-specific anyway). The cluster aligns with the right
+ * edge of the centered `max-w-md` content column.
  *
  * First-run UX: the very first time a player lands here (no
  * tutorialSeen flag in localStorage), the Help modal auto-opens after
@@ -19,6 +20,7 @@ import { hasSeenTutorial, markTutorialSeen } from "@/lib/persistence/localStore"
  * counts as "seen" so we don't keep popping the modal up.
  */
 export function HomeHeaderIcons() {
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -39,6 +41,14 @@ export function HomeHeaderIcons() {
           <div className="flex items-center gap-0.5">
             <button
               type="button"
+              onClick={() => setAchievementsOpen(true)}
+              className={btn}
+              aria-label="Achievements"
+            >
+              🏆
+            </button>
+            <button
+              type="button"
               onClick={() => setStatsOpen(true)}
               className={btn}
               aria-label="Lifetime stats"
@@ -57,6 +67,10 @@ export function HomeHeaderIcons() {
         </div>
       </div>
 
+      <AchievementsModal
+        open={achievementsOpen}
+        onClose={() => setAchievementsOpen(false)}
+      />
       <LifetimeStatsModal open={statsOpen} onClose={() => setStatsOpen(false)} />
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </>

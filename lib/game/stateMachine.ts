@@ -7,14 +7,15 @@ import {
 import { deriveCertainDigits, knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
-export const DEFAULT_MAX_GUESSES = 8;
-/** Hard mode loses one guess on top of its other handicaps (0 starting
- *  locks, no curated opener, Clue Reuse removed). 7 keeps the AI
- *  win-rate band roughly comparable to pre-consolidation Regular. */
+export const DEFAULT_MAX_GUESSES = 7;
+/** Hard mode shares the same 7-turn budget as Regular — the difficulty
+ *  delta lives in its other handicaps (0 starting locks, no curated
+ *  opener, Clue Reuse removed). Kept as a separate constant so callers
+ *  using maxGuessesFor() still resolve mode-aware budgets cleanly. */
 export const HARD_MAX_GUESSES = 7;
 
 /** Per-digit-count guess budgets for Regular mode. Both 5- and 6-digit
- *  games get 8 tries — the 6-digit puzzle is harder by design without
+ *  games get 7 tries — the 6-digit puzzle is harder by design without
  *  an extended budget. Hard mode is handled separately by
  *  maxGuessesFor(); this map is the Regular-mode lookup only. */
 export const MAX_GUESSES_BY_DIGITS: Readonly<Record<number, number>> = {

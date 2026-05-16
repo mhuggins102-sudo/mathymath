@@ -608,6 +608,66 @@ export function loadDailyPercentile(
   }
 }
 
+// --- Achievements ---
+//
+// One persisted blob: per-achievement unlock timestamps for L1 and L2.
+// Read at game end to find what's newly unlocked, then re-saved with
+// the additions. Toasts come from the diff returned by the check.
+
+const achievementsStoreSchema = z.object({
+  v: z.literal(1),
+  unlocked: z.record(
+    z.string(),
+    z.object({
+      level1At: z.string().optional(),
+      level2At: z.string().optional(),
+    }),
+  ),
+});
+
+export type AchievementsStore = z.infer<typeof achievementsStoreSchema>;
+
+const ACHIEVEMENTS_KEY = "achievements:v1";
+
+export function loadAchievements(): AchievementsStore {
+  if (typeof window === "undefined") return { v: 1, unlocked: {} };
+  const raw = window.localStorage.getItem(STORAGE_PREFIX + ACHIEVEMENTS_KEY);
+  if (!raw) return { v: 1, unlocked: {} };
+  try {
+    return achievementsStoreSchema.parse(JSON.parse(raw));
+  } catch {
+    return { v: 1, unlocked: {} };
+  }
+}
+
+export function saveAchievements(store: AchievementsStore): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      STORAGE_PREFIX + ACHIEVEMENTS_KEY,
+      JSON.stringify(store),
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
+
+/** Mark a single (id, level) pair as unlocked at `now`. Idempotent —
+ *  pre-existing entries are left untouched so a later L2 unlock
+ *  doesn't overwrite an earlier L1 timestamp. */
+export function recordAchievementUnlock(
+  id: string,
+  level: 1 | 2,
+  now: string = new Date().toISOString(),
+): void {
+  const store = loadAchievements();
+  const existing = store.unlocked[id] ?? {};
+  if (level === 1 && !existing.level1At) existing.level1At = now;
+  if (level === 2 && !existing.level2At) existing.level2At = now;
+  store.unlocked[id] = existing;
+  saveAchievements(store);
+}
+
 /** Clear all local mathymath data. Used by settings "reset" action. */
 export function clearAllLocalData(): void {
   if (typeof window === "undefined") return;

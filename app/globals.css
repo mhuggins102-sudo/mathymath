@@ -112,6 +112,12 @@ body {
 }
 .reveal { animation: reveal 260ms ease-out both; }
 
+@keyframes toast-enter {
+  0% { transform: translateY(-16px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.toast-enter { animation: toast-enter 200ms ease-out; }
+
 @media (orientation: landscape) and (max-width: 900px) {
   .portrait-only { display: flex !important; }
 }

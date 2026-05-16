@@ -33,6 +33,9 @@ import {
   saveGame,
   type PersonalStats,
 } from "@/lib/persistence/localStore";
+import { buildAchievementCtx } from "@/lib/achievements/buildCtx";
+import { runAchievementCheck } from "@/lib/achievements/check";
+import { pushAchievementToasts } from "@/lib/hooks/useAchievementToasts";
 
 export interface UseGameConfig {
   target: string;
@@ -208,11 +211,27 @@ export function useGame(config: UseGameConfig): UseGameResult {
     );
     statsRecordedRef.current = true;
     setUnlimitedStats(updated);
+
+    // Achievement check. Runs AFTER stats recording so `totalWins`
+    // in the ctx reflects this game's outcome.
+    const ctx = buildAchievementCtx({
+      mode: "unlimited",
+      digits: state.digits,
+      status: state.status,
+      target: state.target,
+      guesses: state.guesses,
+      advancedMode: state.advancedMode,
+      preselectedMode: state.preselectedDeck !== null,
+    });
+    const unlocks = runAchievementCheck(ctx);
+    if (unlocks.length > 0) pushAchievementToasts(unlocks);
   }, [
     state.status,
-    state.guesses.length,
+    state.guesses,
     state.digits,
+    state.target,
     state.advancedMode,
+    state.preselectedDeck,
     config.trackStats,
   ]);
 
