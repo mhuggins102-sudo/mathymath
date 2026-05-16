@@ -1,13 +1,13 @@
 "use client";
 
 /** Trophy SVG used for achievement tier indicators. Renders in
- *  `currentColor` so the parent can swap bronze / gold / locked via
+ *  `currentColor` so the parent can swap silver / gold / locked via
  *  Tailwind text utilities. */
-export type TrophyTier = "locked" | "bronze" | "gold";
+export type TrophyTier = "locked" | "silver" | "gold";
 
 const TIER_COLOR: Record<TrophyTier, string> = {
   locked: "text-muted/40",
-  bronze: "text-amber-700",
+  silver: "text-slate-300",
   gold: "text-amber-400",
 };
 

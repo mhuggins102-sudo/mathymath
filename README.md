@@ -57,6 +57,13 @@ at a Cloudflare D1 database.
    CF_D1_API_TOKEN=...           # API token with D1 read+write
    ```
 
+   On Cloudflare Pages, the two non-secret IDs (`CF_ACCOUNT_ID` and
+   `CF_D1_DATABASE_ID`) are declared in [`wrangler.toml`](./wrangler.toml)
+   under `[vars]` so they survive rebuilds. Fill in the placeholder
+   values there before deploying. `CF_D1_API_TOKEN` is a secret —
+   set it via the CF Pages dashboard's encrypted-variable type or
+   `wrangler pages secret put CF_D1_API_TOKEN`, NOT in `wrangler.toml`.
+
 When all three are present, `getDailyStore()` returns the D1 adapter
 (`lib/api/dailyStoreD1.ts`); otherwise it falls back to the in-memory
 store, so tests and local dev keep working with no setup.

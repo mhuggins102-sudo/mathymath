@@ -36,7 +36,11 @@ export function AchievementToastHost() {
   if (!current) return null;
   const ach = ACHIEVEMENTS.find((a) => a.id === current.id);
   if (!ach) return null;
-  const tier = current.level === 2 ? "gold" : "bronze";
+  // Single-level achievements jump straight to gold on first unlock —
+  // there's no L2 to chase, so the trophy reflects the final state.
+  // Dual-level: L1 = silver, L2 = gold.
+  const tier =
+    current.level === 2 ? "gold" : ach.level2 ? "silver" : "gold";
   const levelInfo = current.level === 2 ? ach.level2 : ach.level1;
 
   return (
@@ -54,7 +58,9 @@ export function AchievementToastHost() {
         <TrophyIcon tier={tier} size="md" />
         <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-wider text-muted">
-            Achievement unlocked · Level {current.level}
+            {ach.level2
+              ? `Achievement unlocked · Level ${current.level}`
+              : "Achievement unlocked"}
           </p>
           <p className="text-sm font-semibold text-foreground truncate">
             {ach.name}
