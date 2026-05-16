@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AchievementToastHost } from "@/components/AchievementToast";
 import { SettingsHydrator } from "@/components/SettingsHydrator";
 
 export const metadata: Metadata = {
@@ -49,6 +50,7 @@ export default function RootLayout({
           <p className="text-lg">Please rotate your phone to portrait.</p>
         </div>
         {children}
+        <AchievementToastHost />
       </body>
     </html>
   );

@@ -7,14 +7,14 @@ import {
 import { deriveCertainDigits, knownSlotsFromHistory } from "./certain";
 import type { LockRecord } from "./locks";
 
-export const DEFAULT_MAX_GUESSES = 8;
+export const DEFAULT_MAX_GUESSES = 7;
 
-/** Per-digit-count guess budgets. Both 5- and 6-digit games get 8
+/** Per-digit-count guess budgets. Both 5- and 6-digit games get 7
  *  tries — the 6-digit puzzle is harder by design without an extended
  *  budget. Returns DEFAULT_MAX_GUESSES for any unlisted digit count. */
 export const MAX_GUESSES_BY_DIGITS: Readonly<Record<number, number>> = {
-  5: 8,
-  6: 8,
+  5: 7,
+  6: 7,
 };
 
 export function maxGuessesForDigits(digits: number): number {

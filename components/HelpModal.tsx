@@ -64,14 +64,14 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             onToggle={() => toggleSection("basics")}
           >
             <p>
-              Guess the secret 5-digit number in 8 tries. Digits can
+              Guess the secret 5-digit number in 7 tries. Digits can
               repeat — e.g.{" "}
               <span className="font-mono text-foreground">74727</span> is a
               valid target.
             </p>
             <p>
               Unlimited mode adds a harder 6-digit variant with the same
-              8-tries budget. Toggle it in{" "}
+              7-tries budget. Toggle it in{" "}
               <span className="text-foreground">Settings</span>.
             </p>
           </Accordion>

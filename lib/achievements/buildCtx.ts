@@ -1,0 +1,54 @@
+"use client";
+
+import { initialLocksFor, locksAvailable } from "@/lib/game/locks";
+import {
+  combinedUnlimitedStats,
+  dailyHistoryStats,
+  loadDailyHistory,
+  loadUnlimitedStats,
+} from "@/lib/persistence/localStore";
+import type {
+  AchievementCtx,
+  ResolvedGuessLite,
+} from "./types";
+
+interface BuildCtxArgs {
+  mode: "daily" | "unlimited";
+  digits: number;
+  status: "won" | "lost";
+  target: string;
+  guesses: readonly ResolvedGuessLite[];
+  advancedMode: boolean;
+  preselectedMode: boolean;
+}
+
+/** Assemble an AchievementCtx from the just-finished game. Reads
+ *  aggregate stats AFTER the round's recordResult calls have run, so
+ *  totals reflect the current game. Daily streak comes from the daily
+ *  history (already updated by `recordDailyResult`). */
+export function buildAchievementCtx(args: BuildCtxArgs): AchievementCtx {
+  const unlimited = loadUnlimitedStats();
+  const daily = dailyHistoryStats(loadDailyHistory());
+  const combinedUnlimited = combinedUnlimitedStats(unlimited);
+  const totalWins = combinedUnlimited.wins + daily.wins;
+
+  const initialLocks = initialLocksFor(args.advancedMode);
+  const locksRemaining = locksAvailable(args.guesses, initialLocks);
+
+  let redrawsUsed = 0;
+  for (const g of args.guesses) redrawsUsed += g.redraws ?? 0;
+
+  return {
+    mode: args.mode,
+    digits: args.digits,
+    status: args.status,
+    target: args.target,
+    guesses: args.guesses,
+    advancedMode: args.advancedMode,
+    preselectedMode: args.preselectedMode,
+    totalWins,
+    locksRemaining,
+    redrawsUsed,
+    dailyStreakEndingToday: daily.currentStreak,
+  };
+}

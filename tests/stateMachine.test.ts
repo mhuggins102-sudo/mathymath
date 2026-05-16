@@ -236,14 +236,14 @@ describe("stateMachine", () => {
 
 
 describe("maxGuessesForDigits", () => {
-  it("returns 8 for the 5-digit puzzle", () => {
-    expect(maxGuessesForDigits(5)).toBe(8);
+  it("returns 7 for the 5-digit puzzle", () => {
+    expect(maxGuessesForDigits(5)).toBe(7);
   });
-  it("returns 8 for the 6-digit puzzle (same budget as 5-digit)", () => {
-    expect(maxGuessesForDigits(6)).toBe(8);
+  it("returns 7 for the 6-digit puzzle (same budget as 5-digit)", () => {
+    expect(maxGuessesForDigits(6)).toBe(7);
   });
   it("falls back to the default for unlisted digit counts", () => {
-    expect(maxGuessesForDigits(4)).toBe(8);
+    expect(maxGuessesForDigits(4)).toBe(7);
   });
 });
 
