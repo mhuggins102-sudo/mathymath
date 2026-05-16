@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "./Modal";
-import { TrophyIcon } from "./TrophyIcon";
+import { TrophyIcon, type TrophyTier } from "./TrophyIcon";
 import {
   ACHIEVEMENTS,
   TOTAL_UNLOCK_SLOTS,
 } from "@/lib/achievements/registry";
+import type { Achievement } from "@/lib/achievements/types";
 import {
   loadAchievements,
   type AchievementsStore,
@@ -17,16 +18,32 @@ interface AchievementsModalProps {
   onClose: () => void;
 }
 
+/** Resolve the trophy tier shown for an achievement given the player's
+ *  unlock state. Single-level achievements skip silver — their first
+ *  (and only) unlock awards gold directly. */
+function trophyTierFor(
+  ach: Achievement,
+  unlock: AchievementsStore["unlocked"][string] | undefined,
+): TrophyTier {
+  const l1 = Boolean(unlock?.level1At);
+  const l2 = Boolean(unlock?.level2At);
+  if (l2) return "gold";
+  if (l1) return ach.level2 ? "silver" : "gold";
+  return "locked";
+}
+
 export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
   const [store, setStore] = useState<AchievementsStore | null>(null);
+  // Per-achievement expanded state for the info popover. Local to the
+  // current modal session — closes whenever the modal closes.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!open) return;
     setStore(loadAchievements());
+    setExpanded({});
   }, [open]);
 
-  // Count unlocked slots (each level counts independently). Single-
-  // level achievements contribute 0 or 1; dual-level contribute 0-2.
   let unlockedCount = 0;
   if (store) {
     for (const ach of ACHIEVEMENTS) {
@@ -60,77 +77,57 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
         <ul className="space-y-2">
           {ACHIEVEMENTS.map((ach) => {
             const u = store?.unlocked[ach.id];
-            const l1 = Boolean(u?.level1At);
-            const l2 = Boolean(u?.level2At);
+            const tier = trophyTierFor(ach, u);
+            const isExpanded = !!expanded[ach.id];
             return (
               <li
                 key={ach.id}
-                className="flex gap-3 items-start rounded-lg border border-border bg-surface-2 p-3"
+                className="rounded-lg border border-border bg-surface-2 p-3"
               >
-                <div className="shrink-0 pt-0.5">
-                  <TrophyIcon
-                    tier={l2 ? "gold" : l1 ? "bronze" : "locked"}
-                    size="lg"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">
-                      {ach.name}
-                    </h3>
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0">
+                    <TrophyIcon tier={tier} size="md" />
                   </div>
-                  <p className="text-xs text-muted mt-0.5 leading-snug">
-                    {ach.description}
-                  </p>
-                  <div className="mt-2 space-y-1 text-xs">
-                    <LevelRow
-                      tier={l1 ? "bronze" : "locked"}
-                      labelPrefix="Level 1"
-                      label={ach.level1.label}
-                    />
+                  <h3 className="text-sm font-semibold text-foreground flex-1 min-w-0 truncate">
+                    {ach.name}
+                  </h3>
+                  <button
+                    type="button"
+                    aria-label={`Show details for ${ach.name}`}
+                    aria-expanded={isExpanded}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-border text-muted hover:text-foreground hover:border-foreground/60 text-xs font-semibold transition shrink-0"
+                    onClick={() =>
+                      setExpanded((prev) => ({
+                        ...prev,
+                        [ach.id]: !prev[ach.id],
+                      }))
+                    }
+                  >
+                    i
+                  </button>
+                </div>
+                {isExpanded && (
+                  <div className="mt-2 pl-10 text-xs space-y-1">
+                    <p className="text-muted leading-snug">
+                      {ach.description}
+                    </p>
+                    <p className="text-foreground leading-snug">
+                      <span className="font-medium">Level 1:</span>{" "}
+                      {ach.level1.label}
+                    </p>
                     {ach.level2 && (
-                      <LevelRow
-                        tier={l2 ? "gold" : "locked"}
-                        labelPrefix="Level 2"
-                        label={ach.level2.label}
-                      />
+                      <p className="text-foreground leading-snug">
+                        <span className="font-medium">Level 2:</span>{" "}
+                        {ach.level2.label}
+                      </p>
                     )}
                   </div>
-                </div>
+                )}
               </li>
             );
           })}
         </ul>
       </div>
     </Modal>
-  );
-}
-
-function LevelRow({
-  tier,
-  labelPrefix,
-  label,
-}: {
-  tier: "locked" | "bronze" | "gold";
-  labelPrefix: string;
-  label: string;
-}) {
-  const dotClass =
-    tier === "gold"
-      ? "bg-amber-400"
-      : tier === "bronze"
-        ? "bg-amber-700"
-        : "bg-muted/30";
-  const textClass = tier === "locked" ? "text-muted" : "text-foreground";
-  return (
-    <div className="flex items-start gap-2">
-      <span
-        className={`mt-1 inline-block w-2 h-2 rounded-full shrink-0 ${dotClass}`}
-        aria-hidden
-      />
-      <span className={`${textClass} leading-snug`}>
-        <span className="font-medium">{labelPrefix}:</span> {label}
-      </span>
-    </div>
   );
 }
