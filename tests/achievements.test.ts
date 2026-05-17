@@ -21,87 +21,103 @@ function baseCtx(overrides: Partial<AchievementCtx> = {}): AchievementCtx {
     guesses: [],
     advancedMode: false,
     preselectedMode: false,
+    maxGuesses: 7,
     totalWins: 0,
     locksRemaining: 0,
     redrawsUsed: 0,
     dailyStreakEndingToday: 0,
+    unlimitedStreakByBucket: {
+      "5": { normal: 0, hard: 0 },
+      "6": { normal: 0, hard: 0 },
+    },
     ...overrides,
   };
 }
 
-function guess(g: string, result?: ClueResult, extras: Partial<ResolvedGuessLite> = {}): ResolvedGuessLite {
+function guess(
+  g: string,
+  result?: ClueResult,
+  extras: Partial<ResolvedGuessLite> = {},
+): ResolvedGuessLite {
   return { guess: g, result, ...extras };
 }
 
-describe("registry", () => {
-  it("contains exactly 14 themes with unique ids", () => {
-    expect(ACHIEVEMENTS.length).toBe(14);
+describe("registry shape", () => {
+  it("contains 19 themes with unique ids", () => {
+    expect(ACHIEVEMENTS.length).toBe(19);
     const ids = new Set(ACHIEVEMENTS.map((a) => a.id));
-    expect(ids.size).toBe(14);
+    expect(ids.size).toBe(19);
   });
-  it("sums to 25 unlock slots (11 dual-level + 3 single-level)", () => {
-    let slots = 0;
-    let single = 0;
+  it("has no single-level achievements (every detector must occur in a winning game)", () => {
     for (const a of ACHIEVEMENTS) {
-      slots += a.level2 ? 2 : 1;
-      if (!a.level2) single++;
+      expect(a.level2, `${a.id} must have a level2`).toBeDefined();
     }
-    expect(slots).toBe(25);
-    expect(single).toBe(3);
   });
 });
 
-describe("Speedrun", () => {
+// --- Speed ---
+
+describe("Speedrun (unlimited-only)", () => {
   const ach = findAch("speedrun");
-  it("L1: win in 4 turns", () => {
-    const ctx = baseCtx({ status: "won", guesses: Array(4).fill(guess("11111")) });
-    expect(ach.level1.detect(ctx)).toBe(true);
-    expect(ach.level2!.detect(ctx)).toBe(false);
+  it("triggers on unlimited win in ≤4 / ≤3", () => {
+    expect(
+      ach.level1.detect(
+        baseCtx({
+          mode: "unlimited",
+          status: "won",
+          guesses: Array(4).fill(guess("11111")),
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      ach.level2!.detect(
+        baseCtx({
+          mode: "unlimited",
+          status: "won",
+          guesses: Array(3).fill(guess("11111")),
+        }),
+      ),
+    ).toBe(true);
   });
-  it("L2: win in 3 turns", () => {
-    const ctx = baseCtx({ status: "won", guesses: Array(3).fill(guess("11111")) });
-    expect(ach.level1.detect(ctx)).toBe(true);
-    expect(ach.level2!.detect(ctx)).toBe(true);
-  });
-  it("loss never triggers", () => {
-    const ctx = baseCtx({ status: "lost", guesses: Array(3).fill(guess("11111")) });
+  it("does NOT trigger in daily mode (even on a fast win)", () => {
+    const ctx = baseCtx({
+      mode: "daily",
+      status: "won",
+      guesses: Array(3).fill(guess("11111")),
+    });
     expect(ach.level1.detect(ctx)).toBe(false);
     expect(ach.level2!.detect(ctx)).toBe(false);
   });
 });
 
-describe("Locked In", () => {
-  const ach = findAch("lockedIn");
-  it("L1 at 1 lock remaining, L2 at 2", () => {
-    expect(ach.level1.detect(baseCtx({ status: "won", locksRemaining: 1 }))).toBe(true);
-    expect(ach.level2!.detect(baseCtx({ status: "won", locksRemaining: 1 }))).toBe(false);
-    expect(ach.level2!.detect(baseCtx({ status: "won", locksRemaining: 2 }))).toBe(true);
-  });
-});
-
-describe("Daily Sprint", () => {
+describe("Daily Sprint (daily-only)", () => {
   const ach = findAch("dailySprint");
-  it("only counts daily mode", () => {
-    const fastWin = { status: "won" as const, guesses: Array(4).fill(guess("11111")) };
-    expect(ach.level1.detect(baseCtx({ ...fastWin, mode: "unlimited" }))).toBe(false);
-    expect(ach.level1.detect(baseCtx({ ...fastWin, mode: "daily" }))).toBe(true);
-    expect(ach.level2!.detect(baseCtx({ ...fastWin, mode: "daily" }))).toBe(true);
-  });
-});
-
-describe("Veteran", () => {
-  const ach = findAch("veteran");
-  it("counts on total wins", () => {
-    expect(ach.level1.detect(baseCtx({ totalWins: 25 }))).toBe(true);
-    expect(ach.level1.detect(baseCtx({ totalWins: 24 }))).toBe(false);
-    expect(ach.level2!.detect(baseCtx({ totalWins: 100 }))).toBe(true);
+  it("L1/L2 thresholds", () => {
+    expect(
+      ach.level1.detect(
+        baseCtx({
+          mode: "daily",
+          status: "won",
+          guesses: Array(5).fill(guess("1")),
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      ach.level2!.detect(
+        baseCtx({
+          mode: "daily",
+          status: "won",
+          guesses: Array(4).fill(guess("1")),
+        }),
+      ),
+    ).toBe(true);
   });
 });
 
 describe("Iron Player", () => {
   const ach = findAch("ironPlayer");
-  it("requires 6-digit Hard Auto AND fast win", () => {
-    const ctxOK = baseCtx({
+  it("requires 6-digit Hard Auto + win + fast", () => {
+    const ok = baseCtx({
       status: "won",
       digits: 6,
       advancedMode: true,
@@ -109,67 +125,265 @@ describe("Iron Player", () => {
       guesses: Array(5).fill(guess("111111")),
       target: "111111",
     });
-    expect(ach.level1.detect(ctxOK)).toBe(true);
-    // Missing one of the flags
-    expect(
-      ach.level1.detect({ ...ctxOK, advancedMode: false }),
-    ).toBe(false);
-    expect(
-      ach.level1.detect({ ...ctxOK, preselectedMode: false }),
-    ).toBe(false);
-    expect(ach.level1.detect({ ...ctxOK, digits: 5 })).toBe(false);
+    expect(ach.level1.detect(ok)).toBe(true);
+    expect(ach.level1.detect({ ...ok, advancedMode: false })).toBe(false);
+    expect(ach.level1.detect({ ...ok, preselectedMode: false })).toBe(false);
+    expect(ach.level1.detect({ ...ok, digits: 5 })).toBe(false);
   });
 });
 
-describe("Eleventh Hour", () => {
-  const ach = findAch("eleventhHour");
-  it("triggers when Oracle reveal supplies the only missing slot", () => {
-    // Target = "12345", player's last guess "10345" — every slot
-    // matches except slot 1; Oracle reveals slot 1 = 2.
-    const oracle: ClueResult = { kind: "oracle", slot: 1, digit: 2 };
+describe("Hail Mary", () => {
+  const ach = findAch("hailMary");
+  it("L1: win on final turn after ≤1 correct on previous", () => {
+    const guesses = Array(7).fill(undefined).map((_, i) => {
+      // Previous turn (index 5): 1 correct digit (slot 0 = "1"),
+      // others wrong. Last turn (index 6): wins.
+      if (i === 5) return guess("19999");
+      if (i === 6) return guess("12345");
+      return guess("99999");
+    });
     const ctx = baseCtx({
       status: "won",
       target: "12345",
-      guesses: [guess("10345", oracle)],
+      guesses,
     });
     expect(ach.level1.detect(ctx)).toBe(true);
+    expect(ach.level2!.detect(ctx)).toBe(false);
   });
-  it("does not trigger when other slots also differ", () => {
-    const oracle: ClueResult = { kind: "oracle", slot: 1, digit: 2 };
+  it("L2: zero correct on previous turn", () => {
+    const guesses = Array(7).fill(undefined).map((_, i) => {
+      if (i === 5) return guess("99999"); // zero correct
+      if (i === 6) return guess("12345"); // win
+      return guess("88888");
+    });
     const ctx = baseCtx({
       status: "won",
       target: "12345",
-      guesses: [guess("19349", oracle)], // slot 4 also differs
+      guesses,
+    });
+    expect(ach.level1.detect(ctx)).toBe(true);
+    expect(ach.level2!.detect(ctx)).toBe(true);
+  });
+  it("does not trigger when win is before final turn", () => {
+    const ctx = baseCtx({
+      status: "won",
+      target: "12345",
+      guesses: [guess("99999"), guess("12345")],
     });
     expect(ach.level1.detect(ctx)).toBe(false);
   });
 });
 
-describe("Mercury Rising", () => {
-  const ach = findAch("mercuryRising");
-  it("L1: all-red thermometer on turn ≤ 2", () => {
-    const allRed: ClueResult = { kind: "thermometer", tier: [2, 2, 2, 2, 2] };
-    expect(
-      ach.level1.detect(baseCtx({ guesses: [guess("11111", allRed)] })),
-    ).toBe(true);
+// --- Mastery / streaks ---
+
+describe("Veteran", () => {
+  const ach = findAch("veteran");
+  it("requires win + totalWins ≥ N", () => {
+    expect(ach.level1.detect(baseCtx({ status: "won", totalWins: 25 }))).toBe(true);
+    expect(ach.level1.detect(baseCtx({ status: "lost", totalWins: 25 }))).toBe(false);
+    expect(ach.level2!.detect(baseCtx({ status: "won", totalWins: 100 }))).toBe(true);
   });
-  it("L2: all-blue thermometer on turn ≤ 2", () => {
-    const allBlue: ClueResult = { kind: "thermometer", tier: [0, 0, 0, 0, 0] };
-    expect(
-      ach.level2!.detect(baseCtx({ guesses: [guess("12345", allBlue)] })),
-    ).toBe(true);
-  });
-  it("ignores thermometer rolled on turn 3+", () => {
-    const allRed: ClueResult = { kind: "thermometer", tier: [2, 2, 2, 2, 2] };
+});
+
+describe("Streaker", () => {
+  const ach = findAch("streaker");
+  it("L1: 7-day daily streak, L2: 30-day", () => {
     expect(
       ach.level1.detect(
-        baseCtx({
-          guesses: [
-            guess("a"),
-            guess("b"),
-            guess("c", allRed),
-          ],
-        }),
+        baseCtx({ mode: "daily", status: "won", dailyStreakEndingToday: 7 }),
+      ),
+    ).toBe(true);
+    expect(
+      ach.level2!.detect(
+        baseCtx({ mode: "daily", status: "won", dailyStreakEndingToday: 30 }),
+      ),
+    ).toBe(true);
+    expect(
+      ach.level2!.detect(
+        baseCtx({ mode: "daily", status: "won", dailyStreakEndingToday: 29 }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("Hot Hand (5-digit unlimited streaks)", () => {
+  const ach = findAch("hotHand");
+  it("L1: 10+ streak in either Normal or Hard 5-digit", () => {
+    const c1 = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      unlimitedStreakByBucket: {
+        "5": { normal: 10, hard: 0 },
+        "6": { normal: 0, hard: 0 },
+      },
+    });
+    expect(ach.level1.detect(c1)).toBe(true);
+    const c2 = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      unlimitedStreakByBucket: {
+        "5": { normal: 0, hard: 10 },
+        "6": { normal: 0, hard: 0 },
+      },
+    });
+    expect(ach.level1.detect(c2)).toBe(true);
+  });
+  it("L2: 20+ streak in 5-digit Hard specifically", () => {
+    const c = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      unlimitedStreakByBucket: {
+        "5": { normal: 50, hard: 20 },
+        "6": { normal: 0, hard: 0 },
+      },
+    });
+    expect(ach.level2!.detect(c)).toBe(true);
+    const cNo = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      unlimitedStreakByBucket: {
+        "5": { normal: 50, hard: 19 },
+        "6": { normal: 0, hard: 0 },
+      },
+    });
+    expect(ach.level2!.detect(cNo)).toBe(false);
+  });
+});
+
+describe("Endurance (6-digit unlimited streaks)", () => {
+  const ach = findAch("endurance");
+  it("L1: 10+ streak in either 6-digit difficulty", () => {
+    const c = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      unlimitedStreakByBucket: {
+        "5": { normal: 0, hard: 0 },
+        "6": { normal: 10, hard: 0 },
+      },
+    });
+    expect(ach.level1.detect(c)).toBe(true);
+  });
+  it("L2: 10+ streak in 6-digit Hard + current game is Hard Auto 6-digit", () => {
+    const c = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      digits: 6,
+      advancedMode: true,
+      preselectedMode: true,
+      unlimitedStreakByBucket: {
+        "5": { normal: 0, hard: 0 },
+        "6": { normal: 0, hard: 10 },
+      },
+    });
+    expect(ach.level2!.detect(c)).toBe(true);
+  });
+  it("L2 fails when current game isn't Hard Auto 6-digit", () => {
+    const cBase = baseCtx({
+      mode: "unlimited",
+      status: "won",
+      digits: 6,
+      advancedMode: true,
+      preselectedMode: true,
+      unlimitedStreakByBucket: {
+        "5": { normal: 0, hard: 0 },
+        "6": { normal: 0, hard: 10 },
+      },
+    });
+    expect(ach.level2!.detect({ ...cBase, preselectedMode: false })).toBe(false);
+    expect(ach.level2!.detect({ ...cBase, advancedMode: false })).toBe(false);
+    expect(ach.level2!.detect({ ...cBase, digits: 5 })).toBe(false);
+  });
+});
+
+// --- Resource craft ---
+
+describe("Locked In", () => {
+  const ach = findAch("lockedIn");
+  it("L1/L2 thresholds", () => {
+    expect(ach.level1.detect(baseCtx({ status: "won", locksRemaining: 1 }))).toBe(true);
+    expect(ach.level2!.detect(baseCtx({ status: "won", locksRemaining: 2 }))).toBe(true);
+  });
+});
+
+describe("Locksmith", () => {
+  const ach = findAch("locksmith");
+  it("counts correct locks; requires win", () => {
+    const lockGuess = (locks: { correct: boolean }[]): ResolvedGuessLite => ({
+      guess: "11111",
+      locks: locks.map((l, i) => ({ slot: i, digit: "1", correct: l.correct })),
+    });
+    const won2 = baseCtx({
+      status: "won",
+      guesses: [
+        lockGuess([{ correct: true }, { correct: false }]),
+        lockGuess([{ correct: true }]),
+      ],
+    });
+    expect(ach.level1.detect(won2)).toBe(true);
+    const lost2 = { ...won2, status: "lost" as const };
+    expect(ach.level1.detect(lost2)).toBe(false);
+  });
+});
+
+describe("Lucky Start", () => {
+  const ach = findAch("luckyStart");
+  it("counts only turn-1 correct locks; requires win", () => {
+    const guesses: ResolvedGuessLite[] = [
+      {
+        guess: "11111",
+        locks: [
+          { slot: 0, digit: "1", correct: true },
+          { slot: 1, digit: "1", correct: true },
+        ],
+      },
+      { guess: "22222" },
+    ];
+    expect(
+      ach.level1.detect(baseCtx({ status: "won", guesses })),
+    ).toBe(true);
+    expect(
+      ach.level2!.detect(baseCtx({ status: "won", guesses })),
+    ).toBe(false);
+  });
+  it("L2: 3+ correct locks on turn 1", () => {
+    const guesses: ResolvedGuessLite[] = [
+      {
+        guess: "11111",
+        locks: [
+          { slot: 0, digit: "1", correct: true },
+          { slot: 1, digit: "1", correct: true },
+          { slot: 2, digit: "1", correct: true },
+        ],
+      },
+    ];
+    expect(ach.level2!.detect(baseCtx({ status: "won", guesses }))).toBe(true);
+  });
+});
+
+// --- Clue craft ---
+
+describe("Mercury Rising", () => {
+  const ach = findAch("mercuryRising");
+  const allRed: ClueResult = { kind: "thermometer", tier: [2, 2, 2, 2, 2] };
+  const allBlue: ClueResult = { kind: "thermometer", tier: [0, 0, 0, 0, 0] };
+  it("L1: win after all-red thermometer on turn ≤ 2", () => {
+    expect(
+      ach.level1.detect(
+        baseCtx({ status: "won", guesses: [guess("11111", allRed)] }),
+      ),
+    ).toBe(true);
+  });
+  it("L2: win after all-blue thermometer on turn ≤ 2", () => {
+    expect(
+      ach.level2!.detect(
+        baseCtx({ status: "won", guesses: [guess("12345", allBlue)] }),
+      ),
+    ).toBe(true);
+  });
+  it("does not trigger on a loss", () => {
+    expect(
+      ach.level1.detect(
+        baseCtx({ status: "lost", guesses: [guess("11111", allRed)] }),
       ),
     ).toBe(false);
   });
@@ -177,110 +391,129 @@ describe("Mercury Rising", () => {
 
 describe("Sweeper", () => {
   const ach = findAch("sweeper");
-  it("L1/L2 thresholds on Elimination mask", () => {
-    const elim4: ClueResult = {
+  it("L1: all but one slot absent", () => {
+    const r4: ClueResult = {
       kind: "elimination",
       mask: [true, true, true, true, false],
     };
-    const elim5: ClueResult = {
+    expect(ach.level1.detect(baseCtx({ status: "won", guesses: [guess("a", r4)] }))).toBe(true);
+    expect(ach.level2!.detect(baseCtx({ status: "won", guesses: [guess("a", r4)] }))).toBe(false);
+  });
+  it("L2: every slot absent", () => {
+    const r5: ClueResult = {
       kind: "elimination",
       mask: [true, true, true, true, true],
     };
-    expect(ach.level1.detect(baseCtx({ guesses: [guess("a", elim4)] }))).toBe(true);
-    expect(ach.level2!.detect(baseCtx({ guesses: [guess("a", elim4)] }))).toBe(false);
-    expect(ach.level2!.detect(baseCtx({ guesses: [guess("a", elim5)] }))).toBe(true);
+    expect(ach.level2!.detect(baseCtx({ status: "won", guesses: [guess("a", r5)] }))).toBe(true);
+  });
+  it("L1 scales with digits (5 of 6 = all-but-one)", () => {
+    const r6: ClueResult = {
+      kind: "elimination",
+      mask: [true, true, true, true, true, false],
+    };
+    expect(ach.level1.detect(baseCtx({ status: "won", digits: 6, target: "111111", guesses: [guess("a", r6)] }))).toBe(true);
   });
 });
 
-describe("Wide Miss", () => {
+describe("Wide Miss (winners only)", () => {
   const ach = findAch("wideMiss");
-  it("triggers on |delta| ≥ N (wins OR losses)", () => {
-    const big: ClueResult = { kind: "sumDelta", delta: -22 };
-    const huge: ClueResult = { kind: "sumDelta", delta: 27 };
-    expect(ach.level1.detect(baseCtx({ status: "lost", guesses: [guess("a", big)] }))).toBe(true);
-    expect(ach.level2!.detect(baseCtx({ status: "lost", guesses: [guess("a", big)] }))).toBe(false);
-    expect(ach.level2!.detect(baseCtx({ status: "lost", guesses: [guess("a", huge)] }))).toBe(true);
+  const big: ClueResult = { kind: "sumDelta", delta: -22 };
+  it("triggers on win", () => {
+    expect(ach.level1.detect(baseCtx({ status: "won", guesses: [guess("a", big)] }))).toBe(true);
+  });
+  it("does NOT trigger on loss anymore", () => {
+    expect(ach.level1.detect(baseCtx({ status: "lost", guesses: [guess("a", big)] }))).toBe(false);
   });
 });
 
-describe("Lucky Target", () => {
+describe("Trending Up (winners only)", () => {
+  const ach = findAch("trendingUp");
+  const r2: ClueResult = { kind: "bullseyeTrend", delta: 2 };
+  const r3: ClueResult = { kind: "bullseyeTrend", delta: 3 };
+  it("L1/L2 thresholds; win-only", () => {
+    expect(ach.level1.detect(baseCtx({ status: "won", guesses: [guess("a", r2)] }))).toBe(true);
+    expect(ach.level2!.detect(baseCtx({ status: "won", guesses: [guess("a", r3)] }))).toBe(true);
+    expect(ach.level1.detect(baseCtx({ status: "lost", guesses: [guess("a", r2)] }))).toBe(false);
+  });
+});
+
+describe("Cold Open (no starred clues used)", () => {
+  const ach = findAch("coldOpen");
+  // Curated set (per lib/game/clueSelector.ts) includes elimination,
+  // oracle, thermometer, etc. Non-curated examples include bullseyes
+  // and sumDelta.
+  it("L1: 5-digit win without any curated/starred clue", () => {
+    const guesses: ResolvedGuessLite[] = [
+      { guess: "11111", clueId: "bullseyes" },
+      { guess: "22222", clueId: "sumDelta" },
+    ];
+    expect(ach.level1.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(true);
+  });
+  it("L1 fails if any curated clue was used", () => {
+    // "elimination" is in ROUND1_CURATED_CLUE_IDS.
+    const guesses: ResolvedGuessLite[] = [
+      { guess: "11111", clueId: "elimination" },
+    ];
+    expect(ach.level1.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(false);
+  });
+  it("L2: same rule on 6-digit", () => {
+    const guesses: ResolvedGuessLite[] = [
+      { guess: "111111", clueId: "bullseyes" },
+    ];
+    expect(
+      ach.level2!.detect(
+        baseCtx({ status: "won", digits: 6, target: "111111", guesses }),
+      ),
+    ).toBe(true);
+  });
+});
+
+// --- Situational ---
+
+describe("Lucky Target (swapped L1/L2)", () => {
   const ach = findAch("luckyTarget");
-  it("L1: target ≤3 unique digits on win", () => {
+  it("L1: ≤3 unique", () => {
     expect(ach.level1.detect(baseCtx({ status: "won", target: "11223" }))).toBe(true);
   });
-  it("L2: target ≤2 unique digits on win", () => {
+  it("L2: ≤2 unique", () => {
     expect(ach.level2!.detect(baseCtx({ status: "won", target: "11221" }))).toBe(true);
     expect(ach.level2!.detect(baseCtx({ status: "won", target: "11223" }))).toBe(false);
   });
-  it("loss never triggers", () => {
-    expect(ach.level1.detect(baseCtx({ status: "lost", target: "11111" }))).toBe(false);
+});
+
+describe("Dice, Dice Baby", () => {
+  const ach = findAch("diceDiceBaby");
+  it("L1: target is all dice (1-6 only)", () => {
+    expect(ach.level1.detect(baseCtx({ status: "won", target: "12345" }))).toBe(true);
+    expect(ach.level1.detect(baseCtx({ status: "won", target: "12340" }))).toBe(false);
+  });
+  it("L2: target has no dice (0/7/8/9 only)", () => {
+    expect(ach.level2!.detect(baseCtx({ status: "won", target: "08970" }))).toBe(true);
+    expect(ach.level2!.detect(baseCtx({ status: "won", target: "08971" }))).toBe(false);
   });
 });
 
-describe("Dice-Free", () => {
-  const ach = findAch("diceFree");
-  it("triggers on target with no 1-6 digits", () => {
-    expect(ach.level1.detect(baseCtx({ status: "won", target: "08970" }))).toBe(true);
-  });
-  it("does not trigger if any dice digit appears", () => {
-    expect(ach.level1.detect(baseCtx({ status: "won", target: "08971" }))).toBe(false);
-  });
-});
-
-describe("Locksmith", () => {
-  const ach = findAch("locksmith");
-  it("counts correct locks across all guesses", () => {
-    const g = (locks: { correct: boolean }[]): ResolvedGuessLite => ({
-      guess: "11111",
-      locks: locks.map((l, i) => ({ slot: i, digit: "1", correct: l.correct })),
+describe("Eleventh Hour (split by digits)", () => {
+  const ach = findAch("eleventhHour");
+  const oracle: ClueResult = { kind: "oracle", slot: 1, digit: 2 };
+  it("L1: only 5-digit", () => {
+    const ctx5 = baseCtx({
+      status: "won",
+      digits: 5,
+      target: "12345",
+      guesses: [guess("10345", oracle)],
     });
-    const ctx = baseCtx({
-      guesses: [
-        g([{ correct: true }, { correct: false }]),
-        g([{ correct: true }]),
-      ],
+    expect(ach.level1.detect(ctx5)).toBe(true);
+    expect(ach.level2!.detect(ctx5)).toBe(false);
+  });
+  it("L2: only 6-digit", () => {
+    const ctx6 = baseCtx({
+      status: "won",
+      digits: 6,
+      target: "123456",
+      guesses: [guess("103456", oracle)],
     });
-    expect(ach.level1.detect(ctx)).toBe(true); // 2 correct
-    expect(ach.level2!.detect(ctx)).toBe(false);
-    const ctx3 = baseCtx({
-      guesses: [
-        g([{ correct: true }, { correct: true }, { correct: true }]),
-      ],
-    });
-    expect(ach.level2!.detect(ctx3)).toBe(true);
-  });
-});
-
-describe("Trending Up", () => {
-  const ach = findAch("trendingUp");
-  it("L1: bullseyeTrend delta ≥ 2", () => {
-    const r: ClueResult = { kind: "bullseyeTrend", delta: 2 };
-    expect(ach.level1.detect(baseCtx({ guesses: [guess("a", r)] }))).toBe(true);
-    expect(ach.level2!.detect(baseCtx({ guesses: [guess("a", r)] }))).toBe(false);
-  });
-  it("L2: ≥ 3", () => {
-    const r: ClueResult = { kind: "bullseyeTrend", delta: 3 };
-    expect(ach.level2!.detect(baseCtx({ guesses: [guess("a", r)] }))).toBe(true);
-  });
-});
-
-describe("Streaker", () => {
-  const ach = findAch("streaker");
-  it("only counts daily mode + 7-day streak", () => {
-    expect(
-      ach.level1.detect(
-        baseCtx({ mode: "daily", dailyStreakEndingToday: 7 }),
-      ),
-    ).toBe(true);
-    expect(
-      ach.level1.detect(
-        baseCtx({ mode: "unlimited", dailyStreakEndingToday: 7 }),
-      ),
-    ).toBe(false);
-    expect(
-      ach.level1.detect(
-        baseCtx({ mode: "daily", dailyStreakEndingToday: 6 }),
-      ),
-    ).toBe(false);
+    expect(ach.level1.detect(ctx6)).toBe(false);
+    expect(ach.level2!.detect(ctx6)).toBe(true);
   });
 });

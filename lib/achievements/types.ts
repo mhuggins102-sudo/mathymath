@@ -13,6 +13,9 @@ export interface AchievementCtx {
   guesses: readonly ResolvedGuessLite[];
   advancedMode: boolean;
   preselectedMode: boolean;
+  /** Per-game guess budget. Used by detectors that need to know
+   *  whether a win happened on the very last possible turn. */
+  maxGuesses: number;
   /** Total wins across BOTH modes (daily + unlimited) as of right now. */
   totalWins: number;
   /** Locks remaining at game end (≥0). */
@@ -23,6 +26,15 @@ export interface AchievementCtx {
    *  mode (don't gate daily-specific detectors on this — they should
    *  also check `mode === "daily"`). */
   dailyStreakEndingToday: number;
+  /** Unlimited current-streak snapshot by (digit, difficulty) bucket,
+   *  post-recording. Detectors that gate on long unlimited streaks
+   *  read from here. Daily mode populates these from PersonalStats
+   *  too, though daily-specific achievements should use
+   *  `dailyStreakEndingToday`. */
+  unlimitedStreakByBucket: {
+    "5": { normal: number; hard: number };
+    "6": { normal: number; hard: number };
+  };
 }
 
 /** The subset of ResolvedGuess that achievement detectors care about.

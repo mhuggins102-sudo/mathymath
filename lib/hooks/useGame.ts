@@ -222,6 +222,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       guesses: state.guesses,
       advancedMode: state.advancedMode,
       preselectedMode: state.preselectedDeck !== null,
+      maxGuesses: state.maxGuesses,
     });
     const unlocks = runAchievementCheck(ctx);
     if (unlocks.length > 0) pushAchievementToasts(unlocks);
