@@ -26,14 +26,20 @@ export interface AchievementCtx {
    *  mode (don't gate daily-specific detectors on this — they should
    *  also check `mode === "daily"`). */
   dailyStreakEndingToday: number;
-  /** Unlimited current-streak snapshot by (digit, difficulty) bucket,
-   *  post-recording. Detectors that gate on long unlimited streaks
-   *  read from here. Daily mode populates these from PersonalStats
-   *  too, though daily-specific achievements should use
+  /** Unlimited current-streak snapshot by (digit, difficulty, clueMode)
+   *  bucket, post-recording. Detectors gate long unlimited streaks
+   *  on this. Daily mode populates these from PersonalStats too,
+   *  though daily-specific achievements should use
    *  `dailyStreakEndingToday`. */
   unlimitedStreakByBucket: {
-    "5": { normal: number; hard: number };
-    "6": { normal: number; hard: number };
+    "5": {
+      normal: { manual: number; auto: number };
+      hard: { manual: number; auto: number };
+    };
+    "6": {
+      normal: { manual: number; auto: number };
+      hard: { manual: number; auto: number };
+    };
   };
 }
 

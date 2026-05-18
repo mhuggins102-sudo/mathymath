@@ -55,12 +55,24 @@ export function buildAchievementCtx(args: BuildCtxArgs): AchievementCtx {
     dailyStreakEndingToday: daily.currentStreak,
     unlimitedStreakByBucket: {
       "5": {
-        normal: unlimited.byDigits["5"].normal.currentStreak,
-        hard: unlimited.byDigits["5"].hard.currentStreak,
+        normal: {
+          manual: unlimited.byDigits["5"].normal.manual.currentStreak,
+          auto: unlimited.byDigits["5"].normal.auto.currentStreak,
+        },
+        hard: {
+          manual: unlimited.byDigits["5"].hard.manual.currentStreak,
+          auto: unlimited.byDigits["5"].hard.auto.currentStreak,
+        },
       },
       "6": {
-        normal: unlimited.byDigits["6"].normal.currentStreak,
-        hard: unlimited.byDigits["6"].hard.currentStreak,
+        normal: {
+          manual: unlimited.byDigits["6"].normal.manual.currentStreak,
+          auto: unlimited.byDigits["6"].normal.auto.currentStreak,
+        },
+        hard: {
+          manual: unlimited.byDigits["6"].hard.manual.currentStreak,
+          auto: unlimited.byDigits["6"].hard.auto.currentStreak,
+        },
       },
     },
   };
