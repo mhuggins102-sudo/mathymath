@@ -112,12 +112,16 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
                       {ach.description}
                     </p>
                     <p className="text-foreground leading-snug">
-                      <span className="font-medium">Level 1:</span>{" "}
+                      <span className="font-medium text-slate-300">
+                        {ach.level2 ? "Silver:" : "Gold:"}
+                      </span>{" "}
                       {ach.level1.label}
                     </p>
                     {ach.level2 && (
                       <p className="text-foreground leading-snug">
-                        <span className="font-medium">Level 2:</span>{" "}
+                        <span className="font-medium text-amber-400">
+                          Gold:
+                        </span>{" "}
                         {ach.level2.label}
                       </p>
                     )}

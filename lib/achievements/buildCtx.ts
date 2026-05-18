@@ -20,12 +20,14 @@ interface BuildCtxArgs {
   guesses: readonly ResolvedGuessLite[];
   advancedMode: boolean;
   preselectedMode: boolean;
+  maxGuesses: number;
 }
 
 /** Assemble an AchievementCtx from the just-finished game. Reads
  *  aggregate stats AFTER the round's recordResult calls have run, so
  *  totals reflect the current game. Daily streak comes from the daily
- *  history (already updated by `recordDailyResult`). */
+ *  history (already updated by `recordDailyResult`); unlimited streaks
+ *  come from the difficulty-split PersonalStats buckets. */
 export function buildAchievementCtx(args: BuildCtxArgs): AchievementCtx {
   const unlimited = loadUnlimitedStats();
   const daily = dailyHistoryStats(loadDailyHistory());
@@ -46,9 +48,20 @@ export function buildAchievementCtx(args: BuildCtxArgs): AchievementCtx {
     guesses: args.guesses,
     advancedMode: args.advancedMode,
     preselectedMode: args.preselectedMode,
+    maxGuesses: args.maxGuesses,
     totalWins,
     locksRemaining,
     redrawsUsed,
     dailyStreakEndingToday: daily.currentStreak,
+    unlimitedStreakByBucket: {
+      "5": {
+        normal: unlimited.byDigits["5"].normal.currentStreak,
+        hard: unlimited.byDigits["5"].hard.currentStreak,
+      },
+      "6": {
+        normal: unlimited.byDigits["6"].normal.currentStreak,
+        hard: unlimited.byDigits["6"].hard.currentStreak,
+      },
+    },
   };
 }

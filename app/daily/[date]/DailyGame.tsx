@@ -146,6 +146,7 @@ export function DailyGame({
         // Daily is always normal mode (no advanced / no preselected).
         advancedMode: false,
         preselectedMode: false,
+        maxGuesses: state.maxGuesses,
       });
       const unlocks = runAchievementCheck(ctx);
       if (unlocks.length > 0) pushAchievementToasts(unlocks);

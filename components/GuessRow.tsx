@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Digit, type DigitBadge, type DigitState } from "./Digit";
 import type { Clue, ClueResult, ClueResultFor } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
+import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
 
 interface GuessRowProps {
   guess: string;
@@ -508,6 +509,7 @@ function ClueLabelContent({
 }) {
   const meta = getClueById(result.kind);
   const sub = subLabelFor(guess, result);
+  const curated = ROUND1_CURATED_CLUE_IDS.has(meta.id);
   // `h-full` + `justify-center` makes the two-line block genuinely
   // vertically centered against the digit cells in the same row.
   // `text-left` balances the row: the label now hugs the main's left
@@ -517,6 +519,14 @@ function ClueLabelContent({
     <div className="flex flex-col justify-center text-left min-w-0 h-full">
       <span className="text-[12px] sm:text-[13px] font-semibold text-foreground truncate leading-tight">
         {meta.name}
+        {curated && (
+          <span
+            aria-hidden
+            className="ml-1 text-warn text-[10px] align-baseline"
+          >
+            ★
+          </span>
+        )}
       </span>
       {sub && (
         <span
@@ -704,6 +714,14 @@ export function GuessRow({
             }`}
           >
             {upcomingClue.name}
+            {ROUND1_CURATED_CLUE_IDS.has(upcomingClue.id) && (
+              <span
+                aria-hidden
+                className="ml-1 text-warn text-[10px] align-baseline"
+              >
+                ★
+              </span>
+            )}
           </span>
         </button>
       );

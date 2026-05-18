@@ -59,7 +59,9 @@ export function AchievementToastHost() {
         <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-wider text-muted">
             {ach.level2
-              ? `Achievement unlocked · Level ${current.level}`
+              ? `Achievement unlocked · ${
+                  current.level === 2 ? "Gold" : "Silver"
+                }`
               : "Achievement unlocked"}
           </p>
           <p className="text-sm font-semibold text-foreground truncate">
