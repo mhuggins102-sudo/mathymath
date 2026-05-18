@@ -243,12 +243,23 @@ const personalStatsV3Schema = z.object({
   }),
 });
 
-/** v4 splits each per-digit bucket into Normal vs Hard so the stats UI
- *  can filter on difficulty. v3 data migrates everything into the
- *  `normal` slot — Hard mode existed before v4 but wasn't tracked
- *  separately, so we lose that distinction for legacy plays. New
- *  plays after the migration are tagged correctly. */
-const perDigitByModeSchema = z.object({
+/** v4 split each per-digit bucket into Normal vs Hard.
+ *  v5 adds a third axis: Manual vs Auto clue selection. v4 data
+ *  migrates to the `manual` slot (we didn't track auto/manual
+ *  separately before, and manual was the original default — close
+ *  enough; player can rebuild auto stats by playing). */
+const perDigitByClueSchema = z.object({
+  manual: perDigitStatsSchema,
+  auto: perDigitStatsSchema,
+});
+
+const perDigitByDifficultyByClueSchema = z.object({
+  normal: perDigitByClueSchema,
+  hard: perDigitByClueSchema,
+});
+
+// v4 — preserved for migration only.
+const perDigitByModeV4Schema = z.object({
   normal: perDigitStatsSchema,
   hard: perDigitStatsSchema,
 });
@@ -258,15 +269,29 @@ const personalStatsV4Schema = z.object({
   currentStreak: z.number(),
   bestStreak: z.number(),
   byDigits: z.object({
-    "5": perDigitByModeSchema,
-    "6": perDigitByModeSchema,
+    "5": perDigitByModeV4Schema,
+    "6": perDigitByModeV4Schema,
+  }),
+});
+
+const personalStatsV5Schema = z.object({
+  version: z.literal(5),
+  currentStreak: z.number(),
+  bestStreak: z.number(),
+  byDigits: z.object({
+    "5": perDigitByDifficultyByClueSchema,
+    "6": perDigitByDifficultyByClueSchema,
   }),
 });
 
 export type PerDigitStats = z.infer<typeof perDigitStatsSchema>;
-export type PerDigitByMode = z.infer<typeof perDigitByModeSchema>;
-export type PersonalStats = z.infer<typeof personalStatsV4Schema>;
+export type PerDigitByClue = z.infer<typeof perDigitByClueSchema>;
+export type PerDigitByDifficultyByClue = z.infer<
+  typeof perDigitByDifficultyByClueSchema
+>;
+export type PersonalStats = z.infer<typeof personalStatsV5Schema>;
 export type StatsDifficulty = "normal" | "hard";
+export type StatsClueMode = "manual" | "auto";
 
 const STATS_KEY_UNLIMITED = "stats:unlimited";
 
@@ -280,24 +305,31 @@ function emptyPerDigit(): PerDigitStats {
   };
 }
 
-function emptyPerDigitByMode(): PerDigitByMode {
-  return { normal: emptyPerDigit(), hard: emptyPerDigit() };
+function emptyPerDigitByClue(): PerDigitByClue {
+  return { manual: emptyPerDigit(), auto: emptyPerDigit() };
+}
+
+function emptyPerDigitByDifficultyByClue(): PerDigitByDifficultyByClue {
+  return {
+    normal: emptyPerDigitByClue(),
+    hard: emptyPerDigitByClue(),
+  };
 }
 
 function emptyStats(): PersonalStats {
   return {
-    version: 4,
+    version: 5,
     currentStreak: 0,
     bestStreak: 0,
     byDigits: {
-      "5": emptyPerDigitByMode(),
-      "6": emptyPerDigitByMode(),
+      "5": emptyPerDigitByDifficultyByClue(),
+      "6": emptyPerDigitByDifficultyByClue(),
     },
   };
 }
 
-/** v1 → v4: predates 6-digit AND difficulty split; bucket everything
- *  into the 5-digit Normal slot, copy global streaks. */
+/** v1 → v5: predates 6-digit, difficulty split, AND auto/manual; bucket
+ *  everything into 5-digit Normal Manual, copy global streaks. */
 function migrateV1(v1: z.infer<typeof personalStatsV1Schema>): PersonalStats {
   const slot: PerDigitStats = {
     played: v1.played,
@@ -307,48 +339,84 @@ function migrateV1(v1: z.infer<typeof personalStatsV1Schema>): PersonalStats {
     bestStreak: v1.bestStreak,
   };
   return {
-    version: 4,
+    version: 5,
     currentStreak: v1.currentStreak,
     bestStreak: v1.bestStreak,
     byDigits: {
-      "5": { normal: slot, hard: emptyPerDigit() },
-      "6": emptyPerDigitByMode(),
+      "5": {
+        normal: { manual: slot, auto: emptyPerDigit() },
+        hard: emptyPerDigitByClue(),
+      },
+      "6": emptyPerDigitByDifficultyByClue(),
     },
   };
 }
 
-/** v2 → v4: keep global streaks; per-bucket streaks default to 0;
- *  legacy plays land in Normal (Hard wasn't separately tracked). */
+/** v2 → v5: keep global streaks; per-bucket streaks default to 0;
+ *  legacy plays land in Normal Manual (Hard / Auto weren't separately
+ *  tracked). */
 function migrateV2(v2: z.infer<typeof personalStatsV2Schema>): PersonalStats {
   return {
-    version: 4,
+    version: 5,
     currentStreak: v2.currentStreak,
     bestStreak: v2.bestStreak,
     byDigits: {
       "5": {
-        normal: { ...v2.byDigits["5"], currentStreak: 0, bestStreak: 0 },
-        hard: emptyPerDigit(),
+        normal: {
+          manual: { ...v2.byDigits["5"], currentStreak: 0, bestStreak: 0 },
+          auto: emptyPerDigit(),
+        },
+        hard: emptyPerDigitByClue(),
       },
       "6": {
-        normal: { ...v2.byDigits["6"], currentStreak: 0, bestStreak: 0 },
-        hard: emptyPerDigit(),
+        normal: {
+          manual: { ...v2.byDigits["6"], currentStreak: 0, bestStreak: 0 },
+          auto: emptyPerDigit(),
+        },
+        hard: emptyPerDigitByClue(),
       },
     },
   };
 }
 
-/** v3 → v4: keep streaks; legacy per-digit stats land in Normal. Old
- *  Hard-mode plays counted in v3's per-digit bucket are not separable
- *  retroactively, so they stay merged into Normal — acceptable since
- *  Hard is a small minority of plays in practice. */
+/** v3 → v5: keep streaks; legacy per-digit stats land in Normal Manual.
+ *  Old Hard / Auto plays counted in v3's per-digit bucket are not
+ *  separable retroactively. */
 function migrateV3(v3: z.infer<typeof personalStatsV3Schema>): PersonalStats {
   return {
-    version: 4,
+    version: 5,
     currentStreak: v3.currentStreak,
     bestStreak: v3.bestStreak,
     byDigits: {
-      "5": { normal: v3.byDigits["5"], hard: emptyPerDigit() },
-      "6": { normal: v3.byDigits["6"], hard: emptyPerDigit() },
+      "5": {
+        normal: { manual: v3.byDigits["5"], auto: emptyPerDigit() },
+        hard: emptyPerDigitByClue(),
+      },
+      "6": {
+        normal: { manual: v3.byDigits["6"], auto: emptyPerDigit() },
+        hard: emptyPerDigitByClue(),
+      },
+    },
+  };
+}
+
+/** v4 → v5: split each (digit, difficulty) into Manual/Auto. Existing
+ *  v4 plays predate the auto-vs-manual split, so they all land under
+ *  Manual — players can rebuild Auto stats by playing. */
+function migrateV4(v4: z.infer<typeof personalStatsV4Schema>): PersonalStats {
+  return {
+    version: 5,
+    currentStreak: v4.currentStreak,
+    bestStreak: v4.bestStreak,
+    byDigits: {
+      "5": {
+        normal: { manual: v4.byDigits["5"].normal, auto: emptyPerDigit() },
+        hard: { manual: v4.byDigits["5"].hard, auto: emptyPerDigit() },
+      },
+      "6": {
+        normal: { manual: v4.byDigits["6"].normal, auto: emptyPerDigit() },
+        hard: { manual: v4.byDigits["6"].hard, auto: emptyPerDigit() },
+      },
     },
   };
 }
@@ -363,9 +431,11 @@ export function loadUnlimitedStats(): PersonalStats {
   } catch {
     return emptyStats();
   }
-  // Try v4, then v3, v2, v1, then give up.
+  // Try v5, then v4, v3, v2, v1, then give up.
+  const asV5 = personalStatsV5Schema.safeParse(parsed);
+  if (asV5.success) return asV5.data;
   const asV4 = personalStatsV4Schema.safeParse(parsed);
-  if (asV4.success) return asV4.data;
+  if (asV4.success) return migrateV4(asV4.data);
   const asV3 = personalStatsV3Schema.safeParse(parsed);
   if (asV3.success) return migrateV3(asV3.data);
   const asV2 = personalStatsV2Schema.safeParse(parsed);
@@ -380,13 +450,14 @@ export function recordUnlimitedResult(
   guessCount: number,
   digits: number,
   difficulty: StatsDifficulty,
+  clueMode: StatsClueMode,
 ): PersonalStats {
   const s = loadUnlimitedStats();
-  // Bucket by (digits, difficulty). Anything outside the 5/6 keys we
-  // know about gets coerced to "5" so legacy callers don't silently
-  // drop data.
+  // Bucket by (digits, difficulty, clueMode). Anything outside the
+  // 5/6 keys we know about gets coerced to "5" so legacy callers
+  // don't silently drop data.
   const dKey: "5" | "6" = digits === 6 ? "6" : "5";
-  const bucket = s.byDigits[dKey][difficulty];
+  const bucket = s.byDigits[dKey][difficulty][clueMode];
   bucket.played += 1;
   if (won) {
     bucket.wins += 1;
@@ -422,17 +493,21 @@ export function sliceUnlimitedStats(
   opts: {
     digit?: "all" | "5" | "6";
     difficulty?: "all" | StatsDifficulty;
+    clueMode?: "all" | StatsClueMode;
   } = {},
 ): PerDigitStats {
   const digitOpt = opts.digit ?? "all";
   const diffOpt = opts.difficulty ?? "all";
+  const clueOpt = opts.clueMode ?? "all";
   const digitKeys: ("5" | "6")[] = digitOpt === "all" ? ["5", "6"] : [digitOpt];
   const diffKeys: StatsDifficulty[] =
     diffOpt === "all" ? ["normal", "hard"] : [diffOpt];
+  const clueKeys: StatsClueMode[] =
+    clueOpt === "all" ? ["manual", "auto"] : [clueOpt];
 
   // Single-bucket pass-through preserves the bucket's own streaks.
-  if (digitKeys.length === 1 && diffKeys.length === 1) {
-    return { ...s.byDigits[digitKeys[0]][diffKeys[0]] };
+  if (digitKeys.length === 1 && diffKeys.length === 1 && clueKeys.length === 1) {
+    return { ...s.byDigits[digitKeys[0]][diffKeys[0]][clueKeys[0]] };
   }
 
   const out: PerDigitStats = {
@@ -442,11 +517,13 @@ export function sliceUnlimitedStats(
   };
   for (const d of digitKeys) {
     for (const m of diffKeys) {
-      const b = s.byDigits[d][m];
-      out.played += b.played;
-      out.wins += b.wins;
-      for (const [k, v] of Object.entries(b.distribution)) {
-        out.distribution[k] = (out.distribution[k] ?? 0) + v;
+      for (const c of clueKeys) {
+        const b = s.byDigits[d][m][c];
+        out.played += b.played;
+        out.wins += b.wins;
+        for (const [k, v] of Object.entries(b.distribution)) {
+          out.distribution[k] = (out.distribution[k] ?? 0) + v;
+        }
       }
     }
   }

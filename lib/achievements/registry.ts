@@ -183,20 +183,26 @@ const hotHand: Achievement = {
   name: "Hot Hand",
   description: "Long unlimited win streaks at 5 digits.",
   level1: {
-    // "5-digit unlimited" without difficulty constraint — accept a
-    // streak of 10 in either Normal or Hard 5-digit unlimited.
+    // "5-digit unlimited" without difficulty / clue-mode constraint —
+    // accept the max streak across all four 5-digit buckets.
     label: "Win 10 in a row in 5-digit unlimited.",
     detect: (c) => {
       if (c.mode !== "unlimited" || c.status !== "won") return false;
       const b5 = c.unlimitedStreakByBucket["5"];
-      return b5.normal >= 10 || b5.hard >= 10;
+      return (
+        b5.normal.manual >= 10 ||
+        b5.normal.auto >= 10 ||
+        b5.hard.manual >= 10 ||
+        b5.hard.auto >= 10
+      );
     },
   },
   level2: {
     label: "Win 20 in a row in 5-digit Hard unlimited.",
     detect: (c) => {
       if (c.mode !== "unlimited" || c.status !== "won") return false;
-      return c.unlimitedStreakByBucket["5"].hard >= 20;
+      const h = c.unlimitedStreakByBucket["5"].hard;
+      return h.manual >= 20 || h.auto >= 20;
     },
   },
 };
@@ -210,21 +216,19 @@ const endurance: Achievement = {
     detect: (c) => {
       if (c.mode !== "unlimited" || c.status !== "won") return false;
       const b6 = c.unlimitedStreakByBucket["6"];
-      return b6.normal >= 10 || b6.hard >= 10;
+      return (
+        b6.normal.manual >= 10 ||
+        b6.normal.auto >= 10 ||
+        b6.hard.manual >= 10 ||
+        b6.hard.auto >= 10
+      );
     },
   },
   level2: {
-    // L2 also requires the current game to be Hard + Auto — the
-    // streak counter alone can't distinguish auto from manual, so we
-    // gate on the current game's mode flags plus a sufficient 6-digit
-    // hard streak. Players consistent in Hard Auto will trip it
-    // naturally.
-    label:
-      "Win 10 in a row in 6-digit Hard Auto unlimited (current game in Hard Auto).",
+    label: "Win 10 in a row in 6-digit Hard Auto unlimited.",
     detect: (c) => {
       if (c.mode !== "unlimited" || c.status !== "won") return false;
-      if (!c.advancedMode || !c.preselectedMode || c.digits !== 6) return false;
-      return c.unlimitedStreakByBucket["6"].hard >= 10;
+      return c.unlimitedStreakByBucket["6"].hard.auto >= 10;
     },
   },
 };

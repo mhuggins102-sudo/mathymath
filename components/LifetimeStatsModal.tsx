@@ -9,6 +9,7 @@ import {
   type DailyHistoryStats,
   type PerDigitStats,
   type PersonalStats,
+  type StatsClueMode,
   type StatsDifficulty,
 } from "@/lib/persistence/localStore";
 import {
@@ -19,9 +20,10 @@ import { Modal } from "./Modal";
 
 export type StatsMode = "daily" | "unlimited" | "both";
 
-/** Filter for the unlimited block: digit count + difficulty mode. */
+/** Filter for the unlimited block: three independent axes. */
 type DigitFilter = "all" | "5" | "6";
 type DifficultyFilter = "all" | StatsDifficulty;
+type ClueModeFilter = "all" | StatsClueMode;
 
 interface LifetimeStatsModalProps {
   open: boolean;
@@ -41,6 +43,8 @@ export function LifetimeStatsModal({
   const [digitFilter, setDigitFilter] = useState<DigitFilter>("all");
   const [difficultyFilter, setDifficultyFilter] =
     useState<DifficultyFilter>("all");
+  const [clueModeFilter, setClueModeFilter] =
+    useState<ClueModeFilter>("all");
 
   useEffect(() => {
     if (!open) return;
@@ -83,11 +87,12 @@ export function LifetimeStatsModal({
     const stats = sliceUnlimitedStats(unlimited, {
       digit: digitFilter,
       difficulty: difficultyFilter,
+      clueMode: clueModeFilter,
     });
     const maxGuesses =
       difficultyFilter === "hard" ? HARD_MAX_GUESSES : DEFAULT_MAX_GUESSES;
     return { stats, maxGuesses };
-  }, [unlimited, digitFilter, difficultyFilter]);
+  }, [unlimited, digitFilter, difficultyFilter, clueModeFilter]);
 
   const content = (
     <>
@@ -127,26 +132,36 @@ export function LifetimeStatsModal({
             distribution={unlimitedView.stats.distribution}
             maxGuesses={unlimitedView.maxGuesses}
             header={
-              <div className="space-y-1.5 mb-3">
-                <FilterRow<DigitFilter>
-                  ariaLabel="Unlimited stats — number length filter"
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <FilterDropdown<DigitFilter>
+                  label="Digits"
                   options={[
                     { v: "all", label: "All" },
-                    { v: "5", label: "5-digit" },
-                    { v: "6", label: "6-digit" },
+                    { v: "5", label: "5" },
+                    { v: "6", label: "6" },
                   ]}
                   value={digitFilter}
                   onChange={setDigitFilter}
                 />
-                <FilterRow<DifficultyFilter>
-                  ariaLabel="Unlimited stats — difficulty filter"
+                <FilterDropdown<DifficultyFilter>
+                  label="Difficulty"
                   options={[
                     { v: "all", label: "All" },
-                    { v: "normal", label: "Normal" },
+                    { v: "normal", label: "Easy" },
                     { v: "hard", label: "Hard" },
                   ]}
                   value={difficultyFilter}
                   onChange={setDifficultyFilter}
+                />
+                <FilterDropdown<ClueModeFilter>
+                  label="Clues"
+                  options={[
+                    { v: "all", label: "All" },
+                    { v: "manual", label: "Manual" },
+                    { v: "auto", label: "Auto" },
+                  ]}
+                  value={clueModeFilter}
+                  onChange={setClueModeFilter}
                 />
               </div>
             }
@@ -169,45 +184,36 @@ export function LifetimeStatsModal({
   );
 }
 
-/** Generic 3-option segmented filter. Used for both the digit-count
- *  and the difficulty-mode rows in the unlimited stats block. */
-function FilterRow<T extends string>({
-  ariaLabel,
+/** Labeled native <select> dropdown. Used for the three independent
+ *  filter axes (Digits / Difficulty / Clues) at the top of the
+ *  Unlimited stats block. Native select gives us free accessibility
+ *  + mobile picker UX without a popover library. */
+function FilterDropdown<T extends string>({
+  label,
   options,
   value,
   onChange,
 }: {
-  ariaLabel: string;
+  label: string;
   options: { v: T; label: string }[];
   value: T;
   onChange: (next: T) => void;
 }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label={ariaLabel}
-      className="grid grid-cols-3 gap-1 bg-surface rounded-md p-1"
-    >
-      {options.map((opt) => {
-        const selected = value === opt.v;
-        return (
-          <button
-            key={opt.v}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => onChange(opt.v)}
-            className={`text-[11px] font-semibold py-1 rounded transition ${
-              selected
-                ? "bg-accent/80 text-background"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
+    <label className="flex flex-col gap-1 text-[11px] uppercase tracking-wider text-muted">
+      <span>{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="w-full text-sm font-semibold text-foreground bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent/60"
+      >
+        {options.map((opt) => (
+          <option key={opt.v} value={opt.v}>
             {opt.label}
-          </button>
-        );
-      })}
-    </div>
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

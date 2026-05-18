@@ -208,6 +208,7 @@ export function useGame(config: UseGameConfig): UseGameResult {
       state.guesses.length,
       state.digits,
       state.advancedMode ? "hard" : "normal",
+      state.preselectedDeck !== null ? "auto" : "manual",
     );
     statsRecordedRef.current = true;
     setUnlimitedStats(updated);

@@ -27,8 +27,14 @@ function baseCtx(overrides: Partial<AchievementCtx> = {}): AchievementCtx {
     redrawsUsed: 0,
     dailyStreakEndingToday: 0,
     unlimitedStreakByBucket: {
-      "5": { normal: 0, hard: 0 },
-      "6": { normal: 0, hard: 0 },
+      "5": {
+        normal: { manual: 0, auto: 0 },
+        hard: { manual: 0, auto: 0 },
+      },
+      "6": {
+        normal: { manual: 0, auto: 0 },
+        hard: { manual: 0, auto: 0 },
+      },
     },
     ...overrides,
   };
@@ -208,13 +214,19 @@ describe("Streaker", () => {
 
 describe("Hot Hand (5-digit unlimited streaks)", () => {
   const ach = findAch("hotHand");
-  it("L1: 10+ streak in either Normal or Hard 5-digit", () => {
+  it("L1: 10+ streak in any 5-digit bucket", () => {
     const c1 = baseCtx({
       mode: "unlimited",
       status: "won",
       unlimitedStreakByBucket: {
-        "5": { normal: 10, hard: 0 },
-        "6": { normal: 0, hard: 0 },
+        "5": {
+          normal: { manual: 10, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
+        "6": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
       },
     });
     expect(ach.level1.detect(c1)).toBe(true);
@@ -222,76 +234,89 @@ describe("Hot Hand (5-digit unlimited streaks)", () => {
       mode: "unlimited",
       status: "won",
       unlimitedStreakByBucket: {
-        "5": { normal: 0, hard: 10 },
-        "6": { normal: 0, hard: 0 },
+        "5": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 10 },
+        },
+        "6": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
       },
     });
     expect(ach.level1.detect(c2)).toBe(true);
   });
-  it("L2: 20+ streak in 5-digit Hard specifically", () => {
+  it("L2: 20+ streak in 5-digit Hard (manual or auto)", () => {
     const c = baseCtx({
       mode: "unlimited",
       status: "won",
       unlimitedStreakByBucket: {
-        "5": { normal: 50, hard: 20 },
-        "6": { normal: 0, hard: 0 },
+        "5": {
+          normal: { manual: 50, auto: 0 },
+          hard: { manual: 20, auto: 0 },
+        },
+        "6": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
       },
     });
     expect(ach.level2!.detect(c)).toBe(true);
-    const cNo = baseCtx({
-      mode: "unlimited",
-      status: "won",
-      unlimitedStreakByBucket: {
-        "5": { normal: 50, hard: 19 },
-        "6": { normal: 0, hard: 0 },
-      },
-    });
-    expect(ach.level2!.detect(cNo)).toBe(false);
   });
 });
 
 describe("Endurance (6-digit unlimited streaks)", () => {
   const ach = findAch("endurance");
-  it("L1: 10+ streak in either 6-digit difficulty", () => {
+  it("L1: 10+ streak in any 6-digit bucket", () => {
     const c = baseCtx({
       mode: "unlimited",
       status: "won",
       unlimitedStreakByBucket: {
-        "5": { normal: 0, hard: 0 },
-        "6": { normal: 10, hard: 0 },
+        "5": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
+        "6": {
+          normal: { manual: 10, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
       },
     });
     expect(ach.level1.detect(c)).toBe(true);
   });
-  it("L2: 10+ streak in 6-digit Hard + current game is Hard Auto 6-digit", () => {
+  it("L2: 10+ streak in the 6-digit Hard Auto bucket specifically", () => {
     const c = baseCtx({
       mode: "unlimited",
       status: "won",
-      digits: 6,
-      advancedMode: true,
-      preselectedMode: true,
       unlimitedStreakByBucket: {
-        "5": { normal: 0, hard: 0 },
-        "6": { normal: 0, hard: 10 },
+        "5": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
+        "6": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 10 },
+        },
       },
     });
     expect(ach.level2!.detect(c)).toBe(true);
   });
-  it("L2 fails when current game isn't Hard Auto 6-digit", () => {
-    const cBase = baseCtx({
+  it("L2 fails when only the Hard Manual streak hits 10", () => {
+    const c = baseCtx({
       mode: "unlimited",
       status: "won",
-      digits: 6,
-      advancedMode: true,
-      preselectedMode: true,
       unlimitedStreakByBucket: {
-        "5": { normal: 0, hard: 0 },
-        "6": { normal: 0, hard: 10 },
+        "5": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 0, auto: 0 },
+        },
+        "6": {
+          normal: { manual: 0, auto: 0 },
+          hard: { manual: 50, auto: 9 },
+        },
       },
     });
-    expect(ach.level2!.detect({ ...cBase, preselectedMode: false })).toBe(false);
-    expect(ach.level2!.detect({ ...cBase, advancedMode: false })).toBe(false);
-    expect(ach.level2!.detect({ ...cBase, digits: 5 })).toBe(false);
+    expect(ach.level2!.detect(c)).toBe(false);
   });
 });
 
