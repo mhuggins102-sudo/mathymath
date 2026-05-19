@@ -35,14 +35,15 @@ function trophyTierFor(
 
 export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
   const [store, setStore] = useState<AchievementsStore | null>(null);
-  // Per-achievement expanded state for the info popover. Local to the
-  // current modal session — closes whenever the modal closes.
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Single-open achievement — clicking another card collapses the
+  // previous one. Local to the current modal session; resets to null
+  // on every modal-open.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setStore(loadAchievements());
-    setExpanded({});
+    setExpandedId(null);
   }, [open]);
 
   let unlockedCount = 0;
@@ -79,12 +80,9 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
           {ACHIEVEMENTS.map((ach) => {
             const u = store?.unlocked[ach.id];
             const tier = trophyTierFor(ach, u);
-            const isExpanded = !!expanded[ach.id];
+            const isExpanded = expandedId === ach.id;
             const toggle = () =>
-              setExpanded((prev) => ({
-                ...prev,
-                [ach.id]: !prev[ach.id],
-              }));
+              setExpandedId((cur) => (cur === ach.id ? null : ach.id));
             return (
               <li
                 key={ach.id}
