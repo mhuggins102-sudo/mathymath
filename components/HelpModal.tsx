@@ -8,7 +8,15 @@ import { ClueLegend } from "./ClueLegend";
 import { ClueLockBadge } from "./ClueLockBadge";
 import { Modal } from "./Modal";
 
-type AccordionId = "basics" | "clues" | "locks" | "tips";
+type AccordionId =
+  | "basics"
+  | "modes"
+  | "clues"
+  | "colors"
+  | "locks"
+  | "settings"
+  | "stats"
+  | "tips";
 
 interface HelpModalProps {
   open: boolean;
@@ -66,15 +74,46 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             onToggle={() => toggleSection("basics")}
           >
             <p>
-              Guess the secret 5-digit number in 7 tries. Digits can
-              repeat — e.g.{" "}
+              Guess the secret 5-digit number in{" "}
+              <strong className="text-foreground">7 tries</strong>. Digits
+              can repeat — e.g.{" "}
               <span className="font-mono text-foreground">74727</span> is a
               valid target.
             </p>
             <p>
-              Unlimited mode adds a harder 6-digit variant with the same
-              7-tries budget. Toggle it in{" "}
-              <span className="text-foreground">Settings</span>.
+              Each guess is scored by a{" "}
+              <strong className="text-foreground">clue</strong> you pick
+              from a two-option chooser. The clue paints the row with
+              colors — match (green), warm (info), cold (info), or idle
+              (no info) — that progressively narrow the target.
+            </p>
+            <p>
+              Win by submitting the exact target before you run out of
+              turns. Wrong guesses still resolve their clue and stay on
+              the board as evidence.
+            </p>
+          </Accordion>
+
+          <Accordion
+            title="Game modes"
+            isOpen={openSection === "modes"}
+            onToggle={() => toggleSection("modes")}
+          >
+            <p>
+              <strong className="text-foreground">Daily.</strong> One fixed
+              puzzle per day, same target for everyone. Fixed settings
+              (5-digit, Normal, Manual). Results are shareable and a
+              daily streak is tracked.
+            </p>
+            <p>
+              <strong className="text-foreground">Unlimited.</strong> Play
+              as many games as you want with adjustable settings — number
+              length, difficulty, and clue selection. Personal stats and
+              streaks are recorded per setting bucket.
+            </p>
+            <p>
+              Tap the gear (⚙︎) icon to open Settings; tap the trophy
+              icon to see your Achievements and stats.
             </p>
           </Accordion>
 
@@ -92,11 +131,55 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             <p>
               On round 1, friendly opener clues are marked with a{" "}
               <span className="text-warn">⭐</span> in the chooser — those
-              are the ones most useful to play first.
+              are designed for the first-guess sweep.
             </p>
             <p>
               A clue type can only be picked once per game — used types
-              won&apos;t reappear as future options.
+              won&apos;t reappear as future options (unless you spend a
+              lock on Clue Reuse).
+            </p>
+            <p>
+              The full clue reference is shown below this list. Tap any
+              clue&apos;s name on a resolved row mid-game to see exactly
+              how its result was computed against your guess.
+            </p>
+          </Accordion>
+
+          <Accordion
+            title="Cell colors"
+            isOpen={openSection === "colors"}
+            onToggle={() => toggleSection("colors")}
+          >
+            <p>
+              The colors painted on a resolved row mean:
+            </p>
+            <ul className="list-disc list-outside pl-5 space-y-1">
+              <li>
+                <span className="text-good">Green</span> — match. The slot
+                holds the target&apos;s digit (Bullseyes, Higher-or-Lower
+                &quot;equal&quot;, Contains Digit &quot;exact&quot;,
+                Oracle reveals, or a correct lock).
+              </li>
+              <li>
+                <span className="text-warn">Warm</span> — partial info
+                pointing toward the target (e.g., digit is in the target
+                but at an unknown slot, or your slot is within 2 of the
+                target).
+              </li>
+              <li>
+                <span className="text-bad">Cold</span> — ruled-out info
+                (e.g., digit doesn&apos;t appear, or your guess is too
+                high/low at that slot).
+              </li>
+              <li>
+                <span className="text-muted">Idle</span> — no info at
+                that slot from the chosen clue.
+              </li>
+            </ul>
+            <p>
+              The exact meaning depends on the clue — check the legend on
+              each clue&apos;s reference card below for the per-color
+              rules.
             </p>
           </Accordion>
 
@@ -123,11 +206,77 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               Some clues — marked with{" "}
               <span className="text-good">+🔒</span> in the chooser —
               grant +1 lock when chosen, so you can stockpile a budget for
-              redraws or Clue Reuse later.
+              redraws or Clue Reuse later. There&apos;s no cap on locks.
             </p>
             <p>
               Hard Unlimited starts with zero locks — you can still earn
               them via bonus-lock clues during the game.
+            </p>
+          </Accordion>
+
+          <Accordion
+            title="Settings"
+            isOpen={openSection === "settings"}
+            onToggle={() => toggleSection("settings")}
+          >
+            <p>
+              Open via the gear (⚙︎) icon in the top bar. Daily uses fixed
+              settings; the rest apply to Unlimited.
+            </p>
+            <ul className="list-disc list-outside pl-5 space-y-1.5">
+              <li>
+                <strong className="text-foreground">Number length</strong>{" "}
+                (Unlimited only) — 5- or 6-digit puzzles. Same 7-turn
+                budget either way.
+              </li>
+              <li>
+                <strong className="text-foreground">Difficulty</strong> —
+                Normal starts you with 1 lock and guarantees a friendly
+                turn-1 clue. Hard starts with 0 locks, no curated opener,
+                and removes Clue Reuse from the deck.
+              </li>
+              <li>
+                <strong className="text-foreground">Clue selection</strong>{" "}
+                — Manual offers two clues each round to pick from. Auto
+                pre-deals one clue per upcoming guess up-front (no
+                chooser, no redraws, no Clue Reuse).
+              </li>
+              <li>
+                <strong className="text-foreground">Color blind palette</strong>{" "}
+                — Swaps the warm/cold colors to blue/orange so cell
+                states stay distinguishable with common forms of color
+                vision deficiency.
+              </li>
+              <li>
+                <strong className="text-foreground">Clue descriptions</strong>{" "}
+                — Toggles the chooser&apos;s description text. Off gives
+                a compact chooser once you&apos;ve learned the clues; the
+                full reference here always shows them.
+              </li>
+            </ul>
+            <p>
+              <strong className="text-foreground">Clear local data</strong>{" "}
+              wipes your in-progress games, personal stats, daily history,
+              and settings on this device. Global daily stats on the
+              server are unaffected.
+            </p>
+          </Accordion>
+
+          <Accordion
+            title="Stats & achievements"
+            isOpen={openSection === "stats"}
+            onToggle={() => toggleSection("stats")}
+          >
+            <p>
+              Personal stats track wins, win rate, average turns, and
+              current/best streaks — broken out by digit length,
+              difficulty, and clue mode in Unlimited.
+            </p>
+            <p>
+              Achievements unlock as you play; some give silver for a
+              first-tier feat and gold for a tougher second tier, others
+              award silver for any prong and gold for clearing every
+              prong. Tap a trophy&apos;s info button for details.
             </p>
           </Accordion>
 
@@ -142,8 +291,15 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               information from the clue you&apos;re hoping to receive.
             </p>
             <p>
-              Tap a clue&apos;s name on a resolved row to see exactly how
-              its result was computed against your guess.
+              Save Clue Reuse for clues whose result depends on the guess
+              (Higher or Lower, Oracle, Thermometer) — re-running them
+              against a sharper guess pulls more new info than re-running
+              a guess-independent clue.
+            </p>
+            <p>
+              Track locks as a budget, not just a safety net: stockpiling
+              via bonus-lock clues opens up multi-redraw turns and lets
+              you chain Clue Reuse picks in the late game.
             </p>
           </Accordion>
         </div>

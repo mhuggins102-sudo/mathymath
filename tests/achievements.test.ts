@@ -372,21 +372,14 @@ describe("Locksmith", () => {
   });
 });
 
-describe("Lucky Start", () => {
+describe("Lucky Start (counts only digits that turn green on turn 1)", () => {
   const ach = findAch("luckyStart");
-  it("counts turn-1 correct digits regardless of locking; requires win", () => {
-    // Target 12345; guess 12399 matches at slots 0,1,2 → 3 correct.
-    const guesses: ResolvedGuessLite[] = [{ guess: "12399" }, { guess: "22222" }];
-    expect(
-      ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
-    ).toBe(true);
-    expect(
-      ach.level2!.detect(baseCtx({ status: "won", target: "12345", guesses })),
-    ).toBe(true);
-  });
-  it("L1 fires on 2 correct, L2 needs 3", () => {
-    // Target 12345; guess 12999 → 2 correct.
-    const guesses: ResolvedGuessLite[] = [{ guess: "12999" }];
+  it("Bullseyes hits count as green", () => {
+    const hits: ClueResult = {
+      kind: "bullseyes",
+      hits: [true, true, false, false, false],
+    };
+    const guesses: ResolvedGuessLite[] = [{ guess: "12999", result: hits }];
     expect(
       ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
     ).toBe(true);
@@ -394,21 +387,93 @@ describe("Lucky Start", () => {
       ach.level2!.detect(baseCtx({ status: "won", target: "12345", guesses })),
     ).toBe(false);
   });
-  it("ignores whether digits were locked or not", () => {
-    // Same shape as the original test (with locks present) — still
-    // counts as ≥2 correct on turn 1 → L1 passes.
+  it("Higher or Lower 'eq' slots count as green", () => {
+    const eqs: ClueResult = {
+      kind: "higherLower",
+      cmp: ["eq", "eq", "eq", "gt", "gt"],
+    };
+    const guesses: ResolvedGuessLite[] = [{ guess: "12399", result: eqs }];
+    expect(
+      ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
+    ).toBe(true);
+    expect(
+      ach.level2!.detect(baseCtx({ status: "won", target: "12345", guesses })),
+    ).toBe(true);
+  });
+  it("Contains Digit 'exact' picks count as green", () => {
+    const r: ClueResult = {
+      kind: "containsDigit",
+      picks: [
+        { slot: 0, digit: 1, present: true, exact: true },
+        { slot: 1, digit: 2, present: true, exact: true },
+      ],
+    };
+    const guesses: ResolvedGuessLite[] = [{ guess: "12999", result: r }];
+    expect(
+      ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
+    ).toBe(true);
+  });
+  it("Correct locks count as green, even with a non-green clue", () => {
+    // Total Deviation paints no slots green on its own; the two correct
+    // locks alone clear the L1 bar.
+    const r: ClueResult = { kind: "totalDeviation", value: 12 };
     const guesses: ResolvedGuessLite[] = [
       {
         guess: "12999",
-        locks: [{ slot: 0, digit: "1", correct: true }],
+        result: r,
+        locks: [
+          { slot: 0, digit: "1", correct: true },
+          { slot: 1, digit: "2", correct: true },
+        ],
       },
     ];
     expect(
       ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
     ).toBe(true);
   });
+  it("Wrong locks do NOT count", () => {
+    const r: ClueResult = { kind: "totalDeviation", value: 12 };
+    const guesses: ResolvedGuessLite[] = [
+      {
+        guess: "12999",
+        result: r,
+        locks: [
+          { slot: 0, digit: "9", correct: false },
+          { slot: 1, digit: "9", correct: false },
+        ],
+      },
+    ];
+    expect(
+      ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
+    ).toBe(false);
+  });
+  it("does not count digits that happen to match but didn't turn green", () => {
+    // Distinct Digits never paints slots green. Even though the guess
+    // matches three slots of the target, the player didn't actually
+    // see those digits turn green.
+    const r: ClueResult = {
+      kind: "distinctDigits",
+      count: 5,
+      sharedRepeated: [false, false, false, false, false],
+    };
+    const guesses: ResolvedGuessLite[] = [{ guess: "12399", result: r }];
+    expect(
+      ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
+    ).toBe(false);
+  });
+  it("Oracle does NOT count (reveal is target's digit, not the player's)", () => {
+    const oracle: ClueResult = { kind: "oracle", slot: 0, digit: 1 };
+    const guesses: ResolvedGuessLite[] = [{ guess: "99999", result: oracle }];
+    expect(
+      ach.level1!.detect(baseCtx({ status: "won", target: "12345", guesses })),
+    ).toBe(false);
+  });
   it("requires status=won", () => {
-    const guesses: ResolvedGuessLite[] = [{ guess: "12345" }];
+    const hits: ClueResult = {
+      kind: "bullseyes",
+      hits: [true, true, true, false, false],
+    };
+    const guesses: ResolvedGuessLite[] = [{ guess: "12399", result: hits }];
     expect(
       ach.level1!.detect(baseCtx({ status: "lost", target: "12345", guesses })),
     ).toBe(false);
@@ -565,34 +630,51 @@ describe("Trending Up (5-digit, winners only)", () => {
   });
 });
 
-describe("Cold Open (no starred clues used)", () => {
+describe("Cold Open (criteria-based: 5-digit + 6-digit prongs)", () => {
   const ach = findAch("coldOpen");
-  // Curated set (per lib/game/clueSelector.ts) includes elimination,
-  // oracle, thermometer, etc. Non-curated examples include bullseyes
-  // and sumDelta.
-  it("L1: 5-digit win without any curated/starred clue", () => {
+  it("uses the criteria schema with fiveDigit + sixDigit prongs", () => {
+    expect(ach.criteria).toBeDefined();
+    expect(ach.criteria!.map((c) => c.id).sort()).toEqual([
+      "fiveDigit",
+      "sixDigit",
+    ]);
+  });
+  it("fiveDigit fires on a 5-digit win without any starred clue", () => {
+    const cr = ach.criteria!.find((c) => c.id === "fiveDigit")!;
     const guesses: ResolvedGuessLite[] = [
       { guess: "11111", clueId: "bullseyes" },
       { guess: "22222", clueId: "sumDelta" },
     ];
-    expect(ach.level1!.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(true);
+    expect(cr.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(true);
   });
-  it("L1 fails if any curated clue was used", () => {
+  it("fiveDigit fails if any curated clue was used", () => {
+    const cr = ach.criteria!.find((c) => c.id === "fiveDigit")!;
     // "elimination" is in ROUND1_CURATED_CLUE_IDS.
     const guesses: ResolvedGuessLite[] = [
       { guess: "11111", clueId: "elimination" },
     ];
-    expect(ach.level1!.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(false);
+    expect(cr.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(false);
   });
-  it("L2: same rule on 6-digit", () => {
+  it("sixDigit fires on a 6-digit win without any starred clue", () => {
+    const cr = ach.criteria!.find((c) => c.id === "sixDigit")!;
     const guesses: ResolvedGuessLite[] = [
       { guess: "111111", clueId: "bullseyes" },
     ];
     expect(
-      ach.level2!.detect(
+      cr.detect(
         baseCtx({ status: "won", digits: 6, target: "111111", guesses }),
       ),
     ).toBe(true);
+  });
+  it("each prong is digit-gated", () => {
+    const fiveCr = ach.criteria!.find((c) => c.id === "fiveDigit")!;
+    const sixCr = ach.criteria!.find((c) => c.id === "sixDigit")!;
+    const five: ResolvedGuessLite[] = [{ guess: "11111", clueId: "bullseyes" }];
+    const six: ResolvedGuessLite[] = [{ guess: "111111", clueId: "bullseyes" }];
+    expect(fiveCr.detect(baseCtx({ status: "won", digits: 5, guesses: five }))).toBe(true);
+    expect(sixCr.detect(baseCtx({ status: "won", digits: 5, guesses: five }))).toBe(false);
+    expect(fiveCr.detect(baseCtx({ status: "won", digits: 6, target: "111111", guesses: six }))).toBe(false);
+    expect(sixCr.detect(baseCtx({ status: "won", digits: 6, target: "111111", guesses: six }))).toBe(true);
   });
 });
 

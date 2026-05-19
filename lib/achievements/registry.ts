@@ -263,27 +263,59 @@ const locksmith: Achievement = {
   },
 };
 
+/** Count slots that visually turn green on turn 1. Only the clues
+ *  whose result paints a slot in the "match" state count: Bullseyes
+ *  hits, Higher-or-Lower "eq" slots, and Contains Digit "exact" picks.
+ *  Correct locks override their slot's state to match (and are
+ *  counted regardless of the chosen clue). Oracle reveals are NOT
+ *  counted — Oracle shows the target's digit at the chosen slot, not
+ *  a digit the player guessed. */
+function turn1GreenSlots(c: AchievementCtx): number {
+  const first = c.guesses[0];
+  if (!first) return 0;
+  const green = new Set<number>();
+  for (const lock of first.locks ?? []) {
+    if (lock.correct) green.add(lock.slot);
+  }
+  const r = first.result;
+  if (r) {
+    switch (r.kind) {
+      case "bullseyes":
+        r.hits.forEach((h, i) => {
+          if (h) green.add(i);
+        });
+        break;
+      case "higherLower":
+        r.cmp.forEach((cmp, i) => {
+          if (cmp === "eq") green.add(i);
+        });
+        break;
+      case "containsDigit":
+        for (const p of r.picks) {
+          if (p.exact) green.add(p.slot);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return green.size;
+}
+
 const luckyStart: Achievement = {
   id: "luckyStart",
   name: "Lucky Start",
-  description: "Big bullseye payoff on the very first turn.",
+  description:
+    "Light up the board on turn 1 via Bullseyes, Higher or Lower, Contains Digit, or correct locks.",
   level1: {
-    label: "Win with 2+ correct digits on turn 1 (locked or not).",
-    detect: (c) => {
-      if (c.status !== "won") return false;
-      const first = c.guesses[0];
-      if (!first) return false;
-      return correctDigitCount(first.guess, c.target) >= 2;
-    },
+    label:
+      "Win with 2+ green digits on turn 1 (from Bullseyes, Higher or Lower, Contains Digit, or correct locks).",
+    detect: (c) => c.status === "won" && turn1GreenSlots(c) >= 2,
   },
   level2: {
-    label: "Win with 3+ correct digits on turn 1 (locked or not).",
-    detect: (c) => {
-      if (c.status !== "won") return false;
-      const first = c.guesses[0];
-      if (!first) return false;
-      return correctDigitCount(first.guess, c.target) >= 3;
-    },
+    label:
+      "Win with 3+ green digits on turn 1 (from Bullseyes, Higher or Lower, Contains Digit, or correct locks).",
+    detect: (c) => c.status === "won" && turn1GreenSlots(c) >= 3,
   },
 };
 
@@ -413,26 +445,30 @@ const coldOpen: Achievement = {
   id: "coldOpen",
   name: "Cold Open",
   description: "Win without leaning on any starred (turn-1) curated clue.",
-  level1: {
-    label: "Win a 5-digit game without using any starred clue.",
-    detect: (c) => {
-      if (c.status !== "won" || c.digits !== 5) return false;
-      for (const g of c.guesses) {
-        if (g.clueId && ROUND1_CURATED_CLUE_IDS.has(g.clueId)) return false;
-      }
-      return true;
+  criteria: [
+    {
+      id: "fiveDigit",
+      name: "Win a 5-digit game without using any starred clue",
+      detect: (c) => {
+        if (c.status !== "won" || c.digits !== 5) return false;
+        for (const g of c.guesses) {
+          if (g.clueId && ROUND1_CURATED_CLUE_IDS.has(g.clueId)) return false;
+        }
+        return true;
+      },
     },
-  },
-  level2: {
-    label: "Win a 6-digit game without using any starred clue.",
-    detect: (c) => {
-      if (c.status !== "won" || c.digits !== 6) return false;
-      for (const g of c.guesses) {
-        if (g.clueId && ROUND1_CURATED_CLUE_IDS.has(g.clueId)) return false;
-      }
-      return true;
+    {
+      id: "sixDigit",
+      name: "Win a 6-digit game without using any starred clue",
+      detect: (c) => {
+        if (c.status !== "won" || c.digits !== 6) return false;
+        for (const g of c.guesses) {
+          if (g.clueId && ROUND1_CURATED_CLUE_IDS.has(g.clueId)) return false;
+        }
+        return true;
+      },
     },
-  },
+  ],
 };
 
 // --- Situational --------------------------------------------------
