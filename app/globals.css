@@ -45,6 +45,7 @@ html.colorblind {
 
 html,
 body {
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -53,30 +54,19 @@ body {
   overscroll-behavior: none;
 }
 
-/* Background-painting strategy for the dark bg:
- *
- * The previous attempt anchored html to `height: 100%` and body to
- * `min-height: 100%; 100dvh`. On Chrome desktop a horizontal cutoff
- * still showed on tall viewports — the bg only painted up to the
- * intrinsic content height, with the browser's canvas bg (pure black)
- * below. Symptom: shrinking the window vertically until it matched
- * content height made the cutoff vanish.
- *
- * The robust fix is to set `background-color` on BOTH html and body,
- * give both a `min-height: 100dvh` anchor, and stop fixing html to a
- * percentage height (which only resolves against the initial
- * containing block and was the source of the cutoff). With both
- * elements painting the bg and both anchored to the dynamic viewport,
- * Chrome can't escape the painted area regardless of body's
- * flex-distributed content height. */
+/* Make html fill the viewport (height: 100%, anchored to the
+   initial containing block) so its background paints edge-to-edge.
+   Body then uses min-height to grow with content but never shrinks
+   below the viewport. The `dvh` line is a progressive enhancement
+   for browsers that compute the dynamic viewport — it falls back to
+   `100vh` when unsupported. Without these, on some desktop layouts
+   body's box collapsed shorter than the viewport and the area below
+   it painted as the browser default. */
 html {
-  background-color: var(--background);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100%;
 }
 body {
-  background-color: var(--background);
-  min-height: 100vh;
+  min-height: 100%;
   min-height: 100dvh;
 }
 
