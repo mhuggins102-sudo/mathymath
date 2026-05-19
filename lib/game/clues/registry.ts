@@ -37,6 +37,13 @@ import { clueReuseClue } from "./clueReuse";
 // totalDeviationClue was briefly retired (overlaps thermometer) but put
 // back: the collapsed-to-a-number feel is different from thermometer's
 // per-slot heat grid and the chooser rhythm benefits from having it.
+// Retired 2026-05-19:
+//   - extraLockClue → bonus-lock semantics moved onto the three
+//     compositional clues that needed reweighting (distinctDigits,
+//     upsAndDowns, divisibleBy). The Extra Lock card itself is no longer
+//     dealt, but its definition stays alive in the legacy map below so
+//     getClueById("extraLock") keeps working for replays of older daily
+//     histories.
 export const CLUES: readonly Clue[] = [
   bullseyesClue,
   higherLowerClue,
@@ -55,11 +62,16 @@ export const CLUES: readonly Clue[] = [
   upsAndDownsClue,
   bullseyeTrendClue,
   eliminationClue,
-  extraLockClue,
   clueReuseClue,
 ] as const;
 
-const CLUE_BY_ID = new Map<ClueId, Clue>(CLUES.map((c) => [c.id, c]));
+/** Clues retired from the deck but still resolvable by id so legacy
+ *  history blobs (captured before the retirement) can be replayed. */
+const RETIRED_CLUES: readonly Clue[] = [extraLockClue] as const;
+
+const CLUE_BY_ID = new Map<ClueId, Clue>(
+  [...CLUES, ...RETIRED_CLUES].map((c) => [c.id, c]),
+);
 
 export function getClueById(id: ClueId): Clue {
   const c = CLUE_BY_ID.get(id);

@@ -52,6 +52,12 @@ interface GuessRowProps {
   /** Marks this row as the next one to be filled in preselected mode.
    *  Adds a subtle highlight so the player can find their place. */
   nextUp?: boolean;
+  /** When true, the inline ★ next to the clue name (shown for curated
+   *  turn-1 clues) is suppressed. Used by HelpModal's example rows so
+   *  the star doesn't clutter the per-clue reference cards — those
+   *  already carry a big corner ⭐. Default false, so in-game rows
+   *  keep showing the inline star on curated clues. */
+  hideCurationStar?: boolean;
 }
 
 /** Per-slot color state derived from the clue result. The `guess`
@@ -503,13 +509,15 @@ export function subLabelFor(
 function ClueLabelContent({
   guess,
   result,
+  hideCurationStar,
 }: {
   guess: string;
   result: ClueResult;
+  hideCurationStar?: boolean;
 }) {
   const meta = getClueById(result.kind);
   const sub = subLabelFor(guess, result);
-  const curated = ROUND1_CURATED_CLUE_IDS.has(meta.id);
+  const curated = ROUND1_CURATED_CLUE_IDS.has(meta.id) && !hideCurationStar;
   // `h-full` + `justify-center` makes the two-line block genuinely
   // vertically centered against the digit cells in the same row.
   // `text-left` balances the row: the label now hugs the main's left
@@ -562,6 +570,7 @@ export function GuessRow({
   winRow = false,
   upcomingClue,
   nextUp,
+  hideCurationStar,
 }: GuessRowProps) {
   // ---------------------------------------------------------------
   // Project a per-cell view for each render mode:
@@ -714,14 +723,15 @@ export function GuessRow({
             }`}
           >
             {upcomingClue.name}
-            {ROUND1_CURATED_CLUE_IDS.has(upcomingClue.id) && (
-              <span
-                aria-hidden
-                className="ml-1 text-warn text-[10px] align-baseline"
-              >
-                ★
-              </span>
-            )}
+            {ROUND1_CURATED_CLUE_IDS.has(upcomingClue.id) &&
+              !hideCurationStar && (
+                <span
+                  aria-hidden
+                  className="ml-1 text-warn text-[10px] align-baseline"
+                >
+                  ★
+                </span>
+              )}
           </span>
         </button>
       );
@@ -735,7 +745,14 @@ export function GuessRow({
         </div>
       );
     if (!result) return null;
-    if (!interactive) return <ClueLabelContent guess={guess} result={result} />;
+    if (!interactive)
+      return (
+        <ClueLabelContent
+          guess={guess}
+          result={result}
+          hideCurationStar={hideCurationStar}
+        />
+      );
     return (
       <button
         type="button"
@@ -756,7 +773,11 @@ export function GuessRow({
         aria-label={`Explain clue: ${meta?.name ?? ""}`}
         className="w-full h-full text-left rounded-md hover:bg-surface-2/50 active:bg-surface-2 transition px-1"
       >
-        <ClueLabelContent guess={guess} result={result} />
+        <ClueLabelContent
+          guess={guess}
+          result={result}
+          hideCurationStar={hideCurationStar}
+        />
       </button>
     );
   })();

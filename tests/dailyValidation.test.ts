@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { validateDailyHistory } from "@/lib/api/dailyValidation";
 import { getClueById } from "@/lib/game/clues/registry";
 import { pickTwoClues } from "@/lib/game/clueSelector";
+import { BONUS_LOCK_CLUE_IDS } from "@/lib/game/locks";
 import type { ClueId } from "@/lib/game/clues/types";
 
 const TARGET = "47628";
@@ -13,17 +14,22 @@ const MAX = 8;
  *  what the next offered pair is, picking an option, and computing the
  *  real result against the target. Prefers clues whose compute is
  *  purely a function of (guess, target) — skipping Special (would
- *  grant +1 lock and skew budget math) and Oracle (result depends on
- *  context.knownSlots, which this helper doesn't thread). Falls back
- *  to the first option if neither fits. */
+ *  grant +1 lock and skew budget math), Oracle (result depends on
+ *  context.knownSlots), and bonus-lock clues (each pick grants +1
+ *  lock and would inflate the budget the tests assume). Falls back to
+ *  the first option if neither fits. */
 function honestGuess(
   chosen: ClueId[],
   guess: string,
 ): { guess: string; clueId: ClueId; result: unknown } {
   const pair = pickTwoClues(SEED, chosen);
   const clue =
-    pair.find((c) => c.category !== "special" && c.id !== "oracle") ??
-    pair[0];
+    pair.find(
+      (c) =>
+        c.category !== "special" &&
+        c.id !== "oracle" &&
+        !BONUS_LOCK_CLUE_IDS.has(c.id),
+    ) ?? pair[0];
   const result = clue.compute(guess, TARGET);
   return { guess, clueId: clue.id, result };
 }

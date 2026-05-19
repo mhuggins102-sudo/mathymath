@@ -6,8 +6,7 @@ import {
   CLUE_REUSE_CLUE_ID,
   CLUE_REUSE_COST,
   INITIAL_LOCKS,
-  MAX_LOCKS,
-  countExtraLocksGained,
+  countBonusLocksGained,
   type LockRecord,
 } from "@/lib/game/locks";
 
@@ -240,14 +239,14 @@ export function validateDailyHistory(
       }
     }
     chosenClueIds.push(g.clueId as ClueId);
-    // Update running budget: Extra Lock grants +1 (capped at MAX_LOCKS);
+    // Update running budget: bonus-lock clues each grant +1 (no cap);
     // incorrect locks + redraws + Clue Reuse picks all spend the budget.
-    const extraSoFar = countExtraLocksGained(
+    const bonusSoFar = countBonusLocksGained(
       history.slice(0, i + 1) as IncomingGuess[],
     );
-    const cap = Math.min(MAX_LOCKS, INITIAL_LOCKS + extraSoFar);
-    // Recompute remaining from cap + spent so we absorb any Extra Lock
-    // just chosen.
+    const cap = INITIAL_LOCKS + bonusSoFar;
+    // Recompute remaining from cap + spent so we absorb any bonus-lock
+    // clue just chosen.
     let spent = 0;
     for (let k = 0; k <= i; k++) {
       for (const lock of history[k].locks ?? []) {

@@ -198,11 +198,11 @@ const hotHand: Achievement = {
     },
   },
   level2: {
-    label: "Win 20 in a row in 5-digit Hard unlimited.",
+    // Mirrors Endurance Gold: specifically the Hard Auto bucket.
+    label: "Win 10 in a row in 5-digit Hard Auto unlimited.",
     detect: (c) => {
       if (c.mode !== "unlimited" || c.status !== "won") return false;
-      const h = c.unlimitedStreakByBucket["5"].hard;
-      return h.manual >= 20 || h.auto >= 20;
+      return c.unlimitedStreakByBucket["5"].hard.auto >= 10;
     },
   },
 };
@@ -240,12 +240,12 @@ const lockedIn: Achievement = {
   name: "Locked In",
   description: "Finish with locks still in the bank.",
   level1: {
-    label: "Win with at least 1 lock remaining.",
-    detect: (c) => c.status === "won" && c.locksRemaining >= 1,
-  },
-  level2: {
     label: "Win with at least 2 locks remaining.",
     detect: (c) => c.status === "won" && c.locksRemaining >= 2,
+  },
+  level2: {
+    label: "Win with at least 3 locks remaining.",
+    detect: (c) => c.status === "won" && c.locksRemaining >= 3,
   },
 };
 
@@ -266,23 +266,23 @@ const locksmith: Achievement = {
 const luckyStart: Achievement = {
   id: "luckyStart",
   name: "Lucky Start",
-  description: "Big lock payoff on the very first turn.",
+  description: "Big bullseye payoff on the very first turn.",
   level1: {
-    label: "Win with 2+ correct locks on turn 1.",
+    label: "Win with 2+ correct digits on turn 1 (locked or not).",
     detect: (c) => {
       if (c.status !== "won") return false;
       const first = c.guesses[0];
-      if (!first || !first.locks) return false;
-      return first.locks.filter((l) => l.correct).length >= 2;
+      if (!first) return false;
+      return correctDigitCount(first.guess, c.target) >= 2;
     },
   },
   level2: {
-    label: "Win with 3+ correct locks on turn 1.",
+    label: "Win with 3+ correct digits on turn 1 (locked or not).",
     detect: (c) => {
       if (c.status !== "won") return false;
       const first = c.guesses[0];
-      if (!first || !first.locks) return false;
-      return first.locks.filter((l) => l.correct).length >= 3;
+      if (!first) return false;
+      return correctDigitCount(first.guess, c.target) >= 3;
     },
   },
 };
@@ -293,36 +293,38 @@ const mercuryRising: Achievement = {
   id: "mercuryRising",
   name: "Mercury Rising",
   description: "Extreme thermometer readings early in a winning game.",
-  level1: {
-    label:
-      "Win after getting an all-red Thermometer (every slot 4+ off) on turn 1 or 2.",
-    detect: (c) => {
-      if (c.status !== "won") return false;
-      return c.guesses
-        .slice(0, 2)
-        .some(
-          (g) =>
-            g.result?.kind === "thermometer" &&
-            g.result.tier.length > 0 &&
-            g.result.tier.every((t) => t === 2),
-        );
+  criteria: [
+    {
+      id: "allRed",
+      name: "All-red Thermometer on turn 1 or 2",
+      detect: (c) => {
+        if (c.status !== "won") return false;
+        return c.guesses
+          .slice(0, 2)
+          .some(
+            (g) =>
+              g.result?.kind === "thermometer" &&
+              g.result.tier.length > 0 &&
+              g.result.tier.every((t) => t === 2),
+          );
+      },
     },
-  },
-  level2: {
-    label:
-      "Win after getting an all-blue Thermometer (every slot within 1) on turn 1 or 2.",
-    detect: (c) => {
-      if (c.status !== "won") return false;
-      return c.guesses
-        .slice(0, 2)
-        .some(
-          (g) =>
-            g.result?.kind === "thermometer" &&
-            g.result.tier.length > 0 &&
-            g.result.tier.every((t) => t === 0),
-        );
+    {
+      id: "allBlue",
+      name: "All-blue Thermometer on turn 1 or 2",
+      detect: (c) => {
+        if (c.status !== "won") return false;
+        return c.guesses
+          .slice(0, 2)
+          .some(
+            (g) =>
+              g.result?.kind === "thermometer" &&
+              g.result.tier.length > 0 &&
+              g.result.tier.every((t) => t === 0),
+          );
+      },
     },
-  },
+  ],
 };
 
 const sweeper: Achievement = {
@@ -365,17 +367,24 @@ const sweeper: Achievement = {
 const wideMiss: Achievement = {
   id: "wideMiss",
   name: "Wide Miss",
-  description: "Be very far off on Digit Sum, then still pull out the win.",
+  description:
+    "Be very far off on Digit Sum in 5-digit manual clue mode, then still pull out the win.",
   level1: {
-    label: "Win after a Digit Sum result off by 20 or more.",
+    label:
+      "Win a 5-digit manual-clue game after a Digit Sum result off by 20 or more.",
     detect: (c) =>
       c.status === "won" &&
+      c.digits === 5 &&
+      !c.preselectedMode &&
       anyResult(c, (r) => r.kind === "sumDelta" && Math.abs(r.delta) >= 20),
   },
   level2: {
-    label: "Win after a Digit Sum result off by 25 or more.",
+    label:
+      "Win a 5-digit manual-clue game after a Digit Sum result off by 25 or more.",
     detect: (c) =>
       c.status === "won" &&
+      c.digits === 5 &&
+      !c.preselectedMode &&
       anyResult(c, (r) => r.kind === "sumDelta" && Math.abs(r.delta) >= 25),
   },
 };
@@ -383,17 +392,19 @@ const wideMiss: Achievement = {
 const trendingUp: Achievement = {
   id: "trendingUp",
   name: "Trending Up",
-  description: "Big jumps in Bullseye Trend during a winning game.",
+  description: "Big jumps in Bullseye Trend during a 5-digit winning game.",
   level1: {
-    label: "Win after a Bullseye Trend result of +2 or more.",
+    label: "Win a 5-digit game after a Bullseye Trend result of +2 or more.",
     detect: (c) =>
       c.status === "won" &&
+      c.digits === 5 &&
       anyResult(c, (r) => r.kind === "bullseyeTrend" && r.delta >= 2),
   },
   level2: {
-    label: "Win after a Bullseye Trend result of +3 or more.",
+    label: "Win a 5-digit game after a Bullseye Trend result of +3 or more.",
     detect: (c) =>
       c.status === "won" &&
+      c.digits === 5 &&
       anyResult(c, (r) => r.kind === "bullseyeTrend" && r.delta >= 3),
   },
 };
@@ -444,14 +455,18 @@ const diceDiceBaby: Achievement = {
   id: "diceDiceBaby",
   name: "Dice, Dice Baby",
   description: "Win against an all-dice or no-dice target.",
-  level1: {
-    label: "Win when the target contains only dice digits (1-6).",
-    detect: (c) => c.status === "won" && targetIsAllDice(c.target),
-  },
-  level2: {
-    label: "Win when the target contains no dice digits (only 0/7/8/9).",
-    detect: (c) => c.status === "won" && targetHasNoDice(c.target),
-  },
+  criteria: [
+    {
+      id: "allDice",
+      name: "Win when the target contains only dice digits (1-6)",
+      detect: (c) => c.status === "won" && targetIsAllDice(c.target),
+    },
+    {
+      id: "noDice",
+      name: "Win when the target contains no dice digits (0/7/8/9)",
+      detect: (c) => c.status === "won" && targetHasNoDice(c.target),
+    },
+  ],
 };
 
 const eleventhHour: Achievement = {
@@ -459,16 +474,20 @@ const eleventhHour: Achievement = {
   name: "Eleventh Hour",
   description:
     "Let Oracle save the round at the last possible moment.",
-  level1: {
-    label:
-      "Win a 5-digit game when Oracle reveals the only remaining unknown slot.",
-    detect: (c) => eleventhHourDetect(c) && c.digits === 5,
-  },
-  level2: {
-    label:
-      "Win a 6-digit game when Oracle reveals the only remaining unknown slot.",
-    detect: (c) => eleventhHourDetect(c) && c.digits === 6,
-  },
+  criteria: [
+    {
+      id: "fiveDigit",
+      name:
+        "Win a 5-digit game when Oracle reveals the only remaining unknown slot",
+      detect: (c) => eleventhHourDetect(c) && c.digits === 5,
+    },
+    {
+      id: "sixDigit",
+      name:
+        "Win a 6-digit game when Oracle reveals the only remaining unknown slot",
+      detect: (c) => eleventhHourDetect(c) && c.digits === 6,
+    },
+  ],
 };
 
 function eleventhHourDetect(c: AchievementCtx): boolean {
@@ -520,8 +539,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
 ];
 
 /** Total number of distinct unlock slots (sum of levels across all
- *  achievements). Used for the modal's "X / N unlocked" header. */
+ *  achievements). Used for the modal's "X / N unlocked" header.
+ *  Criteria-style achievements still have two unlock slots (silver
+ *  for any criterion, gold for all criteria). */
 export const TOTAL_UNLOCK_SLOTS = ACHIEVEMENTS.reduce(
-  (n, a) => n + (a.level2 ? 2 : 1),
+  (n, a) => n + (a.criteria ? 2 : a.level2 ? 2 : 1),
   0,
 );

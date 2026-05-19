@@ -5,6 +5,7 @@ import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
 import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
 import { useSettings } from "@/lib/hooks/useSettings";
 import { ClueLegend } from "./ClueLegend";
+import { ClueLockBadge } from "./ClueLockBadge";
 
 interface ClueChooserProps {
   options: [Clue, Clue];
@@ -71,17 +72,10 @@ export function ClueChooser({
               <div className="flex items-center justify-between mb-1 gap-2">
                 <span className="font-semibold text-foreground inline-flex items-center gap-1.5">
                   {clue.name}
-                  {/* Lock-cost badge sits next to the name for cost-bearing
-                      clues so the price is impossible to miss in the
-                      chooser. Currently only Clue Reuse has a cost. */}
-                  {isClueReuse && (
-                    <span
-                      className="inline-flex items-center text-[11px] font-normal text-muted"
-                      title={`Costs ${CLUE_REUSE_COST} 🔒`}
-                    >
-                      🔒×{CLUE_REUSE_COST}
-                    </span>
-                  )}
+                  {/* Lock-economy badge: green +🔒 for bonus-lock clues,
+                      red −🔒 for Clue Reuse. Sits next to the name so
+                      the player can read the trade-off at a glance. */}
+                  <ClueLockBadge clueId={clue.id} />
                 </span>
                 {showStar && (
                   <span

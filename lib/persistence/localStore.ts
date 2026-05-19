@@ -698,6 +698,10 @@ const achievementsStoreSchema = z.object({
     z.object({
       level1At: z.string().optional(),
       level2At: z.string().optional(),
+      /** Criteria-based achievements: per-criterion first-met
+       *  timestamp. Keyed by `AchievementCriterion.id` so a later
+       *  registry expansion preserves earlier timestamps. */
+      criteria: z.record(z.string(), z.string()).optional(),
     }),
   ),
 });
@@ -741,6 +745,23 @@ export function recordAchievementUnlock(
   const existing = store.unlocked[id] ?? {};
   if (level === 1 && !existing.level1At) existing.level1At = now;
   if (level === 2 && !existing.level2At) existing.level2At = now;
+  store.unlocked[id] = existing;
+  saveAchievements(store);
+}
+
+/** Mark a criterion of a multi-criteria achievement as met at `now`.
+ *  Idempotent — earlier timestamps win so adding a third criterion in a
+ *  future build doesn't reset the first one's date. */
+export function recordAchievementCriterion(
+  id: string,
+  criterionId: string,
+  now: string = new Date().toISOString(),
+): void {
+  const store = loadAchievements();
+  const existing = store.unlocked[id] ?? {};
+  const criteria = existing.criteria ?? {};
+  if (!criteria[criterionId]) criteria[criterionId] = now;
+  existing.criteria = criteria;
   store.unlocked[id] = existing;
   saveAchievements(store);
 }

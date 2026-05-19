@@ -15,7 +15,7 @@ export const distinctDigitsClue: Clue<{
   name: "Distinct Digits",
   category: "compositional",
   description:
-    "How many different digit values the target uses. Also highlights guess slots whose digit is repeated in both your guess and the target.",
+    "How many different digit values the target uses. Also highlights guess slots whose digit is repeated in both your guess and the target. Grants +1 🔒 when chosen.",
   // Medium-info; range tops at 5 (5-digit) or 6 (6-digit). Pivot weight.
   weight: 1.0,
   legend: [

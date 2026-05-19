@@ -63,14 +63,32 @@ export interface AchievementLevel {
   detect: Detector;
 }
 
+/** Multi-criteria achievement model: instead of "level 1 → silver,
+ *  level 2 → gold", the player earns one prong → silver and both
+ *  prongs (any order) → gold. */
+export interface AchievementCriterion {
+  /** Stable id stored in localStorage so a later registry edit can
+   *  add a third criterion without losing earlier timestamps. */
+  id: string;
+  /** Short display label shown in the modal popup. */
+  name: string;
+  detect: Detector;
+}
+
 export interface Achievement {
   id: string;
   name: string;
   /** One-line shared description shown on the modal card. */
   description: string;
-  level1: AchievementLevel;
-  /** Omitted for single-level achievements. */
+  /** Either the level-style schema (level1/level2) OR the criteria-
+   *  style schema (criteria). The check pipeline branches on which
+   *  one is present. */
+  level1?: AchievementLevel;
   level2?: AchievementLevel;
+  /** Criteria-based achievement: silver = any one criterion met,
+   *  gold = every criterion met. Order is the display order in the
+   *  modal popup. */
+  criteria?: readonly AchievementCriterion[];
 }
 
 export type AchievementLevelTier = 1 | 2;
