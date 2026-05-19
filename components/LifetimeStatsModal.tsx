@@ -204,8 +204,14 @@ function FilterDropdown<T extends string>({
       <span>{label}</span>
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="w-full text-sm font-semibold text-foreground bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent/60"
+        onChange={(e) => {
+          onChange(e.target.value as T);
+          // Drop focus after a mouse-driven selection so the blue ring
+          // doesn't linger on the closed dropdown. Keyboard users keep
+          // their focus indicator via the global :focus-visible style.
+          e.currentTarget.blur();
+        }}
+        className="w-full text-sm font-semibold text-foreground bg-surface border border-border rounded-md px-2 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         {options.map((opt) => (
           <option key={opt.v} value={opt.v}>

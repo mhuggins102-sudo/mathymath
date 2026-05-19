@@ -80,62 +80,69 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
             const u = store?.unlocked[ach.id];
             const tier = trophyTierFor(ach, u);
             const isExpanded = !!expanded[ach.id];
+            const toggle = () =>
+              setExpanded((prev) => ({
+                ...prev,
+                [ach.id]: !prev[ach.id],
+              }));
             return (
               <li
                 key={ach.id}
-                className="rounded-lg border border-border bg-surface-2 p-3"
+                className="rounded-lg border border-border bg-surface-2 overflow-hidden"
               >
-                <div className="flex items-center gap-3">
-                  <div className="shrink-0">
-                    <TrophyIcon tier={tier} size="md" />
+                <button
+                  type="button"
+                  onClick={toggle}
+                  aria-expanded={isExpanded}
+                  aria-label={`${
+                    isExpanded ? "Hide" : "Show"
+                  } details for ${ach.name}`}
+                  className="w-full text-left p-3 hover:bg-surface-2/60 active:bg-surface-2/40 transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0">
+                      <TrophyIcon tier={tier} size="md" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground flex-1 min-w-0 truncate">
+                      {ach.name}
+                    </h3>
+                    <span
+                      aria-hidden
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-border text-muted text-xs font-semibold shrink-0"
+                    >
+                      i
+                    </span>
                   </div>
-                  <h3 className="text-sm font-semibold text-foreground flex-1 min-w-0 truncate">
-                    {ach.name}
-                  </h3>
-                  <button
-                    type="button"
-                    aria-label={`Show details for ${ach.name}`}
-                    aria-expanded={isExpanded}
-                    className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-border text-muted hover:text-foreground hover:border-foreground/60 text-xs font-semibold transition shrink-0"
-                    onClick={() =>
-                      setExpanded((prev) => ({
-                        ...prev,
-                        [ach.id]: !prev[ach.id],
-                      }))
-                    }
-                  >
-                    i
-                  </button>
-                </div>
-                {isExpanded && (
-                  <div className="mt-2 pl-10 text-xs space-y-1">
-                    <p className="text-muted leading-snug">
-                      {ach.description}
-                    </p>
-                    {ach.criteria ? (
-                      <CriteriaList ach={ach} unlock={u} />
-                    ) : (
-                      <>
-                        {ach.level1 && (
-                          <p className="text-foreground leading-snug">
-                            <span className="font-medium text-slate-300">
-                              {ach.level2 ? "Silver:" : "Gold:"}
-                            </span>{" "}
-                            {ach.level1.label}
-                          </p>
-                        )}
-                        {ach.level2 && (
-                          <p className="text-foreground leading-snug">
-                            <span className="font-medium text-amber-400">
-                              Gold:
-                            </span>{" "}
-                            {ach.level2.label}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+                  {isExpanded && (
+                    <div className="mt-2 pl-10 text-xs space-y-1">
+                      <p className="text-muted leading-snug">
+                        {ach.description}
+                      </p>
+                      {ach.criteria ? (
+                        <CriteriaList ach={ach} unlock={u} />
+                      ) : (
+                        <>
+                          {ach.level1 && (
+                            <p className="text-foreground leading-snug">
+                              <span className="font-medium text-slate-300">
+                                {ach.level2 ? "Silver:" : "Gold:"}
+                              </span>{" "}
+                              {ach.level1.label}
+                            </p>
+                          )}
+                          {ach.level2 && (
+                            <p className="text-foreground leading-snug">
+                              <span className="font-medium text-amber-400">
+                                Gold:
+                              </span>{" "}
+                              {ach.level2.label}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </button>
               </li>
             );
           })}
