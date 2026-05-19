@@ -48,7 +48,7 @@ describe("pickTwoClues — basics", () => {
     for (const [, n] of counts) expect(n).toBeGreaterThan(200);
   });
 
-  it("every registered info clue is reachable through the deck", () => {
+  it("every active clue is reachable through the deck", () => {
     const seen = new Set<ClueId>();
     for (let i = 0; i < 2000 && seen.size < 22; i++) {
       for (let round = 0; round < 11; round++) {
@@ -76,11 +76,27 @@ describe("pickTwoClues — basics", () => {
       "upsAndDowns",
       "bullseyeTrend",
       "elimination",
-      "extraLock",
       "clueReuse",
     ] as ClueId[]) {
       expect(getClueById(c).id).toBe(c);
       expect(seen.has(c)).toBe(true);
+    }
+  });
+
+  it("extraLock is retired from the deck but still resolvable by id", () => {
+    // Legacy data path: daily replays may carry an extraLock pick.
+    // getClueById must still find it even though pickTwoClues no longer
+    // deals it.
+    expect(getClueById("extraLock" as ClueId).id).toBe("extraLock");
+    for (let i = 0; i < 200; i++) {
+      const seed = `no-extralock-${i}`;
+      const chosen: ClueId[] = [];
+      for (let round = 0; round < 9; round++) {
+        const [a, b] = pickTwoClues(seed, chosen, 0, round % 2 === 0);
+        expect(a.id).not.toBe("extraLock");
+        expect(b.id).not.toBe("extraLock");
+        chosen.push(a.id);
+      }
     }
   });
 });
@@ -313,7 +329,6 @@ describe("pickTwoClues — excludeIds soft filter", () => {
       "divisibleBy",
       "totalDeviation",
       "upsAndDowns",
-      "extraLock",
       "elimination",
       "bullseyes",
       "higherLower",

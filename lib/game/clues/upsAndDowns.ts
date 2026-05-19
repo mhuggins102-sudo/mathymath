@@ -35,7 +35,7 @@ export const upsAndDownsClue: Clue<{ kind: "upsAndDowns"; cmp: Cmp }> = {
   name: "Ups and Downs",
   category: "compositional",
   description:
-    "Compares how many direction changes the target's digits make (left to right) to your guess. Example: 24651 has 2 (up then down); 20054 has 3 (down, up, down).",
+    "Compares how many direction changes the target's digits make (left to right) to your guess. Example: 24651 has 2 (up then down); 20054 has 3 (down, up, down). Grants +1 🔒 when chosen.",
   weight: 1.1,
   legend: [
     { state: "match", label: "same count" },

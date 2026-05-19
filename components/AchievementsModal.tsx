@@ -20,7 +20,8 @@ interface AchievementsModalProps {
 
 /** Resolve the trophy tier shown for an achievement given the player's
  *  unlock state. Single-level achievements skip silver — their first
- *  (and only) unlock awards gold directly. */
+ *  (and only) unlock awards gold directly. Criteria-style achievements
+ *  always have two tiers (silver / gold). */
 function trophyTierFor(
   ach: Achievement,
   unlock: AchievementsStore["unlocked"][string] | undefined,
@@ -28,7 +29,7 @@ function trophyTierFor(
   const l1 = Boolean(unlock?.level1At);
   const l2 = Boolean(unlock?.level2At);
   if (l2) return "gold";
-  if (l1) return ach.level2 ? "silver" : "gold";
+  if (l1) return ach.criteria || ach.level2 ? "silver" : "gold";
   return "locked";
 }
 
@@ -111,19 +112,27 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
                     <p className="text-muted leading-snug">
                       {ach.description}
                     </p>
-                    <p className="text-foreground leading-snug">
-                      <span className="font-medium text-slate-300">
-                        {ach.level2 ? "Silver:" : "Gold:"}
-                      </span>{" "}
-                      {ach.level1.label}
-                    </p>
-                    {ach.level2 && (
-                      <p className="text-foreground leading-snug">
-                        <span className="font-medium text-amber-400">
-                          Gold:
-                        </span>{" "}
-                        {ach.level2.label}
-                      </p>
+                    {ach.criteria ? (
+                      <CriteriaList ach={ach} unlock={u} />
+                    ) : (
+                      <>
+                        {ach.level1 && (
+                          <p className="text-foreground leading-snug">
+                            <span className="font-medium text-slate-300">
+                              {ach.level2 ? "Silver:" : "Gold:"}
+                            </span>{" "}
+                            {ach.level1.label}
+                          </p>
+                        )}
+                        {ach.level2 && (
+                          <p className="text-foreground leading-snug">
+                            <span className="font-medium text-amber-400">
+                              Gold:
+                            </span>{" "}
+                            {ach.level2.label}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -133,5 +142,49 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
         </ul>
       </div>
     </Modal>
+  );
+}
+
+/** Per-criterion list shown in the modal popup for criteria-style
+ *  achievements. Each row shows the criterion name with a dot
+ *  indicating its status: silver if met (and the achievement isn't
+ *  fully gold yet), gold if met when the achievement is gold, muted —
+ *  if not yet earned. */
+function CriteriaList({
+  ach,
+  unlock,
+}: {
+  ach: Achievement;
+  unlock: AchievementsStore["unlocked"][string] | undefined;
+}) {
+  const tier = trophyTierFor(ach, unlock);
+  const metMap = unlock?.criteria ?? {};
+  return (
+    <div className="text-foreground leading-snug">
+      <p>
+        <span className="font-medium text-slate-300">Earn any one:</span>{" "}
+        silver. Earn all → gold.
+      </p>
+      <ul className="mt-1 space-y-1">
+        {(ach.criteria ?? []).map((cr) => {
+          const met = !!metMap[cr.id];
+          const dotClass = met
+            ? tier === "gold"
+              ? "text-amber-400"
+              : "text-slate-300"
+            : "text-muted";
+          return (
+            <li key={cr.id} className="flex items-start gap-2">
+              <span aria-hidden className={`shrink-0 ${dotClass}`}>
+                {met ? "●" : "○"}
+              </span>
+              <span className={met ? "text-foreground" : "text-muted"}>
+                {cr.name}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

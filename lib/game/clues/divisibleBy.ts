@@ -22,7 +22,7 @@ export const divisibleByClue: Clue<{
   name: "Divisible By",
   category: "compositional",
   description:
-    "Lists the 2-9 values that evenly divide both your guess and the target. Says 'no shared' or 'no' when there's no overlap.",
+    "Lists the 2-9 values that evenly divide both your guess and the target. Says 'no shared' or 'no' when there's no overlap. Grants +1 🔒 when chosen.",
   // Single-line cmp clue. Highest weight in the roster — it's the
   // most-common filler clue, kept that way after the recasting since
   // the new variant still resolves quickly and reads as fun trivia.

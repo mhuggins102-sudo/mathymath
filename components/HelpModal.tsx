@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { CLUES } from "@/lib/game/clues/registry";
 import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
-import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
 import { GuessRow } from "./GuessRow";
 import { ClueLegend } from "./ClueLegend";
+import { ClueLockBadge } from "./ClueLockBadge";
 import { Modal } from "./Modal";
 
 type AccordionId = "basics" | "clues" | "locks" | "tips";
@@ -112,15 +112,22 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               locks stay across guesses; wrong locks are spent.
             </p>
             <p>
-              You can also spend a lock to{" "}
+              You can spend a lock to{" "}
               <strong className="text-foreground">redraw</strong> the
-              offered clue pair, or pick{" "}
+              offered clue pair (tap the button again to redraw multiple
+              times), or pick{" "}
               <strong className="text-foreground">Clue Reuse</strong>{" "}
               (costs 1 🔒) to repeat a previously-used clue.
             </p>
             <p>
+              Some clues — marked with{" "}
+              <span className="text-good">+🔒</span> in the chooser —
+              grant +1 lock when chosen, so you can stockpile a budget for
+              redraws or Clue Reuse later.
+            </p>
+            <p>
               Hard Unlimited starts with zero locks — you can still earn
-              them via Extra Lock during the game.
+              them via bonus-lock clues during the game.
             </p>
           </Accordion>
 
@@ -169,11 +176,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="font-semibold text-sm inline-flex items-center gap-1.5">
                       {clue.name}
-                      {clue.id === CLUE_REUSE_CLUE_ID && (
-                        <span className="text-[10px] font-normal text-muted">
-                          🔒×{CLUE_REUSE_COST}
-                        </span>
-                      )}
+                      <ClueLockBadge clueId={clue.id} size="xs" />
                     </span>
                     {isCurated && (
                       <span
@@ -194,6 +197,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                       guess={guess}
                       digits={guess.length}
                       result={result}
+                      hideCurationStar
                     />
                   </div>
                 </div>

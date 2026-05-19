@@ -283,11 +283,18 @@ describe("POST /api/daily/[date]/submit-guess", () => {
 describe("POST /api/daily/[date]/choose-clue", () => {
   it("returns continue + result for a valid pick", async () => {
     const pair = pickTwoClues(DATE, []);
+    // Pin to a context-free clue from the pair — Contains Digit returns
+    // "needs-pick" (slot pick required) and Oracle's result depends on
+    // context the test doesn't thread. Fall back to pair[0] only if
+    // neither option is safe (shouldn't happen for the regular deck).
+    const safe =
+      pair.find((c) => c.id !== "containsDigit" && c.id !== "oracle") ??
+      pair[0];
     const res = await chooseClue(
       mockRequest({
         history: [],
         pendingGuess: "11111",
-        clueId: pair[0].id,
+        clueId: safe.id,
       }),
       { params: paramsP(DATE) },
     );
@@ -296,7 +303,7 @@ describe("POST /api/daily/[date]/choose-clue", () => {
     expect(body.kind).toBe("continue");
     expect(body.result).toBeDefined();
     // Must match what the real pipeline would compute.
-    const expected = getClueById(pair[0].id).compute("11111", TARGET);
+    const expected = getClueById(safe.id).compute("11111", TARGET);
     expect(body.result).toEqual(expected);
   });
 

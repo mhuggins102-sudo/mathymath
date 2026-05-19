@@ -668,20 +668,27 @@ describe("6-digit length sanity", () => {
 });
 
 describe("Registry", () => {
-  it("has 19 clues, each weight > 0 and distinct id", () => {
-    expect(CLUES).toHaveLength(19);
+  it("has 18 active clues, each weight > 0 and distinct id", () => {
+    expect(CLUES).toHaveLength(18);
     const ids = new Set(CLUES.map((c) => c.id));
-    expect(ids.size).toBe(19);
+    expect(ids.size).toBe(18);
     for (const c of CLUES) {
       expect(c.weight).toBeGreaterThan(0);
     }
   });
-  it("lookup by id works for every clue", () => {
+  it("lookup by id works for every active clue", () => {
     for (const c of CLUES) {
       expect(getClueById(c.id)).toBe(c);
     }
   });
-  it("retired clues are gone", () => {
+  it("getClueById still resolves the retired Extra Lock for legacy replays", () => {
+    expect(getClueById("extraLock").id).toBe("extraLock");
+  });
+  it("extraLock is no longer in the active CLUES array", () => {
+    const ids = new Set(CLUES.map((c) => c.id));
+    expect(ids.has("extraLock" as never)).toBe(false);
+  });
+  it("retired clues are gone from the active array", () => {
     const ids = new Set(CLUES.map((c) => c.id));
     for (const retired of [
       "sumDirection",

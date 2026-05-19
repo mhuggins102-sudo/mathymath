@@ -1,15 +1,13 @@
 import type { Clue } from "./types";
 
 /**
- * Extra Lock — the first "Special" card. Picking it costs you the
- * round's clue (no per-slot paint, no compositional intel) but grants
- * +1 lock for the rest of the game (see MAX_LOCKS in locks.ts).
- *
- * The +1 is NOT applied here; locks.ts derives the current budget from
- * history by counting Extra Lock picks (via EXTRA_LOCK_CLUE_ID) and
- * subtracting wrong-lock spends. compute() just produces a flat result
- * object so the rest of the clue pipeline (validator replay, share
- * text, resolved-row rendering) has something to round-trip.
+ * Extra Lock — retired from the active deck on 2026-05-19, but kept
+ * registered so legacy daily replays carrying `{ kind: "extraLock" }`
+ * results still resolve. The "+1 lock when chosen" semantics now live
+ * on three compositional clues (Distinct Digits, Ups and Downs,
+ * Divisible By) via BONUS_LOCK_CLUE_IDS in locks.ts. Replays of older
+ * daily games still grant +1 lock for each Extra Lock pick — the
+ * legacy id is in BONUS_LOCK_CLUE_IDS too.
  */
 export const extraLockClue: Clue<{ kind: "extraLock" }> = {
   id: "extraLock",

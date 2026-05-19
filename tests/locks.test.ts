@@ -1,20 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
+  BONUS_LOCK_CLUE_IDS,
   canUseLockOnGuess,
   certainDigitsFromLocks,
-  countExtraLocksGained,
+  countBonusLocksGained,
   CLUE_REUSE_CLUE_ID,
   EXTRA_LOCK_CLUE_ID,
   INITIAL_LOCKS,
   locksAvailable,
-  MAX_LOCKS,
   type LockRecord,
 } from "@/lib/game/locks";
 
 describe("locks constants", () => {
-  it("starts each game with 1 lock and caps at 2", () => {
+  it("starts each game with 1 lock", () => {
     expect(INITIAL_LOCKS).toBe(1);
-    expect(MAX_LOCKS).toBe(3);
+  });
+  it("BONUS_LOCK_CLUE_IDS covers the three bonus-lock clues plus legacy Extra Lock", () => {
+    expect(BONUS_LOCK_CLUE_IDS.has("distinctDigits")).toBe(true);
+    expect(BONUS_LOCK_CLUE_IDS.has("upsAndDowns")).toBe(true);
+    expect(BONUS_LOCK_CLUE_IDS.has("divisibleBy")).toBe(true);
+    expect(BONUS_LOCK_CLUE_IDS.has(EXTRA_LOCK_CLUE_ID)).toBe(true);
   });
 });
 
@@ -24,18 +29,48 @@ describe("canUseLockOnGuess", () => {
   });
 });
 
-describe("countExtraLocksGained", () => {
-  it("counts the extraLock clue picks in history", () => {
+describe("countBonusLocksGained", () => {
+  it("counts bonus-lock clue picks in history", () => {
     const history = [
       { clueId: "oracle" },
-      { clueId: EXTRA_LOCK_CLUE_ID },
+      { clueId: "distinctDigits" },
       { clueId: "thermometer" },
+      { clueId: "upsAndDowns" },
+      { clueId: "divisibleBy" },
+    ];
+    expect(countBonusLocksGained(history)).toBe(3);
+  });
+  it("still counts legacy Extra Lock picks (replays)", () => {
+    const history = [
+      { clueId: EXTRA_LOCK_CLUE_ID },
       { clueId: EXTRA_LOCK_CLUE_ID },
     ];
-    expect(countExtraLocksGained(history)).toBe(2);
+    expect(countBonusLocksGained(history)).toBe(2);
+  });
+  it("counts Clue Reuse of a bonus-lock clue", () => {
+    const history = [
+      { clueId: "distinctDigits" },
+      {
+        clueId: CLUE_REUSE_CLUE_ID,
+        result: { kind: "distinctDigits", count: 4, sharedRepeated: [] },
+      },
+    ];
+    // First pick is bonus-lock; the reuse re-applies the same clue and
+    // grants another +1.
+    expect(countBonusLocksGained(history)).toBe(2);
+  });
+  it("does NOT double-count Clue Reuse of a non-bonus clue", () => {
+    const history = [
+      { clueId: "oracle" },
+      {
+        clueId: CLUE_REUSE_CLUE_ID,
+        result: { kind: "oracle", slot: 0, digit: 1 },
+      },
+    ];
+    expect(countBonusLocksGained(history)).toBe(0);
   });
   it("is 0 for empty history", () => {
-    expect(countExtraLocksGained([])).toBe(0);
+    expect(countBonusLocksGained([])).toBe(0);
   });
 });
 
@@ -49,27 +84,33 @@ describe("locksAvailable", () => {
     expect(locksAvailable([{ locks: [correct] }])).toBe(1);
     expect(locksAvailable([{ locks: [wrong] }])).toBe(0);
   });
-  it("Extra Lock grants +1 (cap 2)", () => {
-    expect(locksAvailable([{ clueId: EXTRA_LOCK_CLUE_ID }])).toBe(2);
-    // Two extraLock clues: initial 1 + 2 = 3, capped at MAX_LOCKS=3.
+  it("each bonus-lock clue grants +1 with no cap", () => {
+    expect(locksAvailable([{ clueId: "distinctDigits" }])).toBe(2);
     expect(
       locksAvailable([
-        { clueId: EXTRA_LOCK_CLUE_ID },
-        { clueId: EXTRA_LOCK_CLUE_ID },
+        { clueId: "distinctDigits" },
+        { clueId: "upsAndDowns" },
       ]),
     ).toBe(3);
+    // Three bonus-lock picks: initial 1 + 3 = 4 (previously capped at 3).
+    expect(
+      locksAvailable([
+        { clueId: "distinctDigits" },
+        { clueId: "upsAndDowns" },
+        { clueId: "divisibleBy" },
+      ]),
+    ).toBe(4);
   });
-  it("EXTRA_LOCK_CLUE_ID matches the registered extraLock clue id", async () => {
-    const { extraLockClue } = await import("@/lib/game/clues/extraLock");
-    expect(extraLockClue.id).toBe(EXTRA_LOCK_CLUE_ID);
+  it("legacy Extra Lock still grants +1 for replays", () => {
+    expect(locksAvailable([{ clueId: EXTRA_LOCK_CLUE_ID }])).toBe(2);
   });
-  it("Extra Lock after spending can restore up to cap", () => {
+  it("Bonus lock after spending restores up to the new cap", () => {
     const wrong: LockRecord = { slot: 1, digit: "7", correct: false };
-    // Start 1, spend 1 → 0 remaining, Extra Lock → cap 2 − 1 spent = 1.
+    // Start 1, spend 1 → 0 remaining, bonus-lock pick → cap 2 − 1 spent = 1.
     expect(
       locksAvailable([
         { locks: [wrong] },
-        { clueId: EXTRA_LOCK_CLUE_ID },
+        { clueId: "distinctDigits" },
       ]),
     ).toBe(1);
   });
@@ -78,22 +119,30 @@ describe("locksAvailable", () => {
     expect(
       locksAvailable([{ clueId: CLUE_REUSE_CLUE_ID }]),
     ).toBe(0);
-    // Two Extra Locks bring cap to 3; one Clue Reuse pick costs 1
+    // Two bonus-lock picks bring cap to 3; one Clue Reuse pick costs 1
     // → 3 - 1 = 2 remaining.
     expect(
       locksAvailable([
-        { clueId: EXTRA_LOCK_CLUE_ID },
-        { clueId: EXTRA_LOCK_CLUE_ID },
+        { clueId: "distinctDigits" },
+        { clueId: "upsAndDowns" },
         { clueId: CLUE_REUSE_CLUE_ID },
       ]),
     ).toBe(2);
+  });
+  it("supports multi-redraw: N redraws cost N locks", () => {
+    // Two bonus-lock picks → cap 3. Three redraws on one turn spend 3.
+    expect(
+      locksAvailable([
+        { clueId: "distinctDigits" },
+        { clueId: "upsAndDowns" },
+        { redraws: 3 },
+      ]),
+    ).toBe(0);
   });
   it("never goes below 0", () => {
     const wrongA: LockRecord = { slot: 0, digit: "1", correct: false };
     const wrongB: LockRecord = { slot: 1, digit: "2", correct: false };
     const wrongC: LockRecord = { slot: 2, digit: "3", correct: false };
-    // More wrong locks than the cap (shouldn't happen in practice, but
-    // the function still returns a sane 0 rather than negative).
     expect(
       locksAvailable([{ locks: [wrongA, wrongB, wrongC] }]),
     ).toBe(0);
