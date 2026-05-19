@@ -71,10 +71,12 @@ body {
  * flex-distributed content height. */
 html {
   background-color: var(--background);
+  min-height: 100vh;
   min-height: 100dvh;
 }
 body {
   background-color: var(--background);
+  min-height: 100vh;
   min-height: 100dvh;
 }
 
