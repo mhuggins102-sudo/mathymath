@@ -69,28 +69,83 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 
         <div className="space-y-2 mb-6">
           <Accordion
-            title="The basics"
+            title="Overview"
             isOpen={openSection === "basics"}
             onToggle={() => toggleSection("basics")}
           >
             <p>
-              Guess the secret 5-digit number in{" "}
-              <strong className="text-foreground">7 tries</strong>. Digits
-              can repeat — e.g.{" "}
-              <span className="font-mono text-foreground">74727</span> is a
-              valid target.
+              Guess the target number within 7 tries. After each guess,
+              select a clue type from two options. The clue indicates how
+              close your guess is to the target by coloring the digit
+              slots of your guess and/or providing statistics that compare
+              your guess to the target. Win by submitting the exact target
+              before you run out of turns.
+            </p>
+          </Accordion>
+
+          <Accordion
+            title="Clues"
+            isOpen={openSection === "clues"}
+            onToggle={() => toggleSection("clues")}
+          >
+            <p>
+              After each guess you are offered two clue options. Select
+              the one that you think will best help you to narrow in on
+              the target number.
             </p>
             <p>
-              Each guess is scored by a{" "}
-              <strong className="text-foreground">clue</strong> you pick
-              from a two-option chooser. The clue paints the row with
-              colors — match (green), warm (info), cold (info), or idle
-              (no info) — that progressively narrow the target.
+              On turn 1, you will always have at least one friendly opener
+              clue available (marked with a{" "}
+              <span className="text-warn">⭐</span>). These are generally
+              the strongest clues early in a game.
             </p>
             <p>
-              Win by submitting the exact target before you run out of
-              turns. Wrong guesses still resolve their clue and stay on
-              the board as evidence.
+              A clue type can only be selected once per game. Used types
+              will not reappear on later turns (unless you select the
+              special Clue Reuse clue type).
+            </p>
+            <p>
+              The full clue reference is shown below this list. Tap any
+              clue&apos;s name on a resolved row mid-game for text details
+              on how its result was computed against your guess.
+            </p>
+          </Accordion>
+
+          <Accordion
+            title="Locks"
+            isOpen={openSection === "locks"}
+            onToggle={() => toggleSection("locks")}
+          >
+            <p>
+              You start each game with one{" "}
+              <span className="text-foreground">🔒 lock</span>. Locks have
+              three possible uses:
+            </p>
+            <ul className="list-disc list-outside pl-5 space-y-1.5">
+              <li>
+                <strong className="text-foreground">Locking digits:</strong>{" "}
+                When entering a guess, tap a slot to &ldquo;lock in&rdquo;
+                that guessed digit. If correct, that digit will display as
+                green (correct) for the rest of the game. Additionally,
+                your lock will be returned for future use.
+              </li>
+              <li>
+                <strong className="text-foreground">Redraw clues:</strong>{" "}
+                You can spend a lock to redraw the offered clue pair.
+              </li>
+              <li>
+                <strong className="text-foreground">Clue Reuse:</strong>{" "}
+                You can spend a lock to utilize the Clue Reuse clue type,
+                which allows you to reuse any previously selected clue
+                type.
+              </li>
+            </ul>
+            <p>
+              Some clues, marked with{" "}
+              <span className="text-good">+🔒</span>, grant +1 lock when
+              selected. If you possess multiple locks, you may use several
+              during one turn and may try to lock multiple digits or
+              redraw clues multiple times.
             </p>
           </Accordion>
 
@@ -114,34 +169,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             <p>
               Tap the gear (⚙︎) icon to open Settings; tap the trophy
               icon to see your Achievements and stats.
-            </p>
-          </Accordion>
-
-          <Accordion
-            title="Choosing clues"
-            isOpen={openSection === "clues"}
-            onToggle={() => toggleSection("clues")}
-          >
-            <p>
-              After every guess you&apos;re offered{" "}
-              <strong className="text-foreground">two clue options</strong>.
-              Pick the one that will help you most given what the row
-              already tells you.
-            </p>
-            <p>
-              On round 1, friendly opener clues are marked with a{" "}
-              <span className="text-warn">⭐</span> in the chooser — those
-              are designed for the first-guess sweep.
-            </p>
-            <p>
-              A clue type can only be picked once per game — used types
-              won&apos;t reappear as future options (unless you spend a
-              lock on Clue Reuse).
-            </p>
-            <p>
-              The full clue reference is shown below this list. Tap any
-              clue&apos;s name on a resolved row mid-game to see exactly
-              how its result was computed against your guess.
             </p>
           </Accordion>
 
@@ -180,37 +207,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               The exact meaning depends on the clue — check the legend on
               each clue&apos;s reference card below for the per-color
               rules.
-            </p>
-          </Accordion>
-
-          <Accordion
-            title="Locks"
-            isOpen={openSection === "locks"}
-            onToggle={() => toggleSection("locks")}
-          >
-            <p>
-              You start each game with one{" "}
-              <span className="text-foreground">🔒 lock</span>. Tap a cell
-              on the active row to pin a digit you&apos;re sure of. Correct
-              locks stay across guesses; wrong locks are spent.
-            </p>
-            <p>
-              You can spend a lock to{" "}
-              <strong className="text-foreground">redraw</strong> the
-              offered clue pair (tap the button again to redraw multiple
-              times), or pick{" "}
-              <strong className="text-foreground">Clue Reuse</strong>{" "}
-              (costs 1 🔒) to repeat a previously-used clue.
-            </p>
-            <p>
-              Some clues — marked with{" "}
-              <span className="text-good">+🔒</span> in the chooser —
-              grant +1 lock when chosen, so you can stockpile a budget for
-              redraws or Clue Reuse later. There&apos;s no cap on locks.
-            </p>
-            <p>
-              Hard Unlimited starts with zero locks — you can still earn
-              them via bonus-lock clues during the game.
             </p>
           </Accordion>
 
