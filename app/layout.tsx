@@ -19,8 +19,11 @@ export const viewport: Viewport = {
 
 // Inline pre-paint script: reads the saved settings blob and stamps the
 // colorblind class on <html> before first paint. Prevents a red/green flash
-// for colorblind-mode users on cold load. Kept tiny and defensive so a
-// malformed localStorage value can never throw and block render.
+// for colorblind-mode users on cold load. Also force-paints the page bg
+// onto both html and body via inline style so the dark canvas is
+// guaranteed regardless of CSS variable resolution, Tailwind cascade
+// order, or any container-block quirks that have caused the bg cutoff on
+// desktop. Inline style attributes win every specificity battle.
 const NO_FLASH_SCRIPT = `
 try {
   var raw = window.localStorage.getItem("mathymath:settings");
@@ -28,6 +31,20 @@ try {
     var s = JSON.parse(raw);
     if (s && s.colorblind) document.documentElement.classList.add("colorblind");
   }
+} catch (e) {}
+try {
+  var bg = "#0a0a0d";
+  document.documentElement.style.backgroundColor = bg;
+  document.documentElement.style.minHeight = "100dvh";
+  // body may not exist yet when the head script runs; defer to DOMContentLoaded.
+  var paintBody = function () {
+    if (document.body) {
+      document.body.style.backgroundColor = bg;
+      document.body.style.minHeight = "100dvh";
+    }
+  };
+  paintBody();
+  document.addEventListener("DOMContentLoaded", paintBody);
 } catch (e) {}
 `;
 
@@ -37,23 +54,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="antialiased">
+    <html lang="en" className="antialiased bg-background">
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
       </head>
-      <body className="min-h-screen flex flex-col">
+      <body className="min-h-dvh flex flex-col bg-background">
         <SettingsHydrator />
-        {/* Permanent viewport-filling background layer. Body's own bg
-         *  has historically cut off below the page content on tall
-         *  desktop viewports despite min-height anchoring — Chrome
-         *  paints only up to the content's natural height. The
-         *  `fixed inset-0` technique (the same one our modals use,
-         *  where the user confirms the bg paints edge-to-edge) sits
-         *  behind everything via `-z-10` and is inert via
-         *  `pointer-events-none`. */}
+        {/* Permanent viewport-filling background layer. Even with html/
+         *  body bg set, Chrome desktop has historically painted the bg
+         *  only up to body's intrinsic content height on tall viewports.
+         *  This div uses the same `fixed inset-0 bg-background`
+         *  technique our modals use, where the bg is confirmed to paint
+         *  edge-to-edge. Inline style is belt-and-suspenders against
+         *  any CSS-variable resolution issue. */}
         <div
           aria-hidden
           className="fixed inset-0 -z-10 bg-background pointer-events-none"
+          style={{ backgroundColor: "#0a0a0d" }}
         />
         <div
           className="portrait-only hidden fixed inset-0 z-50 bg-black/95 text-foreground items-center justify-center text-center px-6"
