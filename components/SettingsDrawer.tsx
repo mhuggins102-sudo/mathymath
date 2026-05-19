@@ -137,12 +137,11 @@ export function SettingsDrawer({
               intro: "Hard mode is tougher than Normal:",
               bullets: [
                 "Start with 0 locks instead of 1.",
-                "7 guesses instead of 8.",
                 "No guaranteed friendly opener clue on turn 1.",
                 "Clue Reuse is removed from the deck.",
               ],
               outro:
-                "Curated turn-1 clues in Normal are: Digit Overlap, Elimination, Odd or Even, Total Deviation, Higher or Lower, Within 2, Oracle, Thermometer.",
+                "Both modes share the same 7-turn budget. Friendly turn-1 clues in Normal are: Digit Overlap, Elimination, Odd or Even, Total Deviation, Higher or Lower, Within 2, Oracle, Thermometer.",
             }}
           />
           <BinaryRow
@@ -198,121 +197,12 @@ type InfoBody =
   | string
   | { intro: string; bullets: string[]; outro?: string };
 
-/** Two-state binary toggle row: label on the left, segmented A/B
- *  control on the right, optional (i) info popover. Used for the
- *  enum-style settings (5/6-digit, Normal/Hard, Manual/Auto). */
-function BinaryRow<T extends string>({
-  label,
-  optionA,
-  optionB,
-  value,
-  onChange,
-  info,
-  disabled,
-  disabledHint,
-}: {
-  label: string;
-  optionA: { value: T; text: string };
-  optionB: { value: T; text: string };
-  value: T;
-  onChange: (v: T) => void;
-  info: InfoBody;
-  disabled?: boolean;
-  disabledHint?: string;
-}) {
-  // The disabled treatment dims only the segmented control on the
-  // right — labels and info-popover buttons stay fully readable so
-  // a player viewing settings during a Daily can still learn what
-  // each option means even though they can't toggle it.
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="flex-1 min-w-0 inline-flex items-center gap-1.5">
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <InfoPopover label={`Info about ${label}`} body={info} disabledHint={disabledHint} />
-      </div>
-      <div
-        role="radiogroup"
-        aria-label={label}
-        className={`grid grid-cols-2 gap-1 bg-surface rounded-md p-0.5 text-[11px] font-semibold shrink-0 ${
-          disabled ? "opacity-50" : ""
-        }`}
-      >
-        {[optionA, optionB].map((opt) => {
-          const selected = value === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              disabled={disabled}
-              onClick={() => onChange(opt.value)}
-              className={`px-3 py-1.5 rounded transition ${
-                selected
-                  ? "bg-accent/80 text-background"
-                  : "text-muted hover:text-foreground"
-              } ${disabled ? "cursor-not-allowed" : ""}`}
-            >
-              {opt.text}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** Boolean on/off toggle row with the same layout as BinaryRow. */
-function ToggleRow({
-  label,
-  value,
-  onChange,
-  info,
-  disabled,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-  info: InfoBody;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="flex-1 min-w-0 inline-flex items-center gap-1.5">
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <InfoPopover label={`Info about ${label}`} body={info} />
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        disabled={disabled}
-        onClick={() => onChange(!value)}
-        className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-          value ? "bg-accent" : "bg-surface border border-border"
-        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
-            value ? "translate-x-5" : ""
-          }`}
-        />
-      </button>
-    </div>
-  );
-}
-
-/** Small "(i)" button that opens a tooltip-style popover with the
- *  setting's longer description. Closes on outside click or escape. */
-function InfoPopover({
-  label,
-  body,
-  disabledHint,
-}: {
-  label: string;
-  body: InfoBody;
-  disabledHint?: string;
-}) {
+/** Encapsulates the per-row info popover (open/close + outside-click
+ *  dismissal). Returns the wrapper ref the row pins `position: relative`
+ *  to so the popover panel can `inset-x-4 top-full` against the row's
+ *  inner width — keeping the panel inside the modal regardless of
+ *  where the (i) button sits horizontally. */
+function useInfoPopover() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -336,41 +226,185 @@ function InfoPopover({
     };
   }, [open]);
 
+  return {
+    ref,
+    open,
+    toggle: () => setOpen((v) => !v),
+  };
+}
+
+/** Small "(i)" trigger. The popover panel itself is rendered at the
+ *  row level so its width can match the row, not the (i) button. */
+function InfoButton({
+  ariaLabel,
+  onClick,
+}: {
+  ariaLabel: string;
+  onClick: () => void;
+}) {
   return (
-    <div ref={ref} className="relative inline-flex">
-      <button
-        type="button"
-        aria-label={label}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted/50 text-[10px] font-bold text-muted hover:text-foreground hover:border-foreground/60 leading-none"
-      >
-        i
-      </button>
-      {open && (
-        <div className="absolute left-0 top-6 z-30 w-64 max-w-[calc(100vw-2rem)] bg-surface-2 border border-border rounded-lg shadow-lg p-3 text-[11px] text-muted leading-relaxed">
-          {typeof body === "string" ? (
-            <p>{body}</p>
-          ) : (
-            <>
-              <p>{body.intro}</p>
-              <ul className="mt-1.5 space-y-1 list-disc list-outside pl-4">
-                {body.bullets.map((b, i) => (
-                  <li key={i}>{b}</li>
-                ))}
-              </ul>
-              {body.outro && (
-                <p className="mt-1.5 text-foreground/70">{body.outro}</p>
-              )}
-            </>
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-muted/50 text-[10px] font-bold text-muted hover:text-foreground hover:border-foreground/60 leading-none"
+    >
+      i
+    </button>
+  );
+}
+
+/** Row-level info panel. Spans the row's inner width via `inset-x-4`
+ *  (matches the row's `px-4` padding), avoiding the overflow problem
+ *  the old (i)-anchored popover had on narrow screens. */
+function InfoPanel({
+  body,
+  disabledHint,
+}: {
+  body: InfoBody;
+  disabledHint?: string;
+}) {
+  return (
+    <div className="absolute top-full inset-x-3 z-30 -mt-1 mb-2 bg-surface-2 border border-border rounded-lg shadow-lg p-3 text-[11px] text-muted leading-relaxed">
+      {typeof body === "string" ? (
+        <p>{body}</p>
+      ) : (
+        <>
+          <p>{body.intro}</p>
+          <ul className="mt-1.5 space-y-1 list-disc list-outside pl-4">
+            {body.bullets.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+          {body.outro && (
+            <p className="mt-1.5 text-foreground/70">{body.outro}</p>
           )}
-          {disabledHint && (
-            <p className="mt-1 italic text-foreground/70">{disabledHint}</p>
-          )}
-        </div>
+        </>
       )}
+      {disabledHint && (
+        <p className="mt-1 italic text-foreground/70">{disabledHint}</p>
+      )}
+    </div>
+  );
+}
+
+/** Two-state binary toggle row: label on the left, segmented A/B
+ *  control on the right, optional (i) info popover. Used for the
+ *  enum-style settings (5/6-digit, Normal/Hard, Manual/Auto). */
+function BinaryRow<T extends string>({
+  label,
+  optionA,
+  optionB,
+  value,
+  onChange,
+  info,
+  disabled,
+  disabledHint,
+}: {
+  label: string;
+  optionA: { value: T; text: string };
+  optionB: { value: T; text: string };
+  value: T;
+  onChange: (v: T) => void;
+  info: InfoBody;
+  disabled?: boolean;
+  disabledHint?: string;
+}) {
+  const popover = useInfoPopover();
+  // The disabled treatment dims only the segmented control on the
+  // right — labels and info-popover buttons stay fully readable so
+  // a player viewing settings during a Daily can still learn what
+  // each option means even though they can't toggle it.
+  return (
+    <div ref={popover.ref} className="relative">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex-1 min-w-0 inline-flex items-center gap-1.5">
+          <span className="text-sm font-medium text-foreground">{label}</span>
+          <InfoButton
+            ariaLabel={`Info about ${label}`}
+            onClick={popover.toggle}
+          />
+        </div>
+        <div
+          role="radiogroup"
+          aria-label={label}
+          className={`grid grid-cols-2 gap-1 bg-surface rounded-md p-0.5 text-[11px] font-semibold shrink-0 ${
+            disabled ? "opacity-50" : ""
+          }`}
+        >
+          {[optionA, optionB].map((opt) => {
+            const selected = value === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={disabled}
+                onClick={() => onChange(opt.value)}
+                className={`px-3 py-1.5 rounded transition ${
+                  selected
+                    ? "bg-accent/80 text-background"
+                    : "text-muted hover:text-foreground"
+                } ${disabled ? "cursor-not-allowed" : ""}`}
+              >
+                {opt.text}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {popover.open && <InfoPanel body={info} disabledHint={disabledHint} />}
+    </div>
+  );
+}
+
+/** Boolean on/off toggle row with the same layout as BinaryRow. */
+function ToggleRow({
+  label,
+  value,
+  onChange,
+  info,
+  disabled,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  info: InfoBody;
+  disabled?: boolean;
+}) {
+  const popover = useInfoPopover();
+  return (
+    <div ref={popover.ref} className="relative">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex-1 min-w-0 inline-flex items-center gap-1.5">
+          <span className="text-sm font-medium text-foreground">{label}</span>
+          <InfoButton
+            ariaLabel={`Info about ${label}`}
+            onClick={popover.toggle}
+          />
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={value}
+          disabled={disabled}
+          onClick={() => onChange(!value)}
+          className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+            value ? "bg-accent" : "bg-surface border border-border"
+          } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background transition-transform ${
+              value ? "translate-x-5" : ""
+            }`}
+          />
+        </button>
+      </div>
+      {popover.open && <InfoPanel body={info} />}
     </div>
   );
 }
