@@ -41,7 +41,12 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
       </head>
-      <body className="min-h-screen flex flex-col">
+      {/* min-height intentionally lives in globals.css (100dvh with a
+          100% fallback) — Tailwind's min-h-screen uses 100vh, which
+          on Chrome desktop sometimes computes shorter than the
+          dynamic viewport and lets the page background end mid-fold.
+          The CSS file's body selector now owns vertical sizing. */}
+      <body className="flex flex-col">
         <SettingsHydrator />
         <div
           className="portrait-only hidden fixed inset-0 z-50 bg-black/95 text-foreground items-center justify-center text-center px-6"

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { ClueId } from "@/lib/game/clues/types";
 import { getClueById } from "@/lib/game/clues/registry";
 import { Digit, type DigitState } from "./Digit";
@@ -20,7 +21,7 @@ export interface SlotPick {
  * slots become non-tappable. The round ends on a red pick or once
  * every slot has been picked.
  */
-export function SlotPicker({
+function SlotPickerImpl({
   guess,
   picks,
   onPick,
@@ -91,7 +92,7 @@ export function SlotPicker({
  * special. Shows a list of previously-used non-special clues. Tapping
  * one applies that clue again to the current guess.
  */
-export function ReusePicker({
+function ReusePickerImpl({
   usedClueIds,
   onSelect,
   onCancel,
@@ -143,3 +144,13 @@ export function ReusePicker({
     </div>
   );
 }
+
+/**
+ * Memoized to skip re-renders during unrelated keystroke / lock state
+ * updates in the parent. Callers should ensure the `picks` and
+ * `usedClueIds` array references are stable across renders (see
+ * useMemo in app/unlimited/page.tsx) for the shallow compare to skip
+ * work rather than just delay it.
+ */
+export const SlotPicker = memo(SlotPickerImpl);
+export const ReusePicker = memo(ReusePickerImpl);
