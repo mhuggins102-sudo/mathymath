@@ -62,7 +62,7 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
     <Modal open={open} onClose={onClose} titleId={titleId} variant="overlay">
       <div className="bg-surface rounded-xl border border-border shadow-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 id={titleId} className="text-base font-semibold">
+          <h2 id={titleId} className="text-xl font-semibold">
             Achievements
           </h2>
           <button

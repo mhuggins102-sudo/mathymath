@@ -339,11 +339,19 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                       {clue.description}
                     </p>
                     {clue.legend && <ClueLegend entries={clue.legend} />}
-                    <div className="scale-90 origin-left mt-2">
+                    {/* `-mx-3` negates GuessRow's internal px-3 so the
+                        label text left-aligns with the description and
+                        legend above. `tightLabel` caps the label
+                        column so wide sub-labels (e.g. Stat Summary's
+                        median/min/max line) truncate rather than push
+                        the digit cells past the card's right edge in
+                        portrait. */}
+                    <div className="scale-90 origin-left mt-2 -mx-3">
                       <GuessRow
                         guess={guess}
                         digits={guess.length}
                         result={result}
+                        tightLabel
                         hideCurationStar
                       />
                     </div>
