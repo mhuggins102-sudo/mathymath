@@ -197,11 +197,22 @@ function scoreOption(
   clueId: ClueId,
   context: ClueComputeContext,
   priorPicks: readonly ClueId[],
+  /** Lock budget the player would have to spend to pick a meta card.
+   *  Clue Reuse is unaffordable when this is < CLUE_REUSE_COST — we
+   *  return N (no info) to keep the chooser from picking it, which
+   *  models the real-game rule that you can't redeem Clue Reuse
+   *  without a lock to burn. */
+  lockBudget: number,
 ): { expectedRemaining: number; reusedId?: ClueId } {
   if (clueId === "extraLock") {
     return { expectedRemaining: candidates.length };
   }
   if (clueId === "clueReuse") {
+    if (lockBudget < 1) {
+      // Can't afford the lock cost — same outcome as the disabled-card
+      // UI state in the live chooser.
+      return { expectedRemaining: candidates.length };
+    }
     const r = scoreClueReuse(candidates, guess, context, priorPicks);
     return {
       expectedRemaining: r.expectedRemaining,
@@ -289,6 +300,20 @@ function playOne(target: string, seed: string, budget: number): SimStats {
     offeredIds: new Set(),
   };
 
+  // Greedy info-gain doesn't model the lock economy in general, but
+  // the chooser needs to know whether Clue Reuse is affordable — the
+  // live game disables that card when the lock budget can't cover its
+  // cost. We track the budget here strictly to gate that affordance,
+  // matching the live rule that Clue Reuse always spends a lock.
+  // Mirrors lib/game/locks.ts.
+  let lockBudget = 1;
+  const BONUS_LOCK_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
+    "distinctDigits",
+    "upsAndDowns",
+    "divisibleBy",
+    "extraLock",
+  ]);
+
   for (let g = 0; g < budget; g++) {
     const guess = candidates[0] ?? ALL[0];
     stats.guessCount += 1;
@@ -308,8 +333,8 @@ function playOne(target: string, seed: string, budget: number): SimStats {
     }
 
     const ctx = buildContext(history);
-    const score0 = scoreOption(candidates, guess, options[0].id, ctx, chosenSoFar);
-    const score1 = scoreOption(candidates, guess, options[1].id, ctx, chosenSoFar);
+    const score0 = scoreOption(candidates, guess, options[0].id, ctx, chosenSoFar, lockBudget);
+    const score1 = scoreOption(candidates, guess, options[1].id, ctx, chosenSoFar, lockBudget);
 
     // Greedy: lower expected remaining wins. Tie → first offered (index 0).
     const pickedIdx: 0 | 1 =
@@ -355,6 +380,11 @@ function playOne(target: string, seed: string, budget: number): SimStats {
 
     stats.cluePicks.push(pick.id);
     history.push({ guess, clueId: pick.id, result });
+
+    // Lock budget bookkeeping — see comment at the top of playOne.
+    // Used only to gate Clue Reuse affordability on subsequent rounds.
+    if (pick.id === "clueReuse") lockBudget -= 1;
+    if (BONUS_LOCK_IDS.has(pick.id)) lockBudget += 1;
 
     stats.decisions.push({
       round: stats.decisions.length + 1,
