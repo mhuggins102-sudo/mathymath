@@ -254,12 +254,23 @@ export function reduce(state: GameState, action: GameAction): GameState {
             ...locksField,
           },
         ];
-        const lost = guesses.length >= state.maxGuesses;
+        // Oracle auto-win is gated on result.kind here too: in Auto
+        // (preselected) mode the chooser branch never runs, so without
+        // this check Oracle reveals never end the game even when they
+        // complete the certain set or sit on a near-correct guess.
+        const oracleWon = checkOracleWin(
+          guesses,
+          action.guess,
+          result,
+          state.target,
+          state.digits,
+        );
+        const lost = !oracleWon && guesses.length >= state.maxGuesses;
         return {
           ...state,
           offeredClueIds: appendOfferedIds(state.offeredClueIds, [clue]),
           guesses,
-          status: lost ? "lost" : "playing",
+          status: oracleWon ? "won" : lost ? "lost" : "playing",
         };
       }
 
@@ -350,32 +361,9 @@ export function reduce(state: GameState, action: GameAction): GameState {
         },
       ];
       const won = guess === state.target;
-      // Oracle-induced win: when the chosen clue's result reveals the
-      // last unknown slot (combined with prior reveals + correct locks),
-      // the player has effectively solved the puzzle. They shouldn't be
-      // forced to type the now-known target on a subsequent guess.
-      // Triggered on result.kind === "oracle" so it also fires when
-      // Oracle is reached via Clue Reuse (clueId is "clueReuse" but
-      // result.kind is the reused clue's id).
-      let oracleWon = false;
-      if (!won && result.kind === "oracle") {
-        const certain = deriveCertainDigits(guesses, state.digits);
-        if (certain.every((d) => d !== null)) oracleWon = true;
-        // Also win if the player's current guess matches the target
-        // at every slot except the Oracle slot — Oracle just filled
-        // in the only mistake, and forcing the player to re-enter the
-        // same digits to commit the win is wasteful. This handles the
-        // case where the player has a near-correct guess but no locks
-        // at the matching slots, so deriveCertainDigits doesn't count
-        // them as known.
-        if (!oracleWon) {
-          const oracleSlot = result.slot;
-          const matchesElsewhere = [...guess].every(
-            (ch, i) => i === oracleSlot || ch === state.target[i],
-          );
-          if (matchesElsewhere) oracleWon = true;
-        }
-      }
+      const oracleWon =
+        !won &&
+        checkOracleWin(guesses, guess, result, state.target, state.digits);
       const lost = !won && !oracleWon && guesses.length >= state.maxGuesses;
       return {
         ...state,
@@ -389,6 +377,42 @@ export function reduce(state: GameState, action: GameAction): GameState {
 
 export function remainingGuesses(state: GameState): number {
   return Math.max(0, state.maxGuesses - state.guesses.length);
+}
+
+/**
+ * Oracle-induced win check. Returns true when the just-played round's
+ * Oracle reveal (combined with prior reveals + correct locks) means
+ * the player has effectively solved the puzzle, so they shouldn't be
+ * forced to type the now-known target on a subsequent guess.
+ *
+ * Two passing conditions, in order:
+ *  1. Every slot is certain. This is the strict check: prior bullseyes,
+ *     containsDigit/higherLower exacts, oracle reveals (this round's
+ *     reveal included via `guesses`), and correct locks together cover
+ *     all `digits` slots.
+ *  2. Fallback for near-correct guesses where deriveCertainDigits doesn't
+ *     have a per-slot reveal but the guess literally matches the target
+ *     at every slot except the Oracle slot. Oracle just filled the one
+ *     mistake; we don't need to round-trip another guess.
+ *
+ * Fires on result.kind === "oracle" so it also triggers when Oracle is
+ * reached via Clue Reuse (clueId is "clueReuse" but result.kind is the
+ * reused clue's id).
+ */
+function checkOracleWin(
+  guesses: readonly ResolvedGuess[],
+  guess: string,
+  result: ClueResult,
+  target: string,
+  digits: number,
+): boolean {
+  if (result.kind !== "oracle") return false;
+  const certain = deriveCertainDigits(guesses, digits);
+  if (certain.every((d) => d !== null)) return true;
+  const oracleSlot = result.slot;
+  return [...guess].every(
+    (ch, i) => i === oracleSlot || ch === target[i],
+  );
 }
 
 function appendOfferedIds(
