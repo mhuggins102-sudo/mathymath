@@ -90,11 +90,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               your guess to the target. Win by submitting the exact target
               before you run out of turns.
             </p>
-            <p>
-              Your guess doesn&apos;t have to be your best estimate of the
-              target. A strategic guess — like all 5s — often extracts more
-              information from the clue you&apos;re hoping to receive.
-            </p>
           </Accordion>
 
           <Accordion
@@ -119,12 +114,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               special Clue Reuse clue type).
             </p>
             <p>
-              Save Clue Reuse for clues whose result depends on the guess
-              (Higher or Lower, Oracle, Thermometer) — re-running them
-              against a sharper guess pulls more new info than re-running
-              a guess-independent clue.
-            </p>
-            <p>
               Open the &ldquo;Clue Types&rdquo; section below for the full
               reference. Tap any clue&apos;s name on a resolved row
               mid-game for text details on how its result was computed
@@ -132,15 +121,14 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             </p>
           </Accordion>
 
-          {/* Clue Types is a sub-accordion of Clues (its header is
-              visually indented), but its header is rendered at the same
-              level as the other sub-accordions so the player doesn't
-              have to first expand Clues to reach the clue reference. */}
+          {/* Clue Types is conceptually a sub-section of Clues, but it
+              renders at the same visual level as the other sub-accordions
+              so the clue reference cards have the full width of the
+              modal to render in. */}
           <Accordion
             title="Clue Types"
             isOpen={openSection === "clueTypes"}
             onToggle={() => toggleSection("clueTypes")}
-            indent
           >
             <p className="text-xs">
               Example target{" "}
@@ -235,11 +223,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               selected. If you possess multiple locks, you may use several
               during one turn and may try to lock multiple digits or
               redraw clues multiple times.
-            </p>
-            <p>
-              Track locks as a budget, not just a safety net: stockpiling
-              via bonus-lock clues opens up multi-redraw turns and lets
-              you chain Clue Reuse picks in the late game.
             </p>
           </Accordion>
 
@@ -392,26 +375,20 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 /** Controlled accordion. The parent enforces mutual exclusion (only one
- *  body open at a time). `indent` shifts the row right to mark a
- *  conceptually nested sub-accordion (e.g. "Clue Types" under "Clues")
- *  while keeping its header always visible at the same display level. */
+ *  body open at a time across the whole modal). */
 function Accordion({
   title,
   isOpen,
   onToggle,
-  indent = false,
   children,
 }: {
   title: string;
   isOpen: boolean;
   onToggle: () => void;
-  indent?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className={`bg-surface-2/50 rounded-lg border border-border overflow-hidden ${indent ? "ml-4" : ""}`}
-    >
+    <div className="bg-surface-2/50 rounded-lg border border-border overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
