@@ -174,11 +174,21 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                         {clue.description}
                       </p>
                       {clue.legend && <ClueLegend entries={clue.legend} />}
-                      <div className="scale-90 origin-left mt-2">
+                      {/* `compact` is the same narrower-row treatment
+                          used for 6-digit games — smaller digits and a
+                          tighter label column so the row fits inside
+                          the reference card without overflowing the
+                          right edge on portrait phones. Replaces an
+                          earlier scale-90 wrapper that visually shrank
+                          the content but kept its full layout box
+                          (transforms don't affect layout), which left
+                          the trailing digit clipped off-screen. */}
+                      <div className="mt-2">
                         <GuessRow
                           guess={guess}
                           digits={guess.length}
                           result={result}
+                          compact
                           hideCurationStar
                         />
                       </div>
