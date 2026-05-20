@@ -81,6 +81,11 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
             const u = store?.unlocked[ach.id];
             const tier = trophyTierFor(ach, u);
             const isExpanded = expandedId === ach.id;
+            // Mystery achievements keep their description / detection
+            // labels hidden until the player earns them. The trophy
+            // tier and name still render normally — earning the
+            // achievement reveals everything.
+            const isMysteryLocked = !!ach.mystery && tier === "locked";
             const toggle = () =>
               setExpandedId((cur) => (cur === ach.id ? null : ach.id));
             return (
@@ -101,8 +106,17 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
                     <div className="shrink-0">
                       <TrophyIcon tier={tier} size="md" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground flex-1 min-w-0 truncate">
+                    <h3 className="text-sm font-semibold text-foreground flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
                       {ach.name}
+                      {ach.mystery && (
+                        <span
+                          className="text-[10px] uppercase tracking-wider text-warn font-normal"
+                          aria-label="Mystery achievement"
+                          title="Mystery achievement"
+                        >
+                          🎁
+                        </span>
+                      )}
                     </h3>
                     <span
                       aria-hidden
@@ -113,28 +127,37 @@ export function AchievementsModal({ open, onClose }: AchievementsModalProps) {
                   </div>
                   {isExpanded && (
                     <div className="mt-2 pl-10 text-xs space-y-1">
-                      <p className="text-muted leading-snug">
-                        {ach.description}
-                      </p>
-                      {ach.criteria ? (
-                        <CriteriaList ach={ach} unlock={u} />
+                      {isMysteryLocked ? (
+                        <p className="text-muted italic leading-snug">
+                          🎁 Mystery achievement — earn it to reveal the
+                          details.
+                        </p>
                       ) : (
                         <>
-                          {ach.level1 && (
-                            <p className="text-foreground leading-snug">
-                              <span className="font-medium text-slate-300">
-                                {ach.level2 ? "Silver:" : "Gold:"}
-                              </span>{" "}
-                              {ach.level1.label}
-                            </p>
-                          )}
-                          {ach.level2 && (
-                            <p className="text-foreground leading-snug">
-                              <span className="font-medium text-amber-400">
-                                Gold:
-                              </span>{" "}
-                              {ach.level2.label}
-                            </p>
+                          <p className="text-muted leading-snug">
+                            {ach.description}
+                          </p>
+                          {ach.criteria ? (
+                            <CriteriaList ach={ach} unlock={u} />
+                          ) : (
+                            <>
+                              {ach.level1 && (
+                                <p className="text-foreground leading-snug">
+                                  <span className="font-medium text-slate-300">
+                                    {ach.level2 ? "Silver:" : "Gold:"}
+                                  </span>{" "}
+                                  {ach.level1.label}
+                                </p>
+                              )}
+                              {ach.level2 && (
+                                <p className="text-foreground leading-snug">
+                                  <span className="font-medium text-amber-400">
+                                    Gold:
+                                  </span>{" "}
+                                  {ach.level2.label}
+                                </p>
+                              )}
+                            </>
                           )}
                         </>
                       )}

@@ -36,12 +36,25 @@ export function AchievementToastHost() {
   if (!current) return null;
   const ach = ACHIEVEMENTS.find((a) => a.id === current.id);
   if (!ach) return null;
-  // Single-level achievements jump straight to gold on first unlock —
-  // there's no L2 to chase, so the trophy reflects the final state.
-  // Dual-level: L1 = silver, L2 = gold.
+  // Tier rendering: achievements with two unlock slots (level1+level2
+  // OR criteria) award silver on first unlock and gold on the second.
+  // Single-level achievements jump straight to gold on their only
+  // unlock. Criteria-based achievements live in the two-tier branch
+  // because the criteria array IS what makes them two-tier.
+  const hasTwoTiers = !!ach.criteria || !!ach.level2;
   const tier =
-    current.level === 2 ? "gold" : ach.level2 ? "silver" : "gold";
-  const levelInfo = current.level === 2 ? ach.level2 : ach.level1;
+    current.level === 2 ? "gold" : hasTwoTiers ? "silver" : "gold";
+  const tierHeader = hasTwoTiers
+    ? `Achievement unlocked · ${current.level === 2 ? "Gold" : "Silver"}`
+    : "Achievement unlocked";
+  // For level-style achievements, prefer the matching level's label.
+  // For criteria-based achievements (no level1/level2), fall back to
+  // the achievement's `description` so the toast still describes what
+  // the player just earned.
+  const label =
+    current.level === 2
+      ? ach.level2?.label ?? ach.description
+      : ach.level1?.label ?? ach.description;
 
   return (
     <div
@@ -58,17 +71,13 @@ export function AchievementToastHost() {
         <TrophyIcon tier={tier} size="md" />
         <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-wider text-muted">
-            {ach.level2
-              ? `Achievement unlocked · ${
-                  current.level === 2 ? "Gold" : "Silver"
-                }`
-              : "Achievement unlocked"}
+            {tierHeader}
           </p>
           <p className="text-sm font-semibold text-foreground truncate">
             {ach.name}
           </p>
-          {levelInfo && (
-            <p className="text-xs text-muted leading-snug">{levelInfo.label}</p>
+          {label && (
+            <p className="text-xs text-muted leading-snug">{label}</p>
           )}
         </div>
       </button>

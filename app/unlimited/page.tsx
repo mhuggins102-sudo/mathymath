@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
@@ -18,6 +18,8 @@ import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { LifetimeStatsModal } from "@/components/LifetimeStatsModal";
 import { ResourceBalance } from "@/components/ResourceBalance";
 import { loadSettings } from "@/lib/settings";
+import { unlockManualAchievement } from "@/lib/achievements/check";
+import { pushAchievementToasts } from "@/lib/hooks/useAchievementToasts";
 import {
   loadUnlimitedMode,
   type UnlimitedMode,
@@ -274,6 +276,23 @@ function UnlimitedGame({
     return null;
   }, [state.status, state.guesses.length, state.target]);
 
+  // Restart wrapper: fires the "I Saw That" mystery achievement when
+  // the player taps Restart in the last two turns of an in-progress
+  // unlimited game (state.status === "playing" + guesses.length >=
+  // maxGuesses - 2 means they're entering turn N-1 or N of N). The
+  // achievement is single-level and idempotent, so subsequent late-
+  // game restarts won't queue duplicate toasts.
+  const handleRestart = useCallback(() => {
+    if (
+      state.status === "playing" &&
+      state.guesses.length >= maxGuesses - 2
+    ) {
+      const unlocks = unlockManualAchievement("iSawThat");
+      if (unlocks.length > 0) pushAchievementToasts(unlocks);
+    }
+    onNew();
+  }, [state.status, state.guesses.length, maxGuesses, onNew]);
+
   return (
     <main className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6">
       <header className="flex items-center justify-between mb-3 h-11">
@@ -285,7 +304,7 @@ function UnlimitedGame({
           <button
             type="button"
             className="inline-flex items-center justify-center w-11 h-11 rounded-md text-muted hover:text-foreground active:bg-surface-2 transition"
-            onClick={onNew}
+            onClick={handleRestart}
             aria-label="Restart with a new puzzle"
             title="Restart"
           >

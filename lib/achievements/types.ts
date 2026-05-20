@@ -89,6 +89,11 @@ export interface Achievement {
    *  gold = every criterion met. Order is the display order in the
    *  modal popup. */
   criteria?: readonly AchievementCriterion[];
+  /** Hidden until unlocked. In the achievements modal, the player
+   *  sees the name but not the description / detection label until
+   *  they earn it. The trophy state still reflects locked/silver/
+   *  gold normally. */
+  mystery?: boolean;
 }
 
 export type AchievementLevelTier = 1 | 2;

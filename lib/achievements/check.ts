@@ -75,3 +75,19 @@ export function runAchievementCheck(
   for (const u of unlocks) recordAchievementUnlock(u.id, u.level);
   return unlocks;
 }
+
+/** Manually unlock a single-level achievement that doesn't fit the
+ *  game-end-context detection model (e.g. UI-triggered "did the
+ *  player click the restart button while losing badly?" achievements).
+ *  Idempotent — returns an empty array if the achievement is already
+ *  unlocked. The caller is responsible for calling
+ *  pushAchievementToasts on the returned array. */
+export function unlockManualAchievement(
+  id: string,
+): AchievementUnlock[] {
+  const store = loadAchievements();
+  const existing = store.unlocked[id] ?? {};
+  if (existing.level1At) return [];
+  recordAchievementUnlock(id, 1);
+  return [{ id, level: 1 }];
+}
