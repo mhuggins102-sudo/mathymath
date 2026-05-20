@@ -54,20 +54,24 @@ body {
   overscroll-behavior: none;
 }
 
-/* Make html fill the viewport (height: 100%, anchored to the
-   initial containing block) so its background paints edge-to-edge.
-   Body then uses min-height to grow with content but never shrinks
-   below the viewport. The `dvh` line is a progressive enhancement
-   for browsers that compute the dynamic viewport — it falls back to
-   `100vh` when unsupported. Without these, on some desktop layouts
-   body's box collapsed shorter than the viewport and the area below
-   it painted as the browser default. */
+/* Make html and body BOTH grow with content so the background paints
+   edge-to-edge regardless of whether the page scrolls. Previously html
+   was locked to `height: 100%` (exactly viewport-tall) — on Chrome
+   desktop when the body's flex column ran taller than the viewport,
+   the html canvas-background didn't extend below its locked box, and
+   the area horizontally below the playing area painted as the browser
+   default. `min-height` on both lets either grow as needed; the body's
+   explicit `width: 100%` keeps the flex column from shrink-to-fitting
+   horizontally in some Chrome layout cycles. The `dvh` line is a
+   progressive enhancement for browsers that compute the dynamic
+   viewport — it falls back to `100vh` when unsupported. */
 html {
-  height: 100%;
+  min-height: 100%;
 }
 body {
   min-height: 100%;
   min-height: 100dvh;
+  width: 100%;
 }
 
 /* Keyboard focus ring. The site runs on a dark background where the default

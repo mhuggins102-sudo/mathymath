@@ -1,0 +1,550 @@
+{
+  "runAt": "2026-05-20T17:12:13.433Z",
+  "manual": {
+    "label": "manual",
+    "n": 2000,
+    "budget": 8,
+    "digits": 5,
+    "winRate": 0.969,
+    "meanGuessesOnWin": 5.867905056759546,
+    "histogram": {
+      "1": 1,
+      "3": 33,
+      "4": 208,
+      "5": 485,
+      "6": 638,
+      "7": 397,
+      "8": 176
+    },
+    "losses": 62,
+    "perClue": [
+      {
+        "id": "thermometer",
+        "name": "Thermometer",
+        "category": "positional",
+        "offered": 1200,
+        "picks": 1093,
+        "pickRate": 0.9108333333333334,
+        "avgBits": 5.463971472406551,
+        "medBits": 5.643856189774724,
+        "totBits": 5972.12081934036,
+        "meta": false
+      },
+      {
+        "id": "within2",
+        "name": "Within 2",
+        "category": "positional",
+        "offered": 1128,
+        "picks": 751,
+        "pickRate": 0.6657801418439716,
+        "avgBits": 3.9857535864263167,
+        "medBits": 4.1520030934450505,
+        "totBits": 2993.3009434061637,
+        "meta": false
+      },
+      {
+        "id": "parityMask",
+        "name": "Odd or Even",
+        "category": "positional",
+        "offered": 1149,
+        "picks": 926,
+        "pickRate": 0.8059181897302001,
+        "avgBits": 3.8840686757206093,
+        "medBits": 4.135584645483702,
+        "totBits": 3596.647593717284,
+        "meta": false
+      },
+      {
+        "id": "oracle",
+        "name": "Oracle",
+        "category": "positional",
+        "offered": 1126,
+        "picks": 840,
+        "pickRate": 0.7460035523978685,
+        "avgBits": 3.5193565277038665,
+        "medBits": 3.5057077705170734,
+        "totBits": 2956.259483271248,
+        "meta": false
+      },
+      {
+        "id": "sumDelta",
+        "name": "Digit Sum",
+        "category": "compositional",
+        "offered": 1115,
+        "picks": 600,
+        "pickRate": 0.5381165919282511,
+        "avgBits": 3.3958988231080465,
+        "medBits": 3.5302134807417396,
+        "totBits": 2037.5392938648279,
+        "meta": false
+      },
+      {
+        "id": "clueReuse",
+        "name": "Clue Reuse",
+        "category": "special",
+        "offered": 1001,
+        "picks": 452,
+        "pickRate": 0.4515484515484515,
+        "avgBits": 3.375635852328466,
+        "medBits": 3.169925001442312,
+        "totBits": 1525.7874052524667,
+        "meta": true
+      },
+      {
+        "id": "totalDeviation",
+        "name": "Total Deviation",
+        "category": "compositional",
+        "offered": 1101,
+        "picks": 791,
+        "pickRate": 0.7184377838328792,
+        "avgBits": 3.330659328331576,
+        "medBits": 3.3510744405468786,
+        "totBits": 2634.5515287102767,
+        "meta": false
+      },
+      {
+        "id": "higherLower",
+        "name": "Higher or Lower",
+        "category": "positional",
+        "offered": 1162,
+        "picks": 860,
+        "pickRate": 0.7401032702237521,
+        "avgBits": 3.2592524457950054,
+        "medBits": 3.1732252070107156,
+        "totBits": 2802.9571033837046,
+        "meta": false
+      },
+      {
+        "id": "bullseyes",
+        "name": "Bullseye",
+        "category": "positional",
+        "offered": 1126,
+        "picks": 579,
+        "pickRate": 0.5142095914742452,
+        "avgBits": 2.808921154204027,
+        "medBits": 2.700439718141092,
+        "totBits": 1626.3653482841316,
+        "meta": false
+      },
+      {
+        "id": "digitOverlap",
+        "name": "Digit Overlap",
+        "category": "compositional",
+        "offered": 1067,
+        "picks": 707,
+        "pickRate": 0.662605435801312,
+        "avgBits": 2.4813405617777926,
+        "medBits": 2.2838484276071678,
+        "totBits": 1754.3077771768994,
+        "meta": false
+      },
+      {
+        "id": "containsDigit",
+        "name": "Contains Digit",
+        "category": "compositional",
+        "offered": 1106,
+        "picks": 29,
+        "pickRate": 0.026220614828209764,
+        "avgBits": 2.390497050951161,
+        "medBits": 2,
+        "totBits": 69.32441447758367,
+        "meta": false
+      },
+      {
+        "id": "digitClass",
+        "name": "Digit Class",
+        "category": "compositional",
+        "offered": 1093,
+        "picks": 459,
+        "pickRate": 0.41994510521500455,
+        "avgBits": 2.3619999401161147,
+        "medBits": 2,
+        "totBits": 1084.1579725132967,
+        "meta": false
+      },
+      {
+        "id": "elimination",
+        "name": "Elimination",
+        "category": "compositional",
+        "offered": 1110,
+        "picks": 586,
+        "pickRate": 0.527927927927928,
+        "avgBits": 2.074209775077319,
+        "medBits": 1.925535641314943,
+        "totBits": 1215.4869281953088,
+        "meta": false
+      },
+      {
+        "id": "statSummary",
+        "name": "Stat Summary",
+        "category": "compositional",
+        "offered": 1130,
+        "picks": 269,
+        "pickRate": 0.23805309734513275,
+        "avgBits": 1.5342819362900886,
+        "medBits": 1.2801079191927351,
+        "totBits": 412.72184086203384,
+        "meta": false
+      },
+      {
+        "id": "divisibleBy",
+        "name": "Divisible By",
+        "category": "compositional",
+        "offered": 1111,
+        "picks": 292,
+        "pickRate": 0.26282628262826285,
+        "avgBits": 1.362831630751282,
+        "medBits": 1.154100719830562,
+        "totBits": 397.9468361793743,
+        "meta": false
+      },
+      {
+        "id": "bullseyeTrend",
+        "name": "Bullseye Trend",
+        "category": "compositional",
+        "offered": 990,
+        "picks": 303,
+        "pickRate": 0.30606060606060603,
+        "avgBits": 1.333503003056052,
+        "medBits": 1.1844245711374275,
+        "totBits": 404.05140992598376,
+        "meta": false
+      },
+      {
+        "id": "distinctDigits",
+        "name": "Distinct Digits",
+        "category": "compositional",
+        "offered": 1159,
+        "picks": 223,
+        "pickRate": 0.19240724762726488,
+        "avgBits": 1.1368755282363618,
+        "medBits": 1,
+        "totBits": 253.52324279670867,
+        "meta": false
+      },
+      {
+        "id": "upsAndDowns",
+        "name": "Ups and Downs",
+        "category": "compositional",
+        "offered": 1102,
+        "picks": 151,
+        "pickRate": 0.13702359346642468,
+        "avgBits": 0.8404417761845054,
+        "medBits": 0.7369655941662062,
+        "totBits": 126.90670820386032,
+        "meta": false
+      }
+    ],
+    "locks": {
+      "totalPlaced": 641,
+      "correct": 455,
+      "hitRate": 0.7098283931357254,
+      "avgPerGame": 0.3205
+    },
+    "redraws": 77,
+    "clueReusePicks": 452,
+    "reuseAppliedTo": [
+      {
+        "id": "thermometer",
+        "name": "Thermometer",
+        "count": 91
+      },
+      {
+        "id": "higherLower",
+        "name": "Higher or Lower",
+        "count": 69
+      },
+      {
+        "id": "totalDeviation",
+        "name": "Total Deviation",
+        "count": 53
+      },
+      {
+        "id": "digitOverlap",
+        "name": "Digit Overlap",
+        "count": 25
+      },
+      {
+        "id": "oracle",
+        "name": "Oracle",
+        "count": 118
+      },
+      {
+        "id": "elimination",
+        "name": "Elimination",
+        "count": 11
+      },
+      {
+        "id": "within2",
+        "name": "Within 2",
+        "count": 52
+      },
+      {
+        "id": "bullseyes",
+        "name": "Bullseye",
+        "count": 26
+      },
+      {
+        "id": "bullseyeTrend",
+        "name": "Bullseye Trend",
+        "count": 3
+      },
+      {
+        "id": "divisibleBy",
+        "name": "Divisible By",
+        "count": 1
+      },
+      {
+        "id": "digitClass",
+        "name": "Digit Class",
+        "count": 3
+      }
+    ]
+  },
+  "auto": {
+    "label": "auto",
+    "n": 2000,
+    "budget": 8,
+    "digits": 5,
+    "winRate": 0.5445,
+    "meanGuessesOnWin": 6.2047750229568415,
+    "histogram": {
+      "1": 1,
+      "2": 1,
+      "3": 23,
+      "4": 101,
+      "5": 191,
+      "6": 288,
+      "7": 274,
+      "8": 210
+    },
+    "losses": 911,
+    "perClue": [
+      {
+        "id": "containsDigit",
+        "name": "Contains Digit",
+        "category": "compositional",
+        "offered": 622,
+        "picks": 622,
+        "pickRate": 1,
+        "avgBits": 7.800508289370413,
+        "medBits": 7.714245517666122,
+        "totBits": 4851.916155988397,
+        "meta": false
+      },
+      {
+        "id": "thermometer",
+        "name": "Thermometer",
+        "category": "positional",
+        "offered": 0,
+        "picks": 819,
+        "pickRate": 0,
+        "avgBits": 5.0223114635837804,
+        "medBits": 5.620219825507486,
+        "totBits": 4113.273088675116,
+        "meta": false
+      },
+      {
+        "id": "parityMask",
+        "name": "Odd or Even",
+        "category": "positional",
+        "offered": 0,
+        "picks": 835,
+        "pickRate": 0,
+        "avgBits": 3.3723370807840007,
+        "medBits": 4,
+        "totBits": 2815.9014624546408,
+        "meta": false
+      },
+      {
+        "id": "within2",
+        "name": "Within 2",
+        "category": "positional",
+        "offered": 0,
+        "picks": 802,
+        "pickRate": 0,
+        "avgBits": 3.2973832399474277,
+        "medBits": 3.6087942037692295,
+        "totBits": 2644.501358437837,
+        "meta": false
+      },
+      {
+        "id": "oracle",
+        "name": "Oracle",
+        "category": "positional",
+        "offered": 0,
+        "picks": 831,
+        "pickRate": 0,
+        "avgBits": 3.162910181572885,
+        "medBits": 3.4699938258475447,
+        "totBits": 2628.378360887067,
+        "meta": false
+      },
+      {
+        "id": "totalDeviation",
+        "name": "Total Deviation",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 802,
+        "pickRate": 0,
+        "avgBits": 3.136891898316699,
+        "medBits": 3.6330540707259456,
+        "totBits": 2515.7873024499927,
+        "meta": false
+      },
+      {
+        "id": "higherLower",
+        "name": "Higher or Lower",
+        "category": "positional",
+        "offered": 0,
+        "picks": 809,
+        "pickRate": 0,
+        "avgBits": 2.7813644758108405,
+        "medBits": 2.700439718141092,
+        "totBits": 2250.12386093097,
+        "meta": false
+      },
+      {
+        "id": "bullseyes",
+        "name": "Bullseye",
+        "category": "positional",
+        "offered": 0,
+        "picks": 634,
+        "pickRate": 0,
+        "avgBits": 2.3541742325825252,
+        "medBits": 2.045693204593219,
+        "totBits": 1492.546463457321,
+        "meta": false
+      },
+      {
+        "id": "digitOverlap",
+        "name": "Digit Overlap",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 776,
+        "pickRate": 0,
+        "avgBits": 2.1370011208204107,
+        "medBits": 2.283707256802134,
+        "totBits": 1658.3128697566387,
+        "meta": false
+      },
+      {
+        "id": "sumDelta",
+        "name": "Digit Sum",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 632,
+        "pickRate": 0,
+        "avgBits": 2.0536260874121024,
+        "medBits": 2.0874628412503395,
+        "totBits": 1297.8916872444488,
+        "meta": false
+      },
+      {
+        "id": "digitClass",
+        "name": "Digit Class",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 628,
+        "pickRate": 0,
+        "avgBits": 1.744482041951511,
+        "medBits": 1.5434491112403996,
+        "totBits": 1095.534722345549,
+        "meta": false
+      },
+      {
+        "id": "elimination",
+        "name": "Elimination",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 796,
+        "pickRate": 0,
+        "avgBits": 1.7073925518523871,
+        "medBits": 1.857791566997033,
+        "totBits": 1359.0844712745002,
+        "meta": false
+      },
+      {
+        "id": "statSummary",
+        "name": "Stat Summary",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 633,
+        "pickRate": 0,
+        "avgBits": 1.0836560062511826,
+        "medBits": 0.6667565918848034,
+        "totBits": 685.9542519569986,
+        "meta": false
+      },
+      {
+        "id": "divisibleBy",
+        "name": "Divisible By",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 631,
+        "pickRate": 0,
+        "avgBits": 1.0457336901912218,
+        "medBits": 0.8791972134433942,
+        "totBits": 659.8579585106609,
+        "meta": false
+      },
+      {
+        "id": "bullseyeTrend",
+        "name": "Bullseye Trend",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 609,
+        "pickRate": 0,
+        "avgBits": 0.9752577229949267,
+        "medBits": 0.8828346993897308,
+        "totBits": 593.9319533039104,
+        "meta": false
+      },
+      {
+        "id": "distinctDigits",
+        "name": "Distinct Digits",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 606,
+        "pickRate": 0,
+        "avgBits": 0.8936377921910453,
+        "medBits": 0.9083463933184701,
+        "totBits": 541.5445020677735,
+        "meta": false
+      },
+      {
+        "id": "upsAndDowns",
+        "name": "Ups and Downs",
+        "category": "compositional",
+        "offered": 0,
+        "picks": 616,
+        "pickRate": 0,
+        "avgBits": 0.5770961673191274,
+        "medBits": 0.09987693790280475,
+        "totBits": 355.4912390685825,
+        "meta": false
+      },
+      {
+        "id": "clueReuse",
+        "name": "Clue Reuse",
+        "category": "special",
+        "offered": 0,
+        "picks": 0,
+        "pickRate": 0,
+        "avgBits": 0,
+        "medBits": 0,
+        "totBits": 0,
+        "meta": true
+      }
+    ],
+    "locks": {
+      "totalPlaced": 703,
+      "correct": 492,
+      "hitRate": 0.6998577524893315,
+      "avgPerGame": 0.3515
+    },
+    "redraws": 0,
+    "clueReusePicks": 0,
+    "reuseAppliedTo": []
+  }
+}

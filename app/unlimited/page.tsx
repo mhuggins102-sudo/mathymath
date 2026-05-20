@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { v4 as uuidv4 } from "uuid";
 import { useGame } from "@/lib/hooks/useGame";
@@ -110,30 +110,45 @@ function buildShareUrl(session: Session): string {
 }
 
 export default function UnlimitedPage() {
-  const [session, setSession] = useState<Session | null>(null);
+  // Build the initial session synchronously on the client so mobile
+  // doesn't flash a "Loading…" frame before the game appears. SSR
+  // returns null and the post-mount effect picks up share-URL parsing
+  // and invalid-link handling there.
+  const [session, setSession] = useState<Session | null>(() => {
+    if (typeof window === "undefined") return null;
+    const parsed = sessionFromUrl();
+    return parsed.kind === "ok" ? parsed.session : newSession();
+  });
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [shareLinkInvalid, setShareLinkInvalid] = useState(false);
 
-  // Hydrate the saved mode preference on first paint and start the
-  // first session against it. A shared-puzzle URL takes precedence;
-  // a malformed one surfaces an inline notice and falls back fresh.
+  // Post-mount: surface the "invalid share link" notice and strip bad
+  // params from the URL. The session itself is already populated by
+  // the synchronous initializer above; this effect's job is only the
+  // error-path bookkeeping that needs to run after first paint.
   useEffect(() => {
-    const parsed = sessionFromUrl();
-    if (parsed.kind === "ok") {
-      setSession(parsed.session);
-    } else {
+    if (session !== null) {
+      const parsed = sessionFromUrl();
       if (parsed.kind === "invalid") {
         setShareLinkInvalid(true);
-        // Strip the bad params so a refresh doesn't keep the warning.
         if (typeof window !== "undefined" && window.location.search) {
           window.history.replaceState({}, "", window.location.pathname);
         }
       }
+      return;
+    }
+    // SSR-only fallback: if the synchronous initializer returned null
+    // (server render), seed the session on mount.
+    const parsed = sessionFromUrl();
+    if (parsed.kind === "ok") {
+      setSession(parsed.session);
+    } else {
+      if (parsed.kind === "invalid") setShareLinkInvalid(true);
       setSession(newSession());
     }
-  }, []);
+  }, [session]);
 
   if (!session) {
     return (
@@ -276,6 +291,29 @@ function UnlimitedGame({
     return null;
   }, [state.status, state.guesses.length, state.target]);
 
+  // Stable reference for ReusePicker's prop list. Without useMemo the
+  // derived array changes identity every render, and the memoized
+  // picker can't skip work on unrelated parent updates (typed input,
+  // pending-lock state).
+  const usedClueIdsForReuse = useMemo(
+    () =>
+      state.guesses
+        .map((g) => g.clueId)
+        .filter((id): id is ClueId => Boolean(id)),
+    [state.guesses],
+  );
+  // Stable identity for the picks array fed to SlotPicker. The
+  // `?? []` fallback otherwise creates a fresh empty array every render
+  // and defeats React.memo on the SlotPicker.
+  const slotPickerPicks = useMemo(
+    () => pendingClueParam?.picks ?? [],
+    [pendingClueParam?.picks],
+  );
+  const onSelectReuse = useCallback(
+    (clueId: ClueId) => confirmClueParam({ reusedClueId: clueId }),
+    [confirmClueParam],
+  );
+
   // Restart wrapper: fires the "I Saw That" mystery achievement when
   // the player taps Restart in the last two turns of an in-progress
   // unlimited game (state.status === "playing" + guesses.length >=
@@ -366,6 +404,16 @@ function UnlimitedGame({
           preselectedDeck={preselectedDeck}
         />
 
+        {/* Lock-economy toasts: redraw acknowledgement keys off the
+            cumulative deck offset (so it survives the chooser unmount
+            when the player picks a clue immediately after redrawing),
+            and the lock-commit chip flashes when the count of locks
+            placed this turn grows. Both sit above the chooser /
+            keypad / end-state in a stable position so Chrome desktop
+            renders them outside the chooser's mount lifecycle. */}
+        <RedrawToast deckOffset={state.deckOffset} />
+        <LockCommitToast lockCount={lockedSlots.length} />
+
         {error && <p className="text-bad text-xs text-center mt-2 shake">{error}</p>}
 
         <div className="mt-4">
@@ -375,18 +423,14 @@ function UnlimitedGame({
               Reuse (which previously-used clue) need pickers. */}
           {pendingClueParam?.paramKind === "reuse" ? (
             <ReusePicker
-              usedClueIds={state.guesses
-                .map((g) => g.clueId)
-                .filter(Boolean) as ClueId[]}
-              onSelect={(clueId) =>
-                confirmClueParam({ reusedClueId: clueId })
-              }
+              usedClueIds={usedClueIdsForReuse}
+              onSelect={onSelectReuse}
               onCancel={cancelClueParam}
             />
           ) : pendingClueParam?.paramKind === "slot" && state.pendingGuess ? (
             <SlotPicker
               guess={state.pendingGuess.guess}
-              picks={pendingClueParam.picks ?? []}
+              picks={slotPickerPicks}
               onPick={pickContainsDigit}
               onCancel={cancelClueParam}
             />
@@ -396,8 +440,10 @@ function UnlimitedGame({
                   ResourceBalance row below (so it sits on the same
                   line as the balance column) rather than as a full-
                   width button under the chooser cards. The chooser
-                  itself just shows the two clue cards. */}
-              <RedrawToast redraws={state.pendingGuess.redraws} />
+                  itself just shows the two clue cards. The redraw
+                  acknowledgement chip lives at the top of the game
+                  area (not here) so it persists across the chooser's
+                  unmount when the player picks a clue immediately. */}
               <ClueChooser
                 options={state.pendingGuess.options}
                 onChoose={chooseClue}
@@ -551,22 +597,28 @@ function ShareButton({ session }: { session: Session }) {
 }
 
 /**
- * Brief acknowledgement chip that flashes above the chooser cards
- * after a redraw fires. Without this the redraw is silent: a player
- * who taps Redraw and immediately picks a clue might not realize
- * they spent a lock. The chip self-dismisses after ~1.8s; a fresh
- * redraw resets the countdown so chained redraws read as multiple
- * pulses on a single chip.
+ * Brief acknowledgement chip that flashes after a redraw fires.
+ * Without this the redraw is silent: a player who taps Redraw and
+ * immediately picks a clue might not realize they spent a lock. The
+ * chip is keyed off the cumulative `deckOffset` so it survives the
+ * chooser unmount that follows the player's next clue pick — without
+ * that, the chip was disappearing instantly on Chrome desktop because
+ * the parent's chooser branch unmounted as soon as CHOOSE_CLUE
+ * dispatched, taking the toast's own state with it.
  */
-function RedrawToast({ redraws }: { redraws: number }) {
+const RedrawToast = memo(function RedrawToast({
+  deckOffset,
+}: {
+  deckOffset: number;
+}) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    if (redraws <= 0) return;
+    if (deckOffset <= 0) return;
     setVisible(true);
     const t = window.setTimeout(() => setVisible(false), 1800);
     return () => window.clearTimeout(t);
-  }, [redraws]);
-  if (!visible || redraws <= 0) return null;
+  }, [deckOffset]);
+  if (!visible || deckOffset <= 0) return null;
   return (
     <div
       role="status"
@@ -574,12 +626,45 @@ function RedrawToast({ redraws }: { redraws: number }) {
       className="w-full max-w-md mx-auto mb-2 flex items-center justify-center gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-1.5 text-[12px] font-medium text-warn pop"
     >
       <span aria-hidden>↻</span>
-      <span>
-        Redrawn — spent 🔒×1{redraws > 1 ? ` (×${redraws} this round)` : ""}
-      </span>
+      <span>Redrawn — spent 🔒×1</span>
     </div>
   );
-}
+});
+
+/**
+ * Brief acknowledgement chip that flashes when the player commits a
+ * lock. The chip is keyed off the count of locks placed this turn so
+ * each new lock triggers a fresh pulse; resetting the count (after
+ * submit) doesn't reshow.
+ */
+const LockCommitToast = memo(function LockCommitToast({
+  lockCount,
+}: {
+  lockCount: number;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [prev, setPrev] = useState(lockCount);
+  useEffect(() => {
+    if (lockCount > prev) {
+      setVisible(true);
+      const t = window.setTimeout(() => setVisible(false), 1500);
+      setPrev(lockCount);
+      return () => window.clearTimeout(t);
+    }
+    if (lockCount !== prev) setPrev(lockCount);
+  }, [lockCount, prev]);
+  if (!visible || lockCount <= 0) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="w-full max-w-md mx-auto mb-2 flex items-center justify-center gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-[12px] font-medium text-accent pop"
+    >
+      <span aria-hidden>🔒</span>
+      <span>Locked in{lockCount > 1 ? ` (×${lockCount} this turn)` : ""}</span>
+    </div>
+  );
+});
 
 /**
  * Lock-mode banner that sits directly above the keypad while the

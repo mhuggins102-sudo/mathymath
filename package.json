@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sim": "RUN_SIM=1 vitest run scripts/sim.test.ts --reporter=verbose",
+    "sim:strategic": "RUN_SIM=1 vitest run scripts/strategicSim.test.ts --reporter=verbose",
     "puzzleSim": "RUN_PUZZLE_SIM=1 vitest run scripts/puzzleSim.test.ts --reporter=verbose",
     "build:cf": "opennextjs-cloudflare build",
     "preview:cf": "opennextjs-cloudflare preview",

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { Clue, ClueId } from "@/lib/game/clues/types";
 import { CLUE_REUSE_CLUE_ID, CLUE_REUSE_COST } from "@/lib/game/locks";
 import { ROUND1_CURATED_CLUE_IDS } from "@/lib/game/clueSelector";
@@ -25,7 +26,7 @@ interface ClueChooserProps {
  * submitted. Stacked vertically (full width) so each clue's description
  * can render on multiple lines without truncation.
  */
-export function ClueChooser({
+function ClueChooserImpl({
   options,
   onChoose,
   onRedraw,
@@ -114,3 +115,14 @@ export function ClueChooser({
     </div>
   );
 }
+
+/**
+ * Memoized to skip re-renders when the parent re-renders for unrelated
+ * state (typed input, lock pending). The two prop changes that should
+ * trigger a re-render — the offered pair flipping and the locks budget
+ * crossing the Clue Reuse threshold — both come through as primitive /
+ * tuple reference changes that React.memo's default shallow compare
+ * catches. Mobile chooser-phase lag was tracing back to this component
+ * iterating its options list on every keystroke.
+ */
+export const ClueChooser = memo(ClueChooserImpl);

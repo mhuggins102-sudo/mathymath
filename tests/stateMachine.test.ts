@@ -203,6 +203,62 @@ describe("stateMachine", () => {
     }
   });
 
+  it("Oracle wins in Preselected (Auto) mode when the guess is 4-of-5 correct", () => {
+    // Bug regression: in Preselected mode SUBMIT_GUESS resolves the
+    // pre-dealt clue immediately (no chooser step) and previously
+    // skipped the Oracle-induced win check entirely. With a 4-of-5
+    // correct guess and Oracle locking in the 5th digit, the game
+    // must end "won" without the player typing another guess.
+    let state = initGameState({
+      target: "12345",
+      seed: "preselected-oracle",
+      maxGuesses: 7,
+      preselectedClues: true,
+    });
+    expect(state.preselectedDeck).not.toBeNull();
+    // Pin the deck's first slot to Oracle so the test is deterministic.
+    state = { ...state, preselectedDeck: ["oracle", ...state.preselectedDeck!.slice(1)] };
+
+    // Guess matches target at every slot except slot 4 → Oracle's
+    // farthest-slot pick lands on slot 4 and reveals the 5.
+    state = reduce(state, { type: "SUBMIT_GUESS", guess: "12349" });
+    expect(state.status).toBe("won");
+    expect(state.pendingGuess).toBeNull();
+    const row = state.guesses[state.guesses.length - 1];
+    expect(row.result?.kind).toBe("oracle");
+  });
+
+  it("Oracle wins in Preselected (Auto) mode when the certain set is completed", () => {
+    // Same bug — alternate trigger: prior correct locks have pinned
+    // 4 slots, the current guess is wrong on the remaining slot, and
+    // Oracle's reveal completes the certain set.
+    let state = initGameState({
+      target: "12345",
+      seed: "preselected-oracle-certain",
+      maxGuesses: 7,
+      preselectedClues: true,
+    });
+    // Pre-stage four correct locks across prior rows so only slot 4 is
+    // unknown coming into the Oracle round.
+    state = {
+      ...state,
+      guesses: [
+        { guess: "10000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 14 }, locks: [{ slot: 0, digit: "1", correct: true }] },
+        { guess: "12000", clueId: "sumDelta", result: { kind: "sumDelta", delta: 12 }, locks: [{ slot: 1, digit: "2", correct: true }] },
+        { guess: "12300", clueId: "sumDelta", result: { kind: "sumDelta", delta: 9 }, locks: [{ slot: 2, digit: "3", correct: true }] },
+        { guess: "12340", clueId: "sumDelta", result: { kind: "sumDelta", delta: 5 }, locks: [{ slot: 3, digit: "4", correct: true }] },
+      ],
+      preselectedDeck: ["sumDelta", "sumDelta", "sumDelta", "sumDelta", "oracle", "sumDelta"],
+    };
+    // Guess is wrong on slot 4 ("0" instead of "5"); the correct locks
+    // override the typed digit at slots 0-3 in the live UI, but here we
+    // emulate the post-overlay guess directly: "12340". Oracle picks
+    // slot 4 and reveals 5 — certain set becomes complete.
+    state = reduce(state, { type: "SUBMIT_GUESS", guess: "12340" });
+    expect(state.status).toBe("won");
+    expect(state.pendingGuess).toBeNull();
+  });
+
   it("Oracle does NOT win when it leaves slots still unknown", () => {
     const oracle = getClueById("oracle");
     const sumDelta = getClueById("sumDelta");
