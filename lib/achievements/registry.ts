@@ -540,12 +540,68 @@ function eleventhHourDetect(c: AchievementCtx): boolean {
   return true;
 }
 
+// --- Mystery achievements -----------------------------------------
+// Hidden in the modal until earned (only the name shows). Single-
+// level, no silver/gold split — they're fun/funny one-offs.
+
+/** "I Saw That" is fired manually from the unlimited-page restart
+ *  button when the player gives up in the last two turns of an
+ *  in-progress game. The detector here is a no-op so the regular
+ *  game-end pipeline never triggers it; unlockManualAchievement
+ *  handles the real unlock from the click handler. */
+const iSawThat: Achievement = {
+  id: "iSawThat",
+  name: "I Saw That",
+  description:
+    "Restart an unlimited game in its last two turns. Yes, the game noticed.",
+  mystery: true,
+  level1: {
+    label:
+      "Tap the restart icon during turn 6 or 7 of an in-progress unlimited game.",
+    detect: () => false,
+  },
+};
+
+const zilch: Achievement = {
+  id: "zilch",
+  name: "Zilch",
+  description: "Open with all zeros and still pull out the win.",
+  mystery: true,
+  level1: {
+    label:
+      "Win a 5-digit unlimited manual-clue game after guessing 00000 on turn 1.",
+    detect: (c) =>
+      c.mode === "unlimited" &&
+      c.status === "won" &&
+      !c.preselectedMode &&
+      c.digits === 5 &&
+      c.guesses[0]?.guess === "00000",
+  },
+};
+
+const genius: Achievement = {
+  id: "genius",
+  name: "Genius",
+  description: "Submit a final guess with zero correct digits on a loss.",
+  mystery: true,
+  level1: {
+    label: "Lose with zero correct digits on the last turn.",
+    detect: (c) => {
+      if (c.status !== "lost") return false;
+      const last = c.guesses[c.guesses.length - 1];
+      if (!last) return false;
+      return correctDigitCount(last.guess, c.target) === 0;
+    },
+  },
+};
+
 /** Display order in the achievements modal. Logical groups, top-down:
  *    1. Speed
  *    2. Mastery / streaks
  *    3. Resource craft
  *    4. Clue craft / specifics
  *    5. Situational
+ *    6. Mystery (hidden until earned)
  */
 export const ACHIEVEMENTS: readonly Achievement[] = [
   // Speed
@@ -572,6 +628,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   luckyTarget,
   diceDiceBaby,
   eleventhHour,
+  // Mystery
+  iSawThat,
+  zilch,
+  genius,
 ];
 
 /** Total number of distinct unlock slots (sum of levels across all

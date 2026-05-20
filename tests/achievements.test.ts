@@ -49,18 +49,143 @@ function guess(
 }
 
 describe("registry shape", () => {
-  it("contains 19 themes with unique ids", () => {
-    expect(ACHIEVEMENTS.length).toBe(19);
+  it("contains 22 themes with unique ids", () => {
+    expect(ACHIEVEMENTS.length).toBe(22);
     const ids = new Set(ACHIEVEMENTS.map((a) => a.id));
-    expect(ids.size).toBe(19);
+    expect(ids.size).toBe(22);
   });
-  it("every theme exposes either L1+L2 or a criteria list (no single-level)", () => {
+  it("every theme has at least one detection path", () => {
+    // Two-tier achievements: L1 + L2 or a criteria list (≥2 prongs).
+    // Single-tier achievements: just L1 (used by the mystery cards).
     for (const a of ACHIEVEMENTS) {
       const isCriteria =
         Array.isArray(a.criteria) && a.criteria.length >= 2;
       const isTwoLevel = !!a.level1 && !!a.level2;
-      expect(isCriteria || isTwoLevel, `${a.id} must have L1+L2 or ≥2 criteria`).toBe(true);
+      const isSingleLevel = !!a.level1 && !a.level2 && !a.criteria;
+      expect(
+        isCriteria || isTwoLevel || isSingleLevel,
+        `${a.id} must have L1+L2, ≥2 criteria, or L1 alone`,
+      ).toBe(true);
     }
+  });
+});
+
+describe("mystery achievements", () => {
+  it("are flagged with mystery: true", () => {
+    for (const id of ["iSawThat", "zilch", "genius"]) {
+      const ach = findAch(id);
+      expect(ach.mystery, `${id} should be marked mystery`).toBe(true);
+    }
+  });
+  it("Zilch fires on a 5-digit unlimited manual win opening with 00000", () => {
+    const ach = findAch("zilch");
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          mode: "unlimited",
+          status: "won",
+          digits: 5,
+          preselectedMode: false,
+          guesses: [{ guess: "00000" }],
+        }),
+      ),
+    ).toBe(true);
+  });
+  it("Zilch does NOT fire in preselected (auto) clue mode", () => {
+    const ach = findAch("zilch");
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          mode: "unlimited",
+          status: "won",
+          digits: 5,
+          preselectedMode: true,
+          guesses: [{ guess: "00000" }],
+        }),
+      ),
+    ).toBe(false);
+  });
+  it("Zilch does NOT fire on daily or 6-digit, or when opening isn't 00000", () => {
+    const ach = findAch("zilch");
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          mode: "daily",
+          status: "won",
+          digits: 5,
+          preselectedMode: false,
+          guesses: [{ guess: "00000" }],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          mode: "unlimited",
+          status: "won",
+          digits: 6,
+          target: "000000",
+          preselectedMode: false,
+          guesses: [{ guess: "000000" }],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          mode: "unlimited",
+          status: "won",
+          digits: 5,
+          preselectedMode: false,
+          guesses: [{ guess: "12345" }],
+        }),
+      ),
+    ).toBe(false);
+  });
+  it("Genius fires on a loss with zero correct digits on the last guess", () => {
+    const ach = findAch("genius");
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          status: "lost",
+          target: "12345",
+          guesses: [
+            { guess: "99999" },
+            { guess: "88888" },
+            { guess: "77777" },
+            { guess: "66666" },
+            { guess: "55555" },
+            { guess: "44444" },
+            { guess: "99999" },
+          ],
+        }),
+      ),
+    ).toBe(true);
+  });
+  it("Genius does NOT fire on a win or with any correct digit on the last guess", () => {
+    const ach = findAch("genius");
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          status: "won",
+          target: "12345",
+          guesses: [{ guess: "99999" }],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      ach.level1!.detect(
+        baseCtx({
+          status: "lost",
+          target: "12345",
+          guesses: [{ guess: "12999" }], // one correct digit at slot 0
+        }),
+      ),
+    ).toBe(false);
+  });
+  it("I Saw That's detector is intentionally false — it's UI-triggered", () => {
+    const ach = findAch("iSawThat");
+    expect(ach.level1!.detect(baseCtx())).toBe(false);
   });
 });
 
