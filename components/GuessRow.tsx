@@ -36,6 +36,14 @@ interface GuessRowProps {
   /** Tightens cell width and inter-cell gap so the row fits on phone
    *  widths when `digits` is 6. Caller (GuessGrid) decides. */
   compact?: boolean;
+  /** Cap the label column at a tighter max width so a wide sub-label
+   *  truncates instead of pushing the digits past the row's right
+   *  edge. Used by the How to Play modal where the example rows render
+   *  in a fixed-width card and a clue like Stat Summary's
+   *  three-comparison sub-label otherwise overflows. Not used in
+   *  normal gameplay because the players want to see the full sub-
+   *  label there. */
+  tightLabel?: boolean;
   /** When true, this resolved row terminated the game in a win even
    *  though the typed `guess` is not the target — i.e. an Oracle (or
    *  Clue-Reuse-of-Oracle) reveal completed the certain set. The row
@@ -567,6 +575,7 @@ export function GuessRow({
   locks,
   onTapCell,
   compact = false,
+  tightLabel = false,
   winRow = false,
   upcomingClue,
   nextUp,
@@ -799,7 +808,7 @@ export function GuessRow({
         <div
           className={`shrink-0 h-10 sm:h-11 ${
             compact ? "min-w-[4.5rem] sm:min-w-[5rem]" : "min-w-[6rem]"
-          }`}
+          } ${tightLabel ? "max-w-[8rem] overflow-hidden" : ""}`}
         >
           {labelSlot}
         </div>
