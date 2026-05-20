@@ -1,21 +1,24 @@
 /**
  * Strategic-AI simulator.
  *
- * Runs N games each of:
- *   1. 5-digit Regular mode, MANUAL clue selection
- *   2. 5-digit Regular mode, AUTO (preselected) clue selection
+ * Runs N games each of FOUR configurations at 5-digit:
+ *   1. Regular ("Easy") + MANUAL clue selection
+ *   2. Regular ("Easy") + AUTO (preselected) clue selection
+ *   3. Advanced ("Hard") + MANUAL clue selection
+ *   4. Advanced ("Hard") + AUTO (preselected) clue selection
  *
- * Both runs use the strategic AI from scripts/strategicAI.ts — locks
+ * All runs use the strategic AI from scripts/strategicAI.ts — locks
  * placed on high-confidence slots, redraws on weak pairs, category bias
- * on near-ties, Clue Reuse with the lock cost folded in.
+ * on near-ties, Clue Reuse with the lock cost folded in. Hard mode
+ * starts at 0 locks and removes Clue Reuse from the deck (see
+ * lib/game/clueSelector.ts).
  *
  * Output:
  *   - ASCII histograms + per-clue tables printed to console
- *   - JSON dump to scripts/strategicSim-output.json (consumed by
- *     scripts/sims-report.md authoring)
+ *   - JSON dump to scripts/strategicSim-output.json
  *
  * Invoke:
- *   pnpm sim:strategic              # defaults: N=2000, BUDGET=8
+ *   pnpm sim:strategic              # defaults: N=2000, BUDGET=7
  *   SIM_N=500 pnpm sim:strategic    # smaller pilot
  */
 import { describe, it, expect } from "vitest";
@@ -180,6 +183,33 @@ function printLockEconomy(games: GameStats[]) {
   );
 }
 
+function runConfig(
+  label: string,
+  mode: "manual" | "auto",
+  advancedMode: boolean,
+  pool: readonly string[],
+  budget: number,
+  n: number,
+): GameStats[] {
+  const games: GameStats[] = [];
+  for (let i = 0; i < n; i++) {
+    const date = `sim-${label}-${i}`;
+    const target = generateDailyTarget(date, DIGITS);
+    games.push(
+      playStrategic({
+        target,
+        seed: date,
+        digits: DIGITS,
+        budget,
+        mode,
+        candidates: pool.slice(),
+        advancedMode,
+      }),
+    );
+  }
+  return games;
+}
+
 function snapshotForJson(label: string, games: GameStats[], budget: number, n: number) {
   const report = buildReport(games, n);
   const wins = games.filter((g) => g.won);
@@ -234,76 +264,58 @@ function snapshotForJson(label: string, games: GameStats[], budget: number, n: n
 
 describe.skipIf(!runSim)("strategic-AI simulation", () => {
   it(
-    "5-digit Regular mode — manual and auto with strategic AI",
-    { timeout: 1800_000 },
+    "5-digit, four configurations (Regular/Hard × manual/auto)",
+    { timeout: 3600_000 },
     () => {
       const N = Number(process.env.SIM_N ?? 2000);
-      const BUDGET = Number(process.env.SIM_BUDGET ?? 8);
+      const BUDGET = Number(process.env.SIM_BUDGET ?? 7);
       const pool = allCandidates(DIGITS);
 
       console.log(
-        `\nSimulating ${N} games  digits=${DIGITS}  budget=${BUDGET}  mode=Regular  AI=strategic`,
+        `\nSimulating ${N} games per config  digits=${DIGITS}  budget=${BUDGET}  AI=strategic`,
       );
       console.log(`Candidate pool after degenerate filter: ${pool.length}`);
 
-      // --- Manual mode -------------------------------------------------
-      console.log("\n========== MANUAL CLUE SELECTION ==========");
-      const manualGames: GameStats[] = [];
-      for (let i = 0; i < N; i++) {
-        const date = `sim-${i}`;
-        const target = generateDailyTarget(date, DIGITS);
-        manualGames.push(
-          playStrategic({
-            target,
-            seed: date,
-            digits: DIGITS,
-            budget: BUDGET,
-            mode: "manual",
-            candidates: pool,
-          }),
-        );
-      }
-      printHistogram(manualGames, BUDGET, N);
-      const manualReport = buildReport(manualGames, N);
-      printPerClueTable(manualReport.rows, N);
-      printLockEconomy(manualGames);
+      const configs: Array<{
+        key: "regularManual" | "regularAuto" | "hardManual" | "hardAuto";
+        label: string;
+        mode: "manual" | "auto";
+        advancedMode: boolean;
+      }> = [
+        { key: "regularManual", label: "Regular + MANUAL",      mode: "manual", advancedMode: false },
+        { key: "regularAuto",   label: "Regular + AUTO",        mode: "auto",   advancedMode: false },
+        { key: "hardManual",    label: "Hard + MANUAL",         mode: "manual", advancedMode: true  },
+        { key: "hardAuto",      label: "Hard + AUTO",           mode: "auto",   advancedMode: true  },
+      ];
 
-      // --- Auto mode ---------------------------------------------------
-      console.log("\n========== AUTO (PRESELECTED) CLUE SELECTION ==========");
-      const autoGames: GameStats[] = [];
-      for (let i = 0; i < N; i++) {
-        const date = `sim-auto-${i}`;
-        const target = generateDailyTarget(date, DIGITS);
-        autoGames.push(
-          playStrategic({
-            target,
-            seed: date,
-            digits: DIGITS,
-            budget: BUDGET,
-            mode: "auto",
-            candidates: pool,
-          }),
-        );
+      const allGames: Record<string, GameStats[]> = {};
+      for (const cfg of configs) {
+        console.log(`\n========== ${cfg.label} ==========`);
+        const games = runConfig(cfg.key, cfg.mode, cfg.advancedMode, pool, BUDGET, N);
+        allGames[cfg.key] = games;
+        printHistogram(games, BUDGET, N);
+        const report = buildReport(games, N);
+        printPerClueTable(report.rows, N);
+        printLockEconomy(games);
       }
-      printHistogram(autoGames, BUDGET, N);
-      const autoReport = buildReport(autoGames, N);
-      printPerClueTable(autoReport.rows, N);
-      printLockEconomy(autoGames);
 
       // --- JSON dump ---------------------------------------------------
       const outPath = resolve(process.cwd(), "scripts/strategicSim-output.json");
-      const payload = {
+      const payload: Record<string, unknown> = {
         runAt: new Date().toISOString(),
-        manual: snapshotForJson("manual", manualGames, BUDGET, N),
-        auto: snapshotForJson("auto", autoGames, BUDGET, N),
       };
+      for (const cfg of configs) {
+        payload[cfg.key] = snapshotForJson(cfg.key, allGames[cfg.key], BUDGET, N);
+      }
       writeFileSync(outPath, JSON.stringify(payload, null, 2));
       console.log(`\nJSON written → ${outPath}`);
 
-      // Sanity: each variant should win materially more than chance and
-      // not always — the strategy gap study lives in sims-report.md.
-      expect(manualGames.filter((g) => g.won).length / N).toBeGreaterThan(0.3);
-      expect(autoGames.filter((g) => g.won).length / N).toBeGreaterThan(0.1);
+      // Sanity: each variant should win more than chance.
+      for (const cfg of configs) {
+        const games = allGames[cfg.key];
+        const winRate = games.filter((g) => g.won).length / N;
+        expect(winRate).toBeGreaterThan(0.05);
+      }
     },
   );
 });

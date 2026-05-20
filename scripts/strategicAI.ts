@@ -124,6 +124,9 @@ export interface PlayConfig {
   mode: "manual" | "auto";
   /** Pre-built candidate pool. Pass in to avoid recomputing per game. */
   candidates: string[];
+  /** "Hard" rules: full deck shuffle, 0 starting locks, no Clue Reuse,
+   *  no curated round-1 guarantee. Mirrors the live game's hard mode. */
+  advancedMode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +258,15 @@ function pickClueStrategic(
 // ---------------------------------------------------------------------------
 
 export function playStrategic(config: PlayConfig): GameStats {
-  const { target, seed, digits, budget, mode, candidates: initialPool } = config;
+  const {
+    target,
+    seed,
+    digits,
+    budget,
+    mode,
+    candidates: initialPool,
+    advancedMode = false,
+  } = config;
   let candidates = initialPool.slice();
   const history: SimHistoryEntry[] = [];
 
@@ -264,7 +275,7 @@ export function playStrategic(config: PlayConfig): GameStats {
     seed,
     digits,
     maxGuesses: budget,
-    advancedMode: false,
+    advancedMode,
     preselectedClues: mode === "auto",
   });
 
@@ -283,7 +294,8 @@ export function playStrategic(config: PlayConfig): GameStats {
     reuseAppliedTo: [],
   };
 
-  let lockBudget = 1; // initialLocksFor(advancedMode=false) === 1
+  // Mirrors lib/game/locks.ts:initialLocksFor — Regular = 1, Hard = 0.
+  let lockBudget = advancedMode ? 0 : 1;
 
   /** Record an applied clue: filter candidates, push history entry,
    *  generate a decision record. Centralized so the auto-resolve and

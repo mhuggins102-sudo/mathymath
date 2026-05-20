@@ -8,15 +8,25 @@ import { ClueLegend } from "./ClueLegend";
 import { ClueLockBadge } from "./ClueLockBadge";
 import { Modal } from "./Modal";
 
+/**
+ * Section ids for the two top-level groups ("Gameplay" /
+ * "Additional Information"). Each group lists its sub-accordion
+ * headers always visible — only one body is open across the whole
+ * modal at a time. The "Clue Types" sub-accordion lives conceptually
+ * under "Clues" and is visually indented to show that nesting, but its
+ * header is rendered alongside the other sub-accordions so the player
+ * can jump straight to the clue reference without first expanding
+ * Clues.
+ */
 type AccordionId =
-  | "basics"
-  | "modes"
+  | "overview"
   | "clues"
-  | "colors"
+  | "clueTypes"
   | "locks"
+  | "colors"
+  | "modes"
   | "settings"
-  | "stats"
-  | "tips";
+  | "stats";
 
 interface HelpModalProps {
   open: boolean;
@@ -38,11 +48,8 @@ interface HelpModalProps {
 const EXAMPLE_TARGET = "47628";
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
-  // Mutually-exclusive accordion state. All sections start collapsed
-  // so the modal opens to a clean overview the player can scan; they
-  // expand whichever section they want. Opening any other section
-  // closes the previous one, and clicking the open one again
-  // collapses everything. Reset on every modal-open so the player
+  // Mutually-exclusive accordion state across both sections — only one
+  // body is open at a time. Reset on every modal-open so the player
   // always lands on the same all-collapsed state.
   const [openSection, setOpenSection] = useState<AccordionId | null>(null);
   useEffect(() => {
@@ -67,11 +74,13 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           </button>
         </div>
 
-        <div className="space-y-2 mb-6">
+        {/* ---------- Group 1: Gameplay ---------- */}
+        <SectionHeading>Gameplay</SectionHeading>
+        <div className="space-y-2 mb-5">
           <Accordion
             title="Overview"
-            isOpen={openSection === "basics"}
-            onToggle={() => toggleSection("basics")}
+            isOpen={openSection === "overview"}
+            onToggle={() => toggleSection("overview")}
           >
             <p>
               Guess the target number within 7 tries. After each guess,
@@ -80,6 +89,11 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               slots of your guess and/or providing statistics that compare
               your guess to the target. Win by submitting the exact target
               before you run out of turns.
+            </p>
+            <p>
+              Your guess doesn&apos;t have to be your best estimate of the
+              target. A strategic guess — like all 5s — often extracts more
+              information from the clue you&apos;re hoping to receive.
             </p>
           </Accordion>
 
@@ -105,10 +119,85 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               special Clue Reuse clue type).
             </p>
             <p>
-              The full clue reference is shown below this list. Tap any
-              clue&apos;s name on a resolved row mid-game for text details
-              on how its result was computed against your guess.
+              Save Clue Reuse for clues whose result depends on the guess
+              (Higher or Lower, Oracle, Thermometer) — re-running them
+              against a sharper guess pulls more new info than re-running
+              a guess-independent clue.
             </p>
+            <p>
+              Open the &ldquo;Clue Types&rdquo; section below for the full
+              reference. Tap any clue&apos;s name on a resolved row
+              mid-game for text details on how its result was computed
+              against your guess.
+            </p>
+          </Accordion>
+
+          {/* Clue Types is a sub-accordion of Clues (its header is
+              visually indented), but its header is rendered at the same
+              level as the other sub-accordions so the player doesn't
+              have to first expand Clues to reach the clue reference. */}
+          <Accordion
+            title="Clue Types"
+            isOpen={openSection === "clueTypes"}
+            onToggle={() => toggleSection("clueTypes")}
+            indent
+          >
+            <p className="text-xs">
+              Example target{" "}
+              <span className="font-mono font-bold text-foreground">
+                {EXAMPLE_TARGET}
+              </span>
+              . ⭐ marks the curated turn-1 openers.
+            </p>
+            <div className="space-y-3 mt-2">
+              {[...CLUES]
+                // Curated round-1 clues bubble to the top so a new
+                // player sees the friendly openers first. The rest
+                // preserve the registry's existing order.
+                .sort((a, b) => {
+                  const ar = ROUND1_CURATED_CLUE_IDS.has(a.id) ? 0 : 1;
+                  const br = ROUND1_CURATED_CLUE_IDS.has(b.id) ? 0 : 1;
+                  return ar - br;
+                })
+                .map((clue) => {
+                  const { guess, result } = clue.example(EXAMPLE_TARGET);
+                  const isCurated = ROUND1_CURATED_CLUE_IDS.has(clue.id);
+                  return (
+                    <div
+                      key={clue.id}
+                      className="bg-surface rounded-lg border border-border p-3"
+                    >
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <span className="font-semibold text-sm inline-flex items-center gap-1.5">
+                          {clue.name}
+                          <ClueLockBadge clueId={clue.id} size="xs" />
+                        </span>
+                        {isCurated && (
+                          <span
+                            className="text-warn text-sm shrink-0"
+                            title="Curated turn-1 clue"
+                            aria-label="Curated turn-1 clue"
+                          >
+                            ⭐
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted mb-2 leading-relaxed">
+                        {clue.description}
+                      </p>
+                      {clue.legend && <ClueLegend entries={clue.legend} />}
+                      <div className="scale-90 origin-left mt-2">
+                        <GuessRow
+                          guess={guess}
+                          digits={guess.length}
+                          result={result}
+                          hideCurationStar
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </Accordion>
 
           <Accordion
@@ -147,33 +236,15 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               during one turn and may try to lock multiple digits or
               redraw clues multiple times.
             </p>
-          </Accordion>
-
-          <Accordion
-            title="Game modes"
-            isOpen={openSection === "modes"}
-            onToggle={() => toggleSection("modes")}
-          >
             <p>
-              <strong className="text-foreground">Daily.</strong> One fixed
-              puzzle per day, same target for everyone. Fixed settings
-              (5-digit, Normal, Manual). Results are shareable and a
-              daily streak is tracked.
-            </p>
-            <p>
-              <strong className="text-foreground">Unlimited.</strong> Play
-              as many games as you want with adjustable settings — number
-              length, difficulty, and clue selection. Personal stats and
-              streaks are recorded per setting bucket.
-            </p>
-            <p>
-              Tap the gear (⚙︎) icon to open Settings; tap the trophy
-              icon to see your Achievements and stats.
+              Track locks as a budget, not just a safety net: stockpiling
+              via bonus-lock clues opens up multi-redraw turns and lets
+              you chain Clue Reuse picks in the late game.
             </p>
           </Accordion>
 
           <Accordion
-            title="Cell colors"
+            title="Cell Colors"
             isOpen={openSection === "colors"}
             onToggle={() => toggleSection("colors")}
           >
@@ -204,9 +275,36 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               </li>
             </ul>
             <p>
-              The exact meaning depends on the clue — check the legend on
-              each clue&apos;s reference card below for the per-color
+              The exact meaning depends on the clue — check each clue&apos;s
+              legend in the Clue Types section above for the per-color
               rules.
+            </p>
+          </Accordion>
+        </div>
+
+        {/* ---------- Group 2: Additional Information ---------- */}
+        <SectionHeading>Additional Information</SectionHeading>
+        <div className="space-y-2">
+          <Accordion
+            title="Game Modes"
+            isOpen={openSection === "modes"}
+            onToggle={() => toggleSection("modes")}
+          >
+            <p>
+              <strong className="text-foreground">Daily.</strong> One fixed
+              puzzle per day, same target for everyone. Fixed settings
+              (5-digit, Normal, Manual). Results are shareable and a
+              daily streak is tracked.
+            </p>
+            <p>
+              <strong className="text-foreground">Unlimited.</strong> Play
+              as many games as you want with adjustable settings — number
+              length, difficulty, and clue selection. Personal stats and
+              streaks are recorded per setting bucket.
+            </p>
+            <p>
+              Tap the gear (⚙︎) icon to open Settings; tap the trophy
+              icon to see your Achievements and stats.
             </p>
           </Accordion>
 
@@ -259,7 +357,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           </Accordion>
 
           <Accordion
-            title="Stats & achievements"
+            title="Stats & Achievements"
             isOpen={openSection === "stats"}
             onToggle={() => toggleSection("stats")}
           >
@@ -275,109 +373,45 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               prong. Tap a trophy&apos;s info button for details.
             </p>
           </Accordion>
-
-          <Accordion
-            title="Tips & strategy"
-            isOpen={openSection === "tips"}
-            onToggle={() => toggleSection("tips")}
-          >
-            <p>
-              Your guess doesn&apos;t have to be your best estimate of the
-              target. A strategic guess — like all 5s — often extracts more
-              information from the clue you&apos;re hoping to receive.
-            </p>
-            <p>
-              Save Clue Reuse for clues whose result depends on the guess
-              (Higher or Lower, Oracle, Thermometer) — re-running them
-              against a sharper guess pulls more new info than re-running
-              a guess-independent clue.
-            </p>
-            <p>
-              Track locks as a budget, not just a safety net: stockpiling
-              via bonus-lock clues opens up multi-redraw turns and lets
-              you chain Clue Reuse picks in the late game.
-            </p>
-          </Accordion>
-        </div>
-
-        <h3 className="text-sm uppercase tracking-wider text-muted mb-3">
-          Clue reference — example target{" "}
-          <span className="font-mono font-bold text-foreground">
-            {EXAMPLE_TARGET}
-          </span>
-        </h3>
-
-        <div className="space-y-3">
-          {[...CLUES]
-            // Curated round-1 clues bubble to the top so a new player
-            // sees the friendly openers first. The rest preserve the
-            // registry's existing order.
-            .sort((a, b) => {
-              const ar = ROUND1_CURATED_CLUE_IDS.has(a.id) ? 0 : 1;
-              const br = ROUND1_CURATED_CLUE_IDS.has(b.id) ? 0 : 1;
-              return ar - br;
-            })
-            .map((clue) => {
-              const { guess, result } = clue.example(EXAMPLE_TARGET);
-              const isCurated = ROUND1_CURATED_CLUE_IDS.has(clue.id);
-              return (
-                <div
-                  key={clue.id}
-                  className="bg-surface rounded-lg border border-border p-3"
-                >
-                  <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="font-semibold text-sm inline-flex items-center gap-1.5">
-                      {clue.name}
-                      <ClueLockBadge clueId={clue.id} size="xs" />
-                    </span>
-                    {isCurated && (
-                      <span
-                        className="text-warn text-sm shrink-0"
-                        title="Curated turn-1 clue"
-                        aria-label="Curated turn-1 clue"
-                      >
-                        ⭐
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted mb-2 leading-relaxed">
-                    {clue.description}
-                  </p>
-                  {clue.legend && <ClueLegend entries={clue.legend} />}
-                  <div className="scale-90 origin-left mt-2">
-                    <GuessRow
-                      guess={guess}
-                      digits={guess.length}
-                      result={result}
-                      hideCurationStar
-                    />
-                  </div>
-                </div>
-              );
-            })}
         </div>
       </div>
     </Modal>
   );
 }
 
-/** Controlled accordion section. Built on a button + conditional
- *  panel rather than native <details> so the parent can enforce
- *  mutual exclusion (only one open at a time). The chevron rotates
- *  via a class swap. */
+/** Top-level group heading rendered above its sub-accordion list. Not
+ *  itself a control — the group's headers are always visible underneath
+ *  so the player can jump straight to any sub-section without first
+ *  having to expand the group. */
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-[11px] uppercase tracking-wider text-muted mb-2">
+      {children}
+    </h3>
+  );
+}
+
+/** Controlled accordion. The parent enforces mutual exclusion (only one
+ *  body open at a time). `indent` shifts the row right to mark a
+ *  conceptually nested sub-accordion (e.g. "Clue Types" under "Clues")
+ *  while keeping its header always visible at the same display level. */
 function Accordion({
   title,
   isOpen,
   onToggle,
+  indent = false,
   children,
 }: {
   title: string;
   isOpen: boolean;
   onToggle: () => void;
+  indent?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-surface-2/50 rounded-lg border border-border overflow-hidden">
+    <div
+      className={`bg-surface-2/50 rounded-lg border border-border overflow-hidden ${indent ? "ml-4" : ""}`}
+    >
       <button
         type="button"
         onClick={onToggle}
