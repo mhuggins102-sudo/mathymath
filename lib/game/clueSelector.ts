@@ -27,8 +27,8 @@ export function isPositionalClueId(id: string | undefined): boolean {
  *  Digit's interactive multi-tap mechanic is also a heavier ask for
  *  brand-new players. Advanced mode ignores this list. */
 export const ROUND1_CURATED_CLUE_IDS: ReadonlySet<ClueId> = new Set<ClueId>([
-  "digitOverlap",
-  "elimination",
+  "bullseyes",
+  "sumDelta",
   "parityMask",
   "totalDeviation",
   "higherLower",

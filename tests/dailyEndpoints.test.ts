@@ -151,11 +151,23 @@ describe("POST /api/daily/[date]/submit-guess", () => {
   });
 
   it("rejects an over-budget lock attempt on guess 2", async () => {
+    // Pick whichever offered clue is NOT a bonus-lock clue so the
+    // "starts with 1 lock" premise still holds — picking a bonus-lock
+    // clue on guess 1 would give the player a +1 lock and the 2-lock
+    // attempt on guess 2 would fit the budget.
     const pair = pickTwoClues(DATE, []);
+    const choice =
+      pair.find(
+        (c) =>
+          c.id !== "distinctDigits" &&
+          c.id !== "upsAndDowns" &&
+          c.id !== "divisibleBy" &&
+          c.id !== "extraLock",
+      ) ?? pair[0];
     const g1 = {
       guess: "11111",
-      clueId: pair[0].id,
-      result: pair[0].compute("11111", TARGET),
+      clueId: choice.id,
+      result: choice.compute("11111", TARGET),
     };
     const res = await submitGuess(
       mockRequest({
