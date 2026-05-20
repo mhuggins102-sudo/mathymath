@@ -12,16 +12,14 @@ import { Modal } from "./Modal";
  * Section ids for the two top-level groups ("Gameplay" /
  * "Additional Information"). Each group lists its sub-accordion
  * headers always visible — only one body is open across the whole
- * modal at a time. The "Clue Types" sub-accordion lives conceptually
- * under "Clues" and is visually indented to show that nesting, but its
- * header is rendered alongside the other sub-accordions so the player
- * can jump straight to the clue reference without first expanding
- * Clues.
+ * modal at a time. The clue reference cards sit OUTSIDE both groups
+ * under their own "Clue Types" heading at the bottom of the modal,
+ * so the cards have the full content width without being constrained
+ * by an accordion card's padding.
  */
 type AccordionId =
   | "overview"
   | "clues"
-  | "clueTypes"
   | "locks"
   | "colors"
   | "modes"
@@ -119,83 +117,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               mid-game for text details on how its result was computed
               against your guess.
             </p>
-          </Accordion>
-
-          {/* Clue Types is conceptually a sub-section of Clues, but it
-              renders at the same visual level as the other sub-accordions
-              so the clue reference cards have the full width of the
-              modal to render in. */}
-          <Accordion
-            title="Clue Types"
-            isOpen={openSection === "clueTypes"}
-            onToggle={() => toggleSection("clueTypes")}
-          >
-            <p className="text-xs">
-              Example target{" "}
-              <span className="font-mono font-bold text-foreground">
-                {EXAMPLE_TARGET}
-              </span>
-              . ⭐ marks the curated turn-1 openers.
-            </p>
-            <div className="space-y-3 mt-2">
-              {[...CLUES]
-                // Curated round-1 clues bubble to the top so a new
-                // player sees the friendly openers first. The rest
-                // preserve the registry's existing order.
-                .sort((a, b) => {
-                  const ar = ROUND1_CURATED_CLUE_IDS.has(a.id) ? 0 : 1;
-                  const br = ROUND1_CURATED_CLUE_IDS.has(b.id) ? 0 : 1;
-                  return ar - br;
-                })
-                .map((clue) => {
-                  const { guess, result } = clue.example(EXAMPLE_TARGET);
-                  const isCurated = ROUND1_CURATED_CLUE_IDS.has(clue.id);
-                  return (
-                    <div
-                      key={clue.id}
-                      className="bg-surface rounded-lg border border-border p-3"
-                    >
-                      <div className="flex items-center justify-between mb-2 gap-2">
-                        <span className="font-semibold text-sm inline-flex items-center gap-1.5">
-                          {clue.name}
-                          <ClueLockBadge clueId={clue.id} size="xs" />
-                        </span>
-                        {isCurated && (
-                          <span
-                            className="text-warn text-sm shrink-0"
-                            title="Curated turn-1 clue"
-                            aria-label="Curated turn-1 clue"
-                          >
-                            ⭐
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted mb-2 leading-relaxed">
-                        {clue.description}
-                      </p>
-                      {clue.legend && <ClueLegend entries={clue.legend} />}
-                      {/* `compact` is the same narrower-row treatment
-                          used for 6-digit games — smaller digits and a
-                          tighter label column so the row fits inside
-                          the reference card without overflowing the
-                          right edge on portrait phones. Replaces an
-                          earlier scale-90 wrapper that visually shrank
-                          the content but kept its full layout box
-                          (transforms don't affect layout), which left
-                          the trailing digit clipped off-screen. */}
-                      <div className="mt-2">
-                        <GuessRow
-                          guess={guess}
-                          digits={guess.length}
-                          result={result}
-                          compact
-                          hideCurationStar
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
           </Accordion>
 
           <Accordion
@@ -366,6 +287,70 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               prong. Tap a trophy&apos;s info button for details.
             </p>
           </Accordion>
+        </div>
+
+        {/* ---------- Clue Types reference (always visible) ----------
+            Lives outside both accordion groups so the example rows
+            render against the modal's full content width rather than
+            an accordion card's inner padding. The previous in-accordion
+            placement clipped the rightmost digit on narrow portrait
+            phones. */}
+        <div className="mt-5">
+          <SectionHeading>
+            Clue Types — example target{" "}
+            <span className="font-mono font-bold text-foreground">
+              {EXAMPLE_TARGET}
+            </span>
+          </SectionHeading>
+          <div className="space-y-3">
+            {[...CLUES]
+              // Curated round-1 clues bubble to the top so a new
+              // player sees the friendly openers first. The rest
+              // preserve the registry's existing order.
+              .sort((a, b) => {
+                const ar = ROUND1_CURATED_CLUE_IDS.has(a.id) ? 0 : 1;
+                const br = ROUND1_CURATED_CLUE_IDS.has(b.id) ? 0 : 1;
+                return ar - br;
+              })
+              .map((clue) => {
+                const { guess, result } = clue.example(EXAMPLE_TARGET);
+                const isCurated = ROUND1_CURATED_CLUE_IDS.has(clue.id);
+                return (
+                  <div
+                    key={clue.id}
+                    className="bg-surface rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <span className="font-semibold text-sm inline-flex items-center gap-1.5">
+                        {clue.name}
+                        <ClueLockBadge clueId={clue.id} size="xs" />
+                      </span>
+                      {isCurated && (
+                        <span
+                          className="text-warn text-sm shrink-0"
+                          title="Curated turn-1 clue"
+                          aria-label="Curated turn-1 clue"
+                        >
+                          ⭐
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted mb-2 leading-relaxed">
+                      {clue.description}
+                    </p>
+                    {clue.legend && <ClueLegend entries={clue.legend} />}
+                    <div className="scale-90 origin-left mt-2">
+                      <GuessRow
+                        guess={guess}
+                        digits={guess.length}
+                        result={result}
+                        hideCurationStar
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       </div>
     </Modal>
