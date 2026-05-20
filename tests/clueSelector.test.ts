@@ -127,8 +127,8 @@ describe("pickTwoClues — regular mode pair-1 curated guarantee", () => {
   it("ROUND1_CURATED_CLUE_IDS contains the user-specified set", () => {
     expect([...ROUND1_CURATED_CLUE_IDS].sort()).toEqual(
       [
-        "digitOverlap",
-        "elimination",
+        "bullseyes",
+        "sumDelta",
         "parityMask",
         "totalDeviation",
         "higherLower",

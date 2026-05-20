@@ -766,24 +766,26 @@ describe("Cold Open (criteria-based: 5-digit + 6-digit prongs)", () => {
   });
   it("fiveDigit fires on a 5-digit win without any starred clue", () => {
     const cr = ach.criteria!.find((c) => c.id === "fiveDigit")!;
+    // "elimination" and "digitOverlap" are NOT in
+    // ROUND1_CURATED_CLUE_IDS after the 2026-05-20 reshuffle.
     const guesses: ResolvedGuessLite[] = [
-      { guess: "11111", clueId: "bullseyes" },
-      { guess: "22222", clueId: "sumDelta" },
+      { guess: "11111", clueId: "elimination" },
+      { guess: "22222", clueId: "digitOverlap" },
     ];
     expect(cr.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(true);
   });
   it("fiveDigit fails if any curated clue was used", () => {
     const cr = ach.criteria!.find((c) => c.id === "fiveDigit")!;
-    // "elimination" is in ROUND1_CURATED_CLUE_IDS.
+    // "thermometer" is in ROUND1_CURATED_CLUE_IDS.
     const guesses: ResolvedGuessLite[] = [
-      { guess: "11111", clueId: "elimination" },
+      { guess: "11111", clueId: "thermometer" },
     ];
     expect(cr.detect(baseCtx({ status: "won", digits: 5, guesses }))).toBe(false);
   });
   it("sixDigit fires on a 6-digit win without any starred clue", () => {
     const cr = ach.criteria!.find((c) => c.id === "sixDigit")!;
     const guesses: ResolvedGuessLite[] = [
-      { guess: "111111", clueId: "bullseyes" },
+      { guess: "111111", clueId: "elimination" },
     ];
     expect(
       cr.detect(
@@ -794,8 +796,8 @@ describe("Cold Open (criteria-based: 5-digit + 6-digit prongs)", () => {
   it("each prong is digit-gated", () => {
     const fiveCr = ach.criteria!.find((c) => c.id === "fiveDigit")!;
     const sixCr = ach.criteria!.find((c) => c.id === "sixDigit")!;
-    const five: ResolvedGuessLite[] = [{ guess: "11111", clueId: "bullseyes" }];
-    const six: ResolvedGuessLite[] = [{ guess: "111111", clueId: "bullseyes" }];
+    const five: ResolvedGuessLite[] = [{ guess: "11111", clueId: "elimination" }];
+    const six: ResolvedGuessLite[] = [{ guess: "111111", clueId: "elimination" }];
     expect(fiveCr.detect(baseCtx({ status: "won", digits: 5, guesses: five }))).toBe(true);
     expect(sixCr.detect(baseCtx({ status: "won", digits: 5, guesses: five }))).toBe(false);
     expect(fiveCr.detect(baseCtx({ status: "won", digits: 6, target: "111111", guesses: six }))).toBe(false);
